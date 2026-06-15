@@ -1,0 +1,85 @@
+import React from 'react';
+import { Link } from 'react-router-dom';
+
+export const Footer: React.FC = () => {
+  const currentYear = new Date().getFullYear();
+
+  const handleScrollTop = () => {
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+  };
+
+  return (
+    <footer className="bg-navy text-white pt-20 pb-10 border-t border-white/5 relative z-10">
+      <div className="max-w-7xl mx-auto px-6 lg:px-8">
+        
+        {/* Footer Top */}
+        <div className="grid grid-cols-1 md:grid-cols-5 gap-12 mb-16">
+          
+          {/* Logo & Tagline column */}
+          <div className="md:col-span-2 flex flex-col gap-6">
+            <Link to="/" onClick={handleScrollTop} className="flex items-center">
+              <img 
+                src="/Logo.png" 
+                alt="BillHouse Logo" 
+                className="h-14 w-auto rounded-lg" 
+              />
+            </Link>
+            <p className="text-text-secondary text-sm leading-relaxed max-w-sm">
+              BillHouse is a modern invoicing SaaS platform designed for freelancers, agencies, and SMEs. Create invoices, automate payment reminders, and secure client cash flows.
+            </p>
+            <span className="text-xs font-bold text-green-mint uppercase tracking-widest">
+              Create. Send. Get Paid.
+            </span>
+          </div>
+
+          {/* Links Column 1 */}
+          <div className="flex flex-col gap-4">
+            <h4 className="text-xs font-bold uppercase tracking-wider text-green">Product</h4>
+            <ul className="flex flex-col gap-2.5 text-sm text-text-secondary">
+              <li><a href="#features" className="hover:text-white transition-colors duration-200">Features</a></li>
+              <li><a href="#benefits" className="hover:text-white transition-colors duration-200">Invoicing</a></li>
+              <li><a href="#pricing" className="hover:text-white transition-colors duration-200">Pricing Tiers</a></li>
+              <li><a href="#" className="hover:text-white transition-colors duration-200">Integrations</a></li>
+            </ul>
+          </div>
+
+          {/* Links Column 2 */}
+          <div className="flex flex-col gap-4">
+            <h4 className="text-xs font-bold uppercase tracking-wider text-green">Resources</h4>
+            <ul className="flex flex-col gap-2.5 text-sm text-text-secondary">
+              <li><a href="#faq" className="hover:text-white transition-colors duration-200">FAQ Help</a></li>
+              <li><a href="#" className="hover:text-white transition-colors duration-200">API Docs</a></li>
+              <li><a href="#" className="hover:text-white transition-colors duration-200">SaaS Guides</a></li>
+              <li><a href="#" className="hover:text-white transition-colors duration-200">Status Check</a></li>
+            </ul>
+          </div>
+
+          {/* Links Column 3 */}
+          <div className="flex flex-col gap-4">
+            <h4 className="text-xs font-bold uppercase tracking-wider text-green">Legal</h4>
+            <ul className="flex flex-col gap-2.5 text-sm text-text-secondary">
+              <li><Link to="/privacy" className="hover:text-white transition-colors duration-200">Privacy Policy</Link></li>
+              <li><Link to="/terms" className="hover:text-white transition-colors duration-200">Terms of Service</Link></li>
+              <li><Link to="/gdpr" className="hover:text-white transition-colors duration-200">GDPR Compliance</Link></li>
+              <li><Link to="/security" className="hover:text-white transition-colors duration-200">Security Audit</Link></li>
+            </ul>
+          </div>
+
+        </div>
+
+        {/* Footer Bottom */}
+        <div className="border-t border-white/5 pt-8 flex flex-col md:flex-row items-center justify-between gap-4 text-xs text-text-secondary font-medium">
+          <p>© {currentYear} BillHouse Technologies Inc. All rights reserved.</p>
+          <div className="flex gap-6">
+            <a href="#" className="hover:text-white transition-colors">Twitter</a>
+            <a href="#" className="hover:text-white transition-colors">GitHub</a>
+            <a href="#" className="hover:text-white transition-colors">LinkedIn</a>
+          </div>
+        </div>
+
+      </div>
+    </footer>
+  );
+};
+
+export default Footer;

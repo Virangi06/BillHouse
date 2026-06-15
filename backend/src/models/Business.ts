@@ -1,0 +1,71 @@
+import mongoose, { Schema, Document } from 'mongoose';
+
+export interface IBusiness extends Document {
+  tenantId: string;
+  name: string;
+  type: 'freelancer' | 'agency' | 'business';
+  email?: string;
+  phone?: string;
+  // Address
+  address?: string;
+  city?: string;
+  state?: string;
+  pincode?: string;
+  country: string;
+  // Tax identifiers
+  gstNumber?: string;
+  panNumber?: string;
+  // Branding
+  logoBase64?: string; // base64-encoded image, stored in DB (zero-cost, no cloud needed)
+  // Invoice config
+  invoicePrefix: string;
+  invoiceNextNumber: number;
+  currency: string;
+  // Bank details (shown on printed invoice)
+  bankName?: string;
+  bankAccount?: string;
+  bankIfsc?: string;
+  bankUpi?: string;
+  // Timestamps
+  createdAt: Date;
+  updatedAt: Date;
+}
+
+const BusinessSchema: Schema = new Schema(
+  {
+    tenantId: { type: String, required: true, unique: true, index: true },
+    name: { type: String, required: true, trim: true },
+    type: {
+      type: String,
+      enum: ['freelancer', 'agency', 'business'],
+      default: 'freelancer'
+    },
+    email: { type: String, trim: true, lowercase: true },
+    phone: { type: String, trim: true },
+    // Address
+    address: { type: String, trim: true },
+    city: { type: String, trim: true },
+    state: { type: String, trim: true },
+    pincode: { type: String, trim: true },
+    country: { type: String, default: 'India' },
+    // Tax
+    gstNumber: { type: String, trim: true, uppercase: true },
+    panNumber: { type: String, trim: true, uppercase: true },
+    // Branding – base64 stored in DB (suitable for MVP, zero cloud cost)
+    logoBase64: { type: String },
+    // Invoice config
+    invoicePrefix: { type: String, default: 'INV', trim: true },
+    invoiceNextNumber: { type: Number, default: 1, min: 1 },
+    currency: { type: String, default: 'INR' },
+    // Bank details
+    bankName: { type: String, trim: true },
+    bankAccount: { type: String, trim: true },
+    bankIfsc: { type: String, trim: true, uppercase: true },
+    bankUpi: { type: String, trim: true }
+  },
+  {
+    timestamps: true
+  }
+);
+
+export default mongoose.model<IBusiness>('Business', BusinessSchema);
