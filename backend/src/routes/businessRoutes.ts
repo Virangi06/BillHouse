@@ -36,10 +36,11 @@ router.post('/', async (req: AuthRequest, res: Response) => {
 
     const {
       name, type, email, phone,
-      address, city, state, pincode, country,
-      gstNumber, panNumber,
-      logoBase64,
-      invoicePrefix, invoiceNextNumber,
+      legalName, website, industry,
+      address, addressLine2, city, state, pincode, country,
+      gstNumber, panNumber, taxRegistrationNumber,
+      logoBase64, bannerBase64,
+      invoicePrefix, invoiceNextNumber, currency, timeZone, invoiceNumberFormat,
       bankName, bankAccount, bankIfsc, bankUpi
     } = req.body;
 
@@ -51,6 +52,10 @@ router.post('/', async (req: AuthRequest, res: Response) => {
     if (logoBase64 && logoBase64.length > 700_000) {
       return res.status(400).json({ error: 'Logo image is too large. Please use an image under 500KB.' });
     }
+    // Validate banner size
+    if (bannerBase64 && bannerBase64.length > 2_000_000) {
+      return res.status(400).json({ error: 'Banner image is too large. Please use an image under 1.5MB.' });
+    }
 
     const business = new Business({
       tenantId,
@@ -58,16 +63,25 @@ router.post('/', async (req: AuthRequest, res: Response) => {
       type: type || 'freelancer',
       email: email?.trim().toLowerCase(),
       phone: phone?.trim(),
+      legalName: legalName?.trim(),
+      website: website?.trim(),
+      industry: industry?.trim(),
       address: address?.trim(),
+      addressLine2: addressLine2?.trim(),
       city: city?.trim(),
       state: state?.trim(),
       pincode: pincode?.trim(),
       country: country || 'India',
       gstNumber: gstNumber?.trim().toUpperCase(),
       panNumber: panNumber?.trim().toUpperCase(),
+      taxRegistrationNumber: taxRegistrationNumber?.trim(),
       logoBase64,
+      bannerBase64,
       invoicePrefix: invoicePrefix?.trim().toUpperCase() || 'INV',
       invoiceNextNumber: Math.max(1, parseInt(invoiceNextNumber) || 1),
+      currency: currency || 'INR',
+      timeZone: timeZone || 'Asia/Kolkata',
+      invoiceNumberFormat: invoiceNumberFormat || '{prefix}-{number}',
       bankName: bankName?.trim(),
       bankAccount: bankAccount?.trim(),
       bankIfsc: bankIfsc?.trim().toUpperCase(),
@@ -100,10 +114,11 @@ router.put('/', async (req: AuthRequest, res: Response) => {
 
     const {
       name, type, email, phone,
-      address, city, state, pincode, country,
-      gstNumber, panNumber,
-      logoBase64,
-      invoicePrefix, invoiceNextNumber,
+      legalName, website, industry,
+      address, addressLine2, city, state, pincode, country,
+      gstNumber, panNumber, taxRegistrationNumber,
+      logoBase64, bannerBase64,
+      invoicePrefix, invoiceNextNumber, currency, timeZone, invoiceNumberFormat,
       bankName, bankAccount, bankIfsc, bankUpi
     } = req.body;
 
@@ -111,21 +126,34 @@ router.put('/', async (req: AuthRequest, res: Response) => {
     if (logoBase64 && logoBase64.length > 700_000) {
       return res.status(400).json({ error: 'Logo image is too large. Please use an image under 500KB.' });
     }
+    // Validate banner size
+    if (bannerBase64 && bannerBase64.length > 2_000_000) {
+      return res.status(400).json({ error: 'Banner image is too large. Please use an image under 1.5MB.' });
+    }
 
     if (name !== undefined) business.name = name.trim();
     if (type !== undefined) business.type = type;
     if (email !== undefined) business.email = email.trim().toLowerCase();
     if (phone !== undefined) business.phone = phone.trim();
+    if (legalName !== undefined) business.legalName = legalName.trim();
+    if (website !== undefined) business.website = website.trim();
+    if (industry !== undefined) business.industry = industry.trim();
     if (address !== undefined) business.address = address.trim();
+    if (addressLine2 !== undefined) business.addressLine2 = addressLine2.trim();
     if (city !== undefined) business.city = city.trim();
     if (state !== undefined) business.state = state.trim();
     if (pincode !== undefined) business.pincode = pincode.trim();
     if (country !== undefined) business.country = country;
     if (gstNumber !== undefined) business.gstNumber = gstNumber.trim().toUpperCase();
     if (panNumber !== undefined) business.panNumber = panNumber.trim().toUpperCase();
+    if (taxRegistrationNumber !== undefined) business.taxRegistrationNumber = taxRegistrationNumber.trim();
     if (logoBase64 !== undefined) business.logoBase64 = logoBase64;
+    if (bannerBase64 !== undefined) business.bannerBase64 = bannerBase64;
     if (invoicePrefix !== undefined) business.invoicePrefix = invoicePrefix.trim().toUpperCase();
     if (invoiceNextNumber !== undefined) business.invoiceNextNumber = Math.max(1, parseInt(invoiceNextNumber) || 1);
+    if (currency !== undefined) business.currency = currency;
+    if (timeZone !== undefined) business.timeZone = timeZone;
+    if (invoiceNumberFormat !== undefined) business.invoiceNumberFormat = invoiceNumberFormat;
     if (bankName !== undefined) business.bankName = bankName.trim();
     if (bankAccount !== undefined) business.bankAccount = bankAccount.trim();
     if (bankIfsc !== undefined) business.bankIfsc = bankIfsc.trim().toUpperCase();

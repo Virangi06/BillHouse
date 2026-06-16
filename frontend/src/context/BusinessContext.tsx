@@ -9,17 +9,30 @@ export interface BusinessProfile {
   type: 'freelancer' | 'agency' | 'business';
   email?: string;
   phone?: string;
+  legalName?: string;
+  website?: string;
+  industry?: string;
+  // Address
   address?: string;
+  addressLine2?: string;
   city?: string;
   state?: string;
   pincode?: string;
   country?: string;
+  // Tax
   gstNumber?: string;
   panNumber?: string;
+  taxRegistrationNumber?: string;
+  // Branding
   logoBase64?: string;
+  bannerBase64?: string;
+  // Invoice config
   invoicePrefix: string;
   invoiceNextNumber: number;
   currency: string;
+  timeZone?: string;
+  invoiceNumberFormat?: string;
+  // Bank details
   bankName?: string;
   bankAccount?: string;
   bankIfsc?: string;

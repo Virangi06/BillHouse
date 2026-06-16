@@ -9,12 +9,14 @@ import InvoiceForm from '../components/invoices/InvoiceForm';
 import InvoiceDetail from '../components/invoices/InvoiceDetail';
 import OnboardingWizard from '../components/onboarding/OnboardingWizard';
 import BusinessSettings from '../components/settings/BusinessSettings';
+import BusinessProfilePage from '../components/profile/BusinessProfilePage';
 import { useBusinessProfile } from '../context/BusinessContext';
 import {
   LayoutDashboard,
   Users,
   FileText,
   Settings,
+  Building2,
   LogOut,
   Search,
   Bell,
@@ -196,7 +198,7 @@ export const DashboardStub: React.FC = () => {
     return () => document.removeEventListener('mousedown', handleClickOutside);
   }, []);
 
-  const handleTabChange = (tab: 'dashboard' | 'clients' | 'invoices' | 'settings') => {
+  const handleTabChange = (tab: 'dashboard' | 'clients' | 'invoices' | 'settings' | 'profile') => {
     setSearchParams({ tab });
     setActiveMenuId(null);
     setSuccessMsg(null);
@@ -379,6 +381,19 @@ export const DashboardStub: React.FC = () => {
             <BarChart3 className="h-5 w-5" />
             Reports
             <span className="text-[9px] bg-white/10 text-white/60 px-1.5 py-0.5 rounded-full ml-auto">Mod 6</span>
+          </button>
+
+          {/* Business Profile tab link */}
+          <button
+            onClick={() => handleTabChange('profile')}
+            className={`w-full flex items-center gap-3 px-4 py-3 rounded-2xl text-sm font-semibold transition-all duration-200 ${
+              activeTab === 'profile'
+                ? 'bg-[#0C4737] text-white shadow-md border-l-4 border-green'
+                : 'text-white/70 hover:text-white hover:bg-white/5'
+            }`}
+          >
+            <Building2 className="h-5 w-5 text-green" />
+            Business Profile
           </button>
 
           {/* Module 7: Settings */}
@@ -1218,6 +1233,8 @@ export const DashboardStub: React.FC = () => {
               </div>
 
             </div>
+          ) : activeTab === 'profile' ? (
+            <BusinessProfilePage />
           ) : activeTab === 'settings' ? (
             <BusinessSettings />
           ) : null}

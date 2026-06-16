@@ -13,7 +13,7 @@ export const Footer: React.FC = () => {
       <div className="max-w-7xl mx-auto px-6 lg:px-8">
         
         {/* Footer Top */}
-        <div className="grid grid-cols-1 md:grid-cols-5 gap-12 mb-16">
+        <div className="grid grid-cols-1 md:grid-cols-4 gap-12 mb-16">
           
           {/* Logo & Tagline column */}
           <div className="md:col-span-2 flex flex-col gap-6">
@@ -32,29 +32,18 @@ export const Footer: React.FC = () => {
             </span>
           </div>
 
-          {/* Links Column 1 */}
+          {/* Links Column 1: Product */}
           <div className="flex flex-col gap-4">
             <h4 className="text-xs font-bold uppercase tracking-wider text-green">Product</h4>
             <ul className="flex flex-col gap-2.5 text-sm text-text-secondary">
               <li><a href="#features" className="hover:text-white transition-colors duration-200">Features</a></li>
               <li><a href="#benefits" className="hover:text-white transition-colors duration-200">Invoicing</a></li>
               <li><a href="#pricing" className="hover:text-white transition-colors duration-200">Pricing Tiers</a></li>
-              <li><a href="#" className="hover:text-white transition-colors duration-200">Integrations</a></li>
-            </ul>
-          </div>
-
-          {/* Links Column 2 */}
-          <div className="flex flex-col gap-4">
-            <h4 className="text-xs font-bold uppercase tracking-wider text-green">Resources</h4>
-            <ul className="flex flex-col gap-2.5 text-sm text-text-secondary">
               <li><a href="#faq" className="hover:text-white transition-colors duration-200">FAQ Help</a></li>
-              <li><a href="#" className="hover:text-white transition-colors duration-200">API Docs</a></li>
-              <li><a href="#" className="hover:text-white transition-colors duration-200">SaaS Guides</a></li>
-              <li><a href="#" className="hover:text-white transition-colors duration-200">Status Check</a></li>
             </ul>
           </div>
 
-          {/* Links Column 3 */}
+          {/* Links Column 2: Legal */}
           <div className="flex flex-col gap-4">
             <h4 className="text-xs font-bold uppercase tracking-wider text-green">Legal</h4>
             <ul className="flex flex-col gap-2.5 text-sm text-text-secondary">
