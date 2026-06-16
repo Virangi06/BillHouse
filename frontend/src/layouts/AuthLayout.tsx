@@ -1,6 +1,7 @@
 import React from 'react';
 import { Link } from 'react-router-dom';
 import { ShieldCheck, ArrowLeft } from 'lucide-react';
+import logo from '../assets/Logo.png';
 
 interface AuthLayoutProps {
   children: React.ReactNode;
@@ -37,7 +38,7 @@ export const AuthLayout: React.FC<AuthLayoutProps> = ({
         <div className="relative z-10 my-auto">
           <Link to="/" className="inline-block mb-6 relative z-10">
             <img 
-              src="/Logo.png" 
+              src={logo} 
               alt="BillHouse Logo" 
               className="h-16 w-auto rounded-lg mix-blend-multiply bg-transparent" 
             />

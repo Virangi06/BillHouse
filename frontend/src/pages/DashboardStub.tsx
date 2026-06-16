@@ -10,6 +10,7 @@ import InvoiceDetail from '../components/invoices/InvoiceDetail';
 import OnboardingWizard from '../components/onboarding/OnboardingWizard';
 import BusinessSettings from '../components/settings/BusinessSettings';
 import BusinessProfilePage from '../components/profile/BusinessProfilePage';
+import logo from '../assets/Logo.png';
 import { useBusinessProfile } from '../context/BusinessContext';
 import {
   LayoutDashboard,
@@ -313,7 +314,7 @@ export const DashboardStub: React.FC = () => {
           <div className="flex items-center gap-3">
             <Link to="/" className="flex items-center gap-3 group">
               <img 
-                src="/Logo.png" 
+                src={logo} 
                 alt="BillHouse Logo" 
                 className="h-10 w-auto rounded-lg mix-blend-multiply bg-transparent shrink-0" 
               />

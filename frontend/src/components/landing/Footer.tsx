@@ -1,5 +1,6 @@
 import React from 'react';
 import { Link } from 'react-router-dom';
+import logo from '../../assets/Logo.png';
 
 export const Footer: React.FC = () => {
   const currentYear = new Date().getFullYear();
@@ -19,7 +20,7 @@ export const Footer: React.FC = () => {
           <div className="md:col-span-2 flex flex-col gap-6">
             <Link to="/" onClick={handleScrollTop} className="flex items-center">
               <img 
-                src="/Logo.png" 
+                src={logo} 
                 alt="BillHouse Logo" 
                 className="h-14 w-auto rounded-lg" 
               />

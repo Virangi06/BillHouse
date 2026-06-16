@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import { Menu, X } from 'lucide-react';
 import { useAuth } from '../../context/AuthContext';
+import logo from '../../assets/Logo.png';
 
 export const Navbar: React.FC = () => {
   const [isOpen, setIsOpen] = useState(false);
@@ -37,7 +38,7 @@ export const Navbar: React.FC = () => {
           <div className="flex items-center justify-start flex-1 min-w-[180px] shrink-0">
             <Link to="/" className="flex items-center group">
               <img
-                src="/Logo.png"
+                src={logo}
                 alt="BillHouse Logo"
                 className="h-8 md:h-9 lg:h-10 w-auto object-contain rounded-lg shadow-sm transition-transform duration-300 group-hover:scale-105"
               />
