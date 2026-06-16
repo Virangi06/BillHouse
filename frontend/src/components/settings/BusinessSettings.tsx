@@ -1,6 +1,6 @@
 import React, { useState, useRef, useEffect } from 'react';
 import API from '../../utils/api';
-import { useBusinessProfile, BusinessProfile } from '../../context/BusinessContext';
+import { useBusinessProfile } from '../../context/BusinessContext';
 import {
   Building2, User, Briefcase, MapPin, Upload, X,
   Save, CheckCircle, AlertCircle, Banknote, FileText,

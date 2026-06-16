@@ -1,12 +1,12 @@
 import React, { useState, useRef } from 'react';
 import API from '../../utils/api';
-import { useBusinessProfile, BusinessProfile } from '../../context/BusinessContext';
+import { useBusinessProfile, type BusinessProfile } from '../../context/BusinessContext';
 import { useAuth } from '../../context/AuthContext';
 import {
-  Building2, User, Briefcase, Phone, Mail,
-  MapPin, FileText, Hash, CreditCard, CheckCircle,
+  Building2, User, Briefcase,
+  MapPin, FileText, CheckCircle,
   ChevronRight, ChevronLeft, Upload, X, Sparkles,
-  Shield, Banknote, BadgePercent, ArrowRight
+  Shield, Banknote
 } from 'lucide-react';
 
 const STEPS = [
@@ -21,8 +21,6 @@ const BUSINESS_TYPES = [
   { value: 'agency', label: 'Agency', icon: Briefcase, desc: 'Small team, 2-20 people' },
   { value: 'business', label: 'Business', icon: Building2, desc: 'Company / organization' },
 ];
-
-const GST_RATES = ['0', '5', '12', '18', '28'];
 
 interface FormData {
   // Step 1
