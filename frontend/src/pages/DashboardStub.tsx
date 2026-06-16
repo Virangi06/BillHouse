@@ -316,7 +316,7 @@ export const DashboardStub: React.FC = () => {
               <img 
                 src={logo} 
                 alt="BillHouse Logo" 
-                className="h-10 w-auto rounded-lg mix-blend-multiply bg-transparent shrink-0" 
+                className="h-12 w-auto rounded-lg mix-blend-multiply bg-transparent shrink-0" 
               />
               <span className="text-xl font-bold tracking-tight text-white select-none">BillHouse</span>
             </Link>

@@ -40,7 +40,7 @@ export const Navbar: React.FC = () => {
               <img
                 src={logo}
                 alt="BillHouse Logo"
-                className="h-8 md:h-9 lg:h-10 w-auto object-contain rounded-lg shadow-sm transition-transform duration-300 group-hover:scale-105"
+                className="h-10 md:h-12 lg:h-14 w-auto object-contain rounded-lg shadow-sm transition-transform duration-300 group-hover:scale-105"
               />
             </Link>
           </div>

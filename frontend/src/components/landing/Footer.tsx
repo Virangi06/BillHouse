@@ -22,7 +22,7 @@ export const Footer: React.FC = () => {
               <img 
                 src={logo} 
                 alt="BillHouse Logo" 
-                className="h-14 w-auto rounded-lg" 
+                className="h-18 w-auto rounded-lg" 
               />
             </Link>
             <p className="text-text-secondary text-sm leading-relaxed max-w-sm">
