@@ -303,6 +303,19 @@ export const DashboardStub: React.FC = () => {
   const sparkPaid = stats?.sparklinePaid || [{ v: 0 }, { v: 0 }, { v: 0 }, { v: 0 }, { v: 0 }, { v: 0 }];
   const sparkOverdue = stats?.sparklineOverdue || [{ v: 0 }, { v: 0 }, { v: 0 }, { v: 0 }, { v: 0 }, { v: 0 }];
 
+  if (isLoadingBusiness) {
+    return (
+      <div className="min-h-screen flex flex-col gap-4 justify-center items-center bg-[#F8FAFC]">
+        <div className="w-10 h-10 border-4 border-green/20 border-t-green rounded-full animate-spin"></div>
+        <span className="text-xs font-bold text-text-secondary animate-pulse">Loading business profile...</span>
+      </div>
+    );
+  }
+
+  if (!hasCompletedOnboarding) {
+    return <OnboardingWizard />;
+  }
+
   return (
     <div className="min-h-screen bg-[#F8FAFC] flex font-sans text-navy">
       
@@ -1399,9 +1412,6 @@ export const DashboardStub: React.FC = () => {
           </div>
         </div>
       )}
-
-      {/* Onboarding Wizard Overlay */}
-      {!hasCompletedOnboarding && !isLoadingBusiness && <OnboardingWizard />}
 
     </div>
   );

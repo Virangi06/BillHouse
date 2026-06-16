@@ -132,12 +132,10 @@ const OnboardingWizard: React.FC = () => {
     setErrorMsg(null);
   };
 
-  const handleSkip = async () => {
-    await handleSave(true);
-  };
 
-  const handleSave = async (isSkip = false) => {
-    if (!isSkip && !validateStep()) return;
+
+  const handleSave = async () => {
+    if (!validateStep()) return;
     setSaving(true);
     setErrorMsg(null);
     try {
@@ -494,15 +492,6 @@ const OnboardingWizard: React.FC = () => {
           </button>
 
           <div className="flex items-center gap-3">
-            {/* Skip button */}
-            <button
-              onClick={handleSkip}
-              disabled={saving}
-              className="text-xs text-text-secondary hover:text-navy font-bold px-3 py-2 rounded-xl hover:bg-navy/5 transition-all"
-            >
-              {saving ? 'Saving...' : 'Skip for now'}
-            </button>
-
             {/* Next / Finish */}
             {currentStep < 4 ? (
               <button
@@ -516,7 +505,7 @@ const OnboardingWizard: React.FC = () => {
             ) : (
               <button
                 id="ob-save-btn"
-                onClick={() => handleSave(false)}
+                onClick={handleSave}
                 disabled={saving}
                 className="flex items-center gap-2 bg-green text-white px-6 py-2.5 rounded-xl text-sm font-extrabold hover:bg-green/90 transition-all shadow-sm disabled:opacity-60"
               >
