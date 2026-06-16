@@ -36,7 +36,8 @@ import {
   X,
   BarChart3,
   UserPlus,
-  Eye
+  Eye,
+  Menu
 } from 'lucide-react';
 import {
   AreaChart,
@@ -109,6 +110,7 @@ export const DashboardStub: React.FC = () => {
   const [searchParams, setSearchParams] = useSearchParams();
   const activeTab = searchParams.get('tab') || 'dashboard';
   const action = searchParams.get('action');
+  const [isMobileSidebarOpen, setIsMobileSidebarOpen] = useState<boolean>(false);
 
   // Date range utility
   const getCurrentMonthRange = () => {
@@ -204,6 +206,7 @@ export const DashboardStub: React.FC = () => {
     setActiveMenuId(null);
     setSuccessMsg(null);
     setErrorMsg(null);
+    setIsMobileSidebarOpen(false);
   };
 
   // Client modal handlers
@@ -319,24 +322,36 @@ export const DashboardStub: React.FC = () => {
   return (
     <div className="min-h-screen bg-[#F8FAFC] flex font-sans text-navy">
       
+      {/* Sidebar Mobile Backdrop */}
+      {isMobileSidebarOpen && (
+        <div 
+          className="fixed inset-0 bg-[#061B2D]/60 backdrop-blur-sm z-30 lg:hidden"
+          onClick={() => setIsMobileSidebarOpen(false)}
+        />
+      )}
+
       {/* 1. LEFT SIDEBAR - Zero Trust design */}
-      <aside className="w-64 bg-[#061B2D] text-white flex flex-col justify-between shrink-0 relative z-20 transition-all duration-300">
+      <aside className={`fixed inset-y-0 left-0 w-64 bg-white border-r border-navy/5 text-navy flex flex-col justify-between shrink-0 z-40 transition-transform duration-300 transform lg:relative lg:translate-x-0 ${
+        isMobileSidebarOpen ? 'translate-x-0' : '-translate-x-full'
+      }`}>
         
         {/* Top Branding Logo area */}
-        <div className="p-6 flex flex-col gap-1 border-b border-white/5">
-          <div className="flex items-center gap-3">
-            <Link to="/" className="flex items-center gap-3 group">
-              <img 
-                src={logo} 
-                alt="BillHouse Logo" 
-                className="h-12 w-auto rounded-lg mix-blend-multiply bg-transparent shrink-0" 
-              />
-              <span className="text-xl font-bold tracking-tight text-white select-none">BillHouse</span>
-            </Link>
-          </div>
-          <span className="text-[10px] font-bold text-green-mint uppercase tracking-widest pl-1 mt-1">
-            Create. Send. Get Paid.
-          </span>
+        <div className="py-4 px-6 border-b border-navy/5 flex items-center justify-between lg:justify-center shrink-0">
+          <Link to="/" className="flex items-center justify-center">
+            <img 
+              src={logo} 
+              alt="BillHouse Logo" 
+              className="h-8 sm:h-9 lg:h-11 w-auto object-contain shrink-0" 
+            />
+          </Link>
+          <button 
+            type="button"
+            onClick={() => setIsMobileSidebarOpen(false)}
+            className="p-1.5 hover:bg-navy/5 rounded-xl text-navy/70 hover:text-navy lg:hidden"
+            aria-label="Close sidebar"
+          >
+            <X className="h-5 w-5" />
+          </button>
         </div>
 
         {/* Navigation Lists - Aligned to core MVP modules in project plan */}
@@ -348,7 +363,7 @@ export const DashboardStub: React.FC = () => {
             className={`w-full flex items-center gap-3 px-4 py-3 rounded-2xl text-sm font-semibold transition-all duration-200 ${
               activeTab === 'dashboard'
                 ? 'bg-[#0C4737] text-white shadow-md border-l-4 border-green'
-                : 'text-white/70 hover:text-white hover:bg-white/5'
+                : 'text-navy/70 hover:text-navy hover:bg-navy/5'
             }`}
           >
             <LayoutDashboard className="h-5 w-5 text-green" />
@@ -361,7 +376,7 @@ export const DashboardStub: React.FC = () => {
             className={`w-full flex items-center gap-3 px-4 py-3 rounded-2xl text-sm font-semibold transition-all duration-200 ${
               activeTab === 'invoices'
                 ? 'bg-[#0C4737] text-white shadow-md border-l-4 border-green'
-                : 'text-white/70 hover:text-white hover:bg-white/5'
+                : 'text-navy/70 hover:text-navy hover:bg-navy/5'
             }`}
           >
             <FileText className="h-5 w-5 text-green" />
@@ -374,7 +389,7 @@ export const DashboardStub: React.FC = () => {
             className={`w-full flex items-center gap-3 px-4 py-3 rounded-2xl text-sm font-semibold transition-all duration-200 ${
               activeTab === 'clients'
                 ? 'bg-[#0C4737] text-white shadow-md border-l-4 border-green'
-                : 'text-white/70 hover:text-white hover:bg-white/5'
+                : 'text-navy/70 hover:text-navy hover:bg-navy/5'
             }`}
           >
             <Users className="h-5 w-5 text-green" />
@@ -388,13 +403,13 @@ export const DashboardStub: React.FC = () => {
 
           {/* Module 6: Reports & Analytics */}
           <button
-            className="w-full flex items-center gap-3 px-4 py-3 rounded-2xl text-sm font-semibold text-white/50 hover:text-white hover:bg-white/5 cursor-not-allowed opacity-50"
+            className="w-full flex items-center gap-3 px-4 py-3 rounded-2xl text-sm font-semibold text-navy/40 hover:bg-navy/5 cursor-not-allowed opacity-50"
             title="Reports Module (Module 6)"
             disabled
           >
-            <BarChart3 className="h-5 w-5" />
+            <BarChart3 className="h-5 w-5 text-navy/30" />
             Reports
-            <span className="text-[9px] bg-white/10 text-white/60 px-1.5 py-0.5 rounded-full ml-auto">Mod 6</span>
+            <span className="text-[9px] bg-navy/5 text-navy/60 px-1.5 py-0.5 rounded-full ml-auto font-bold">Mod 6</span>
           </button>
 
           {/* Business Profile tab link */}
@@ -403,7 +418,7 @@ export const DashboardStub: React.FC = () => {
             className={`w-full flex items-center gap-3 px-4 py-3 rounded-2xl text-sm font-semibold transition-all duration-200 ${
               activeTab === 'profile'
                 ? 'bg-[#0C4737] text-white shadow-md border-l-4 border-green'
-                : 'text-white/70 hover:text-white hover:bg-white/5'
+                : 'text-navy/70 hover:text-navy hover:bg-navy/5'
             }`}
           >
             <Building2 className="h-5 w-5 text-green" />
@@ -416,7 +431,7 @@ export const DashboardStub: React.FC = () => {
             className={`w-full flex items-center gap-3 px-4 py-3 rounded-2xl text-sm font-semibold transition-all duration-200 ${
               activeTab === 'settings'
                 ? 'bg-[#0C4737] text-white shadow-md border-l-4 border-green'
-                : 'text-white/70 hover:text-white hover:bg-white/5'
+                : 'text-navy/70 hover:text-navy hover:bg-navy/5'
             }`}
           >
             <Settings className="h-5 w-5 text-green" />
@@ -426,27 +441,27 @@ export const DashboardStub: React.FC = () => {
 
         {/* Pro Upgrades Info */}
         <div className="p-4">
-          <div className="p-4 bg-gradient-to-br from-[#0F1E2E] to-[#0A2923] border border-green/20 rounded-2xl flex flex-col gap-3">
-            <div className="flex items-center gap-2 text-green">
+          <div className="p-4 bg-gradient-to-br from-[#F8FAFC] to-green/5 border border-green/15 rounded-2xl flex flex-col gap-3">
+            <div className="flex items-center gap-2 text-green-dark">
               <span className="text-yellow-500 text-sm">👑</span>
-              <span className="text-xs font-bold uppercase tracking-wider text-green-mint">Upgrade to Pro</span>
+              <span className="text-xs font-bold uppercase tracking-wider text-[#0C4737]">Upgrade to Pro</span>
             </div>
-            <p className="text-[11px] text-white/70 leading-relaxed">
+            <p className="text-[11px] text-text-secondary leading-relaxed">
               Unlock advanced features like recurring invoices, custom branding & reminders.
             </p>
-            <button className="w-full py-2 bg-green hover:bg-[#257362] text-white transition-all rounded-xl text-xs font-bold shadow-sm">
+            <button className="w-full py-2 bg-[#0C4737] hover:bg-[#0A3B2F] text-white transition-all rounded-xl text-xs font-bold shadow-sm">
               Upgrade Now
             </button>
           </div>
         </div>
 
         {/* Footer info collapse */}
-        <div className="p-4 border-t border-white/5 flex items-center justify-between text-xs text-white/70">
-          <div className="flex items-center gap-2 hover:text-white cursor-pointer select-none">
+        <div className="p-4 border-t border-navy/5 flex items-center justify-between text-xs text-navy/70">
+          <div className="flex items-center gap-2 hover:text-navy cursor-pointer select-none">
             <span>◀</span>
             <span className="font-semibold">Collapse</span>
           </div>
-          <span className="text-[9px] bg-white/10 px-1.5 py-0.5 rounded text-white/50">M1 & M2 Active</span>
+          <span className="text-[9px] bg-navy/5 px-1.5 py-0.5 rounded text-navy/50 font-bold">M1 & M2 Active</span>
         </div>
       </aside>
 
@@ -456,14 +471,24 @@ export const DashboardStub: React.FC = () => {
         {/* Top Header Navigation panel */}
         <header className="bg-white border-b border-navy/5 py-4 px-8 flex flex-col sm:flex-row gap-4 items-center justify-between shadow-sm shrink-0 sticky top-0 z-10">
           
-          {/* Welcome Greeting context */}
-          <div className="flex flex-col text-center sm:text-left">
-            <h1 className="text-2xl font-extrabold text-navy tracking-tight">
-              Welcome back, {user?.name?.split(' ')[0] || 'Alex'}! 👋
-            </h1>
-            <p className="text-xs text-text-secondary font-semibold mt-0.5">
-              Here's what's happening with your business today.
-            </p>
+          {/* Welcome Greeting context with responsive hamburger toggler */}
+          <div className="flex items-center gap-3 w-full sm:w-auto">
+            <button 
+              type="button"
+              onClick={() => setIsMobileSidebarOpen(true)}
+              className="p-2 -ml-2 hover:bg-navy/5 rounded-xl text-navy lg:hidden focus:outline-none shrink-0"
+              aria-label="Open sidebar"
+            >
+              <Menu className="h-6 w-6 text-navy" />
+            </button>
+            <div className="flex flex-col text-left">
+              <h1 className="text-xl sm:text-2xl font-extrabold text-navy tracking-tight">
+                Welcome back, {user?.name?.split(' ')[0] || 'Alex'}! 👋
+              </h1>
+              <p className="text-[11px] sm:text-xs text-text-secondary font-semibold mt-0.5">
+                Here's what's happening with your business today.
+              </p>
+            </div>
           </div>
 
           {/* Quick Actions Search, Profile, Notification */}
