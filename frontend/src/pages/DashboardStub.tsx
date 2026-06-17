@@ -646,30 +646,17 @@ export const DashboardStub: React.FC = () => {
             <span className="text-[9px] bg-green/10 text-green px-1.5 py-0.5 rounded-full ml-auto font-bold">Pro</span>
           </button>
 
-          {/* Business Profile tab link */}
-          <button
-            onClick={() => handleTabChange('profile')}
-            className={`w-full flex items-center gap-3 px-4 py-3 rounded-2xl text-sm font-semibold transition-all duration-200 ${
-              activeTab === 'profile'
-                ? 'bg-green/10 text-green-dark border-l-4 border-green font-bold shadow-sm'
-                : 'text-navy/70 hover:text-navy hover:bg-navy/5'
-            }`}
-          >
-            <Building2 className="h-5 w-5 text-green" />
-            Business Profile
-          </button>
-
-          {/* Module 7: Settings */}
+          {/* Business Settings */}
           <button
             onClick={() => handleTabChange('settings')}
             className={`w-full flex items-center gap-3 px-4 py-3 rounded-2xl text-sm font-semibold transition-all duration-200 ${
-              activeTab === 'settings'
+              activeTab === 'settings' || activeTab === 'profile'
                 ? 'bg-green/10 text-green-dark border-l-4 border-green font-bold shadow-sm'
                 : 'text-navy/70 hover:text-navy hover:bg-navy/5'
             }`}
           >
             <Settings className="h-5 w-5 text-green" />
-            Settings
+            Business Settings
           </button>
         </nav>
 
@@ -1935,9 +1922,7 @@ export const DashboardStub: React.FC = () => {
                 </>
               )}
             </div>
-          ) : activeTab === 'profile' ? (
-            <BusinessProfilePage />
-          ) : activeTab === 'settings' ? (
+          ) : activeTab === 'settings' || activeTab === 'profile' ? (
             <BusinessSettings />
           ) : null}
 
