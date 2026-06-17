@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import { Menu, X } from 'lucide-react';
 import { useAuth } from '../../context/AuthContext';
-import logo from '../../assets/Logo.png';
+import logo from '../../assets/Logo_transparent.png';
 
 export const Navbar: React.FC = () => {
   const [isOpen, setIsOpen] = useState(false);
@@ -40,7 +40,7 @@ export const Navbar: React.FC = () => {
               <img
                 src={logo}
                 alt="BillHouse Logo"
-                className="h-10 md:h-12 lg:h-14 w-auto object-contain rounded-lg shadow-sm transition-transform duration-300 group-hover:scale-105"
+                className="h-10 md:h-12 lg:h-14 w-auto object-contain transition-transform duration-300 group-hover:scale-105"
               />
             </Link>
           </div>

@@ -1,7 +1,7 @@
 import React from 'react';
 import { Link } from 'react-router-dom';
 import { ShieldCheck, ArrowLeft } from 'lucide-react';
-import logo from '../assets/Logo.png';
+import logo from '../assets/Logo_white.png';
 
 interface AuthLayoutProps {
   children: React.ReactNode;
@@ -40,7 +40,7 @@ export const AuthLayout: React.FC<AuthLayoutProps> = ({
             <img 
               src={logo} 
               alt="BillHouse Logo" 
-              className="h-24 w-auto rounded-lg mix-blend-multiply bg-transparent" 
+              className="h-24 w-auto object-contain" 
             />
           </Link>
           <h2 className="text-4xl md:text-5xl font-extrabold leading-tight mb-4">

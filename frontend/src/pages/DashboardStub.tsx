@@ -10,7 +10,7 @@ import InvoiceDetail from '../components/invoices/InvoiceDetail';
 import OnboardingWizard from '../components/onboarding/OnboardingWizard';
 import BusinessSettings from '../components/settings/BusinessSettings';
 import BusinessProfilePage from '../components/profile/BusinessProfilePage';
-import logo from '../assets/Logo.png';
+import logo from '../assets/Logo_transparent.png';
 import { useBusinessProfile } from '../context/BusinessContext';
 import {
   LayoutDashboard,
