@@ -25,9 +25,14 @@ router.get('/', async (req: AuthRequest, res: Response) => {
     }
 
     const { tenantId } = req.user;
-    const { sortBy, country } = req.query;
+    const { sortBy, country, archived } = req.query;
 
     const query: any = { tenantId };
+    if (archived === 'true') {
+      query.isArchived = true;
+    } else {
+      query.isArchived = { $ne: true };
+    }
     if (country && typeof country === 'string' && country !== 'All') {
       query.country = country;
     }
@@ -52,10 +57,15 @@ router.get('/with-financials', async (req: AuthRequest, res: Response) => {
     }
 
     const { tenantId } = req.user;
-    const { sortBy, country } = req.query;
+    const { sortBy, country, archived } = req.query;
 
     // MongoDB aggregation: join clients with their invoices and compute totals
     const matchStage: any = { tenantId };
+    if (archived === 'true') {
+      matchStage.isArchived = true;
+    } else {
+      matchStage.isArchived = { $ne: true };
+    }
     if (country && typeof country === 'string' && country !== 'All') {
       matchStage.country = country;
     }
@@ -232,7 +242,7 @@ router.put('/:id', async (req: AuthRequest, res: Response) => {
 
     const { id } = req.params;
     const { tenantId } = req.user;
-    const { name, companyName, email, phone, address, country, taxId, gstNumber, notes } = req.body;
+    const { name, companyName, email, phone, address, country, taxId, gstNumber, notes, isArchived } = req.body;
 
     const access = await verifyTenantAccess(id, tenantId);
     if ('error' in access) {
@@ -249,6 +259,7 @@ router.put('/:id', async (req: AuthRequest, res: Response) => {
     if (taxId !== undefined) client.taxId = taxId;
     if (gstNumber !== undefined) client.gstNumber = gstNumber ? gstNumber.toUpperCase() : '';
     if (notes !== undefined) client.notes = notes;
+    if (isArchived !== undefined) client.isArchived = isArchived;
 
     await client.save();
 
@@ -277,10 +288,12 @@ router.delete('/:id', async (req: AuthRequest, res: Response) => {
       return res.status(access.status || 500).json({ error: access.error });
     }
 
-    // Delete the client document
-    await Client.findByIdAndDelete(id);
+    // Soft-delete: set isArchived to true
+    const { client } = access;
+    client.isArchived = true;
+    await client.save();
 
-    return res.status(200).json({ message: 'Client deleted successfully' });
+    return res.status(200).json({ message: 'Client archived successfully' });
   } catch (error) {
     console.error('❌ Delete client error:', error);
     return res.status(500).json({ error: 'Server error deleting client record' });

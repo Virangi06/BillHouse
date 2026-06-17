@@ -34,6 +34,8 @@ import {
   MoreHorizontal,
   Edit2,
   Trash2,
+  Archive,
+  RotateCcw,
   X,
   BarChart3,
   UserPlus,
@@ -165,6 +167,7 @@ export const DashboardStub: React.FC = () => {
   // Client list sort/filter
   const [clientSortBy, setClientSortBy] = useState<'name' | 'date' | 'outstanding'>('name');
   const [clientCountryFilter, setClientCountryFilter] = useState<string>('All');
+  const [clientStatusFilter, setClientStatusFilter] = useState<'active' | 'archived'>('active');
 
   // Profile Dropdown and row menus Refs
   const [isProfileDropdownOpen, setIsProfileDropdownOpen] = useState<boolean>(false);
@@ -260,6 +263,7 @@ export const DashboardStub: React.FC = () => {
       const params: any = {};
       if (clientSortBy !== 'name') params.sortBy = clientSortBy;
       if (clientCountryFilter !== 'All') params.country = clientCountryFilter;
+      if (clientStatusFilter === 'archived') params.archived = 'true';
       const response = await API.get<ClientData[]>('/clients/with-financials', { params });
       setClients(response.data);
     } catch (err: any) {
@@ -273,7 +277,7 @@ export const DashboardStub: React.FC = () => {
   useEffect(() => {
     fetchClients();
     fetchDashboardStats();
-  }, [activeTab, clientSortBy, clientCountryFilter]);
+  }, [activeTab, clientSortBy, clientCountryFilter, clientStatusFilter]);
 
   // Handle click outside hooks
   useEffect(() => {
@@ -381,15 +385,30 @@ export const DashboardStub: React.FC = () => {
     setSuccessMsg(null);
     try {
       await API.delete(`/clients/${isDeletingClient._id}`);
-      setSuccessMsg('Client deleted successfully');
+      setSuccessMsg('Client archived successfully');
       setClients(prev => prev.filter(c => c._id !== isDeletingClient._id));
-      addNotification('client', 'Client Deleted', `${isDeletingClient.name} was removed from the database.`);
+      addNotification('client', 'Client Archived', `${isDeletingClient.name} was archived to preserve invoice history.`);
       setIsDeletingClient(null);
       setActiveMenuId(null);
       fetchDashboardStats(); // Refresh stats counters
     } catch (err: any) {
       console.error(err);
       setErrorMsg(err.response?.data?.error || 'Error deleting client record');
+    }
+  };
+
+  const handleReactivateClient = async (client: ClientData) => {
+    setErrorMsg(null);
+    setSuccessMsg(null);
+    try {
+      await API.put(`/clients/${client._id}`, { isArchived: false });
+      setSuccessMsg('Client reactivated successfully');
+      setClients(prev => prev.filter(c => c._id !== client._id));
+      addNotification('client', 'Client Reactivated', `${client.name} is now active.`);
+      fetchDashboardStats(); // Refresh stats counters
+    } catch (err: any) {
+      console.error(err);
+      setErrorMsg(err.response?.data?.error || 'Error reactivating client');
     }
   };
 
@@ -1765,6 +1784,18 @@ export const DashboardStub: React.FC = () => {
                           <option value="Others">Others</option>
                         </select>
                       </div>
+
+                      <div className="flex items-center gap-1.5">
+                        <span className="text-[10px] font-extrabold uppercase tracking-wider text-text-secondary whitespace-nowrap">Status:</span>
+                        <select
+                          value={clientStatusFilter}
+                          onChange={(e) => { setClientStatusFilter(e.target.value as any); }}
+                          className="px-3 py-2.5 text-xs rounded-xl border border-navy/10 bg-white text-navy focus:outline-none focus:border-green transition-all font-semibold cursor-pointer"
+                        >
+                          <option value="active">Active Profiles</option>
+                          <option value="archived">Archived (History)</option>
+                        </select>
+                      </div>
                     </div>
                   </div>
 
@@ -1822,7 +1853,14 @@ export const DashboardStub: React.FC = () => {
                                       {client.name.split(' ').map((w: string) => w[0]).join('').toUpperCase().slice(0, 2)}
                                     </div>
                                     <div className="flex flex-col gap-0.5 min-w-0">
-                                      <span className="font-extrabold text-sm truncate">{client.name}</span>
+                                      <div className="flex items-center gap-2">
+                                        <span className="font-extrabold text-sm truncate">{client.name}</span>
+                                        {client.isArchived && (
+                                          <span className="px-1.5 py-0.5 bg-slate-100 border border-slate-200 text-slate-500 rounded-md text-[9px] font-extrabold uppercase tracking-wider select-none">
+                                            Archived
+                                          </span>
+                                        )}
+                                      </div>
                                       {client.companyName && (
                                         <span className="text-[10px] font-semibold text-green-dark truncate">{client.companyName}</span>
                                       )}
@@ -1859,20 +1897,32 @@ export const DashboardStub: React.FC = () => {
                                     >
                                       <Eye className="h-4.5 w-4.5" />
                                     </button>
-                                    <button
-                                      onClick={() => openEditClientModal(client)}
-                                      title="Edit Client"
-                                      className="p-1.5 hover:bg-navy/5 rounded-lg text-text-secondary hover:text-navy transition-all"
-                                    >
-                                      <Edit2 className="h-4.5 w-4.5" />
-                                    </button>
-                                    <button
-                                      onClick={() => setIsDeletingClient(client)}
-                                      title="Delete Client"
-                                      className="p-1.5 hover:bg-red-500/10 rounded-lg text-text-secondary hover:text-red-600 transition-all"
-                                    >
-                                      <Trash2 className="h-4.5 w-4.5" />
-                                    </button>
+                                    {!client.isArchived ? (
+                                      <>
+                                        <button
+                                          onClick={() => openEditClientModal(client)}
+                                          title="Edit Client"
+                                          className="p-1.5 hover:bg-navy/5 rounded-lg text-text-secondary hover:text-navy transition-all"
+                                        >
+                                          <Edit2 className="h-4.5 w-4.5" />
+                                        </button>
+                                        <button
+                                          onClick={() => setIsDeletingClient(client)}
+                                          title="Archive Client"
+                                          className="p-1.5 hover:bg-amber-500/10 rounded-lg text-text-secondary hover:text-amber-600 transition-all"
+                                        >
+                                          <Archive className="h-4.5 w-4.5" />
+                                        </button>
+                                      </>
+                                    ) : (
+                                      <button
+                                        onClick={() => handleReactivateClient(client)}
+                                        title="Reactivate Client"
+                                        className="p-1.5 hover:bg-green/10 rounded-lg text-text-secondary hover:text-green-dark transition-all"
+                                      >
+                                        <RotateCcw className="h-4.5 w-4.5" />
+                                      </button>
+                                    )}
                                   </div>
                                 </td>
                               </tr>
@@ -2075,15 +2125,15 @@ export const DashboardStub: React.FC = () => {
         <div className="fixed inset-0 bg-[#06121E]/60 backdrop-blur-sm z-50 flex items-center justify-center p-4">
           <div className="w-full max-w-md bg-white rounded-3xl border border-navy/5 shadow-2xl p-6 flex flex-col gap-5 text-center">
             
-            <div className="p-4 bg-red-500/10 text-red-500 rounded-full mx-auto w-16 h-16 flex items-center justify-center">
-              <Trash2 className="h-7 w-7" />
+            <div className="p-4 bg-amber-500/10 text-amber-600 rounded-full mx-auto w-16 h-16 flex items-center justify-center">
+              <Archive className="h-7 w-7" />
             </div>
 
             <div>
-              <h3 className="text-base font-extrabold text-navy">Confirm Client Deletion</h3>
+              <h3 className="text-base font-extrabold text-navy">Archive Client Profile</h3>
               <p className="text-xs text-text-secondary font-semibold mt-2 leading-relaxed">
-                Are you sure you want to permanently delete client <strong>{isDeletingClient.name}</strong>? 
-                This action is irreversible and will erase their billing information and records.
+                Are you sure you want to archive client <strong>{isDeletingClient.name}</strong>? 
+                This will deactivate them and hide them from active lists, but all historical invoices and billing records will be kept.
               </p>
             </div>
 
@@ -2093,14 +2143,14 @@ export const DashboardStub: React.FC = () => {
                 onClick={() => setIsDeletingClient(null)}
                 className="py-2.5 px-4 text-xs font-bold border-navy/10 text-navy hover:bg-navy/5"
               >
-                No, Keep Record
+                No, Keep Active
               </Button>
               <Button
                 variant="primary"
                 onClick={handleDeleteClient}
-                className="py-2.5 px-5 text-xs font-bold bg-red-500 hover:bg-red-600 border-red-500 text-white shadow-sm"
+                className="py-2.5 px-5 text-xs font-bold bg-amber-600 hover:bg-amber-700 border-amber-600 text-white shadow-sm"
               >
-                Yes, Delete Client
+                Yes, Archive Client
               </Button>
             </div>
 

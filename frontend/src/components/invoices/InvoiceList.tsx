@@ -253,9 +253,22 @@ export const InvoiceList: React.FC<InvoiceListProps> = ({ onAddNotification }) =
       </div>
 
       {/* Control panel: search, sort, filters */}
-      <div className="flex flex-col lg:flex-row gap-4 justify-between items-stretch lg:items-center">
+      <div className="flex flex-col md:flex-row gap-4 justify-between items-stretch md:items-center">
+        {/* Search bar */}
+        <div className="relative max-w-md w-full">
+          <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 h-4 w-4 text-text-secondary" />
+          <input
+            id="invoice-search"
+            type="text"
+            placeholder="Search invoice number or client name..."
+            value={searchQuery}
+            onChange={(e) => setSearchQuery(e.target.value)}
+            className="w-full pl-10 pr-4 py-2.5 text-xs rounded-xl border border-navy/10 bg-white text-navy focus:outline-none focus:border-green focus:ring-1 focus:ring-green transition-all font-semibold"
+          />
+        </div>
+
         {/* Status filtering tags */}
-        <div className="flex flex-wrap gap-2">
+        <div className="flex flex-wrap gap-2 justify-start md:justify-end">
           {['All', 'Draft', 'Sent', 'Paid', 'Overdue', 'Cancelled'].map((status) => (
             <button
               key={status}
@@ -270,19 +283,6 @@ export const InvoiceList: React.FC<InvoiceListProps> = ({ onAddNotification }) =
               {status}
             </button>
           ))}
-        </div>
-
-        {/* Search bar */}
-        <div className="relative max-w-md w-full">
-          <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 h-4 w-4 text-text-secondary" />
-          <input
-            id="invoice-search"
-            type="text"
-            placeholder="Search invoice number or client name..."
-            value={searchQuery}
-            onChange={(e) => setSearchQuery(e.target.value)}
-            className="w-full pl-10 pr-4 py-2.5 text-xs rounded-xl border border-navy/10 bg-white text-navy focus:outline-none focus:border-green focus:ring-1 focus:ring-green transition-all font-semibold"
-          />
         </div>
       </div>
 

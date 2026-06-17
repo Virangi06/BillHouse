@@ -12,6 +12,7 @@ export interface IClient extends Document {
   notes?: string;         // Internal notes / special instructions
   tenantId: string;       // The tenant space partition ID
   createdBy: mongoose.Types.ObjectId; // The user who created this client record
+  isArchived?: boolean;   // Soft-delete/archive flag
   createdAt: Date;
   updatedAt: Date;
 }
@@ -33,7 +34,8 @@ const ClientSchema: Schema = new Schema(
     gstNumber: { type: String, trim: true, uppercase: true },
     notes: { type: String, trim: true },
     tenantId: { type: String, required: true, index: true },
-    createdBy: { type: Schema.Types.ObjectId, ref: 'User', required: true }
+    createdBy: { type: Schema.Types.ObjectId, ref: 'User', required: true },
+    isArchived: { type: Boolean, default: false, index: true }
   },
   {
     timestamps: true

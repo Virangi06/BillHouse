@@ -134,6 +134,26 @@ export const InvoiceForm: React.FC<InvoiceFormProps> = ({ onAddNotification }) =
     }
   }, [action, invoiceId]);
 
+  // Load specific client if it's referenced but missing from active clients (e.g. if archived)
+  useEffect(() => {
+    const checkAndFetchSelectedClient = async () => {
+      if (selectedClientId && clients.length > 0 && !clients.some(c => c._id === selectedClientId)) {
+        try {
+          const res = await API.get<Client>(`/clients/${selectedClientId}`);
+          if (res.data) {
+            setClients(prev => {
+              if (prev.some(c => c._id === res.data._id)) return prev;
+              return [...prev, res.data];
+            });
+          }
+        } catch (err) {
+          console.warn('Failed to fetch selected client', err);
+        }
+      }
+    };
+    checkAndFetchSelectedClient();
+  }, [selectedClientId, clients]);
+
   // Recalculate individual item amounts when quantity or rate changes
   const handleItemChange = (index: number, field: keyof LineItem, value: any) => {
     const updatedItems = [...items];
