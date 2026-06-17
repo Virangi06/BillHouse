@@ -2,6 +2,8 @@ import express from 'express';
 import mongoose from 'mongoose';
 import cors from 'cors';
 import dotenv from 'dotenv';
+import path from 'path';
+import fs from 'fs';
 import authRoutes from './routes/authRoutes';
 import clientRoutes from './routes/clientRoutes';
 import dashboardRoutes from './routes/dashboardRoutes';
@@ -34,7 +36,14 @@ app.use(cors({
 }));
 
 // Body parser
-app.use(express.json());
+app.use(express.json({ limit: '10mb' }));
+
+// Ensure uploads directory exists
+const uploadsDir = path.join(__dirname, '../uploads');
+if (!fs.existsSync(uploadsDir)) {
+  fs.mkdirSync(uploadsDir, { recursive: true });
+}
+app.use('/uploads', express.static(uploadsDir));
 
 // Request logger middleware
 app.use((req, res, next) => {

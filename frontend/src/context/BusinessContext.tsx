@@ -115,3 +115,14 @@ export const useBusinessProfile = () => {
   }
   return context;
 };
+
+// Helper function to resolve static logo path urls or fallback to base64 strings
+export const getLogoUrl = (pathOrBase64?: string): string => {
+  if (!pathOrBase64) return '';
+  if (pathOrBase64.startsWith('/uploads')) {
+    const rawApiUrl = import.meta.env.VITE_API_URL || 'http://localhost:5000/api';
+    const backendUrl = rawApiUrl.replace(/\/api$/, '');
+    return `${backendUrl}${pathOrBase64}`;
+  }
+  return pathOrBase64;
+};

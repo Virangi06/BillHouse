@@ -19,8 +19,8 @@ export default {
           light: '#3ea68e',
         },
         cream: {
-          DEFAULT: '#FFFFFF',
-          dark: '#F5F5F5',
+          DEFAULT: '#F9F6EE',
+          dark: '#F4F1E8',
           light: '#FFFFFF',
         },
         text: {

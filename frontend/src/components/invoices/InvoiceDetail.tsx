@@ -4,7 +4,7 @@ import API from '../../utils/api';
 import Button from '../common/Button';
 import GlassCard from '../common/GlassCard';
 import { useAuth } from '../../context/AuthContext';
-import { useBusinessProfile } from '../../context/BusinessContext';
+import { useBusinessProfile, getLogoUrl } from '../../context/BusinessContext';
 import {
   ChevronLeft,
   Edit2,
@@ -319,7 +319,7 @@ export const InvoiceDetail: React.FC = () => {
             <div className="flex flex-col sm:flex-row justify-between items-start gap-6 border-b border-navy/10 pb-8">
               <div className="flex flex-col gap-2">
                 {businessProfile?.logoBase64 ? (
-                  <img src={businessProfile.logoBase64} alt={businessProfile.name} className="h-12 w-auto object-contain mb-1" />
+                  <img src={getLogoUrl(businessProfile.logoBase64)} alt={businessProfile.name} className="h-12 w-auto object-contain mb-1" />
                 ) : (
                   <div className="flex items-center gap-2">
                     <span className="text-xl">⚡</span>

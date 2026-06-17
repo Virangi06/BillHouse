@@ -1,6 +1,42 @@
 import { Router, Response } from 'express';
+import fs from 'fs';
+import path from 'path';
 import Business from '../models/Business';
 import { AuthRequest } from '../middleware/authMiddleware';
+
+// Helper function to decode and save base64 image data to local disk
+function saveLogoToDisk(logoBase64: string, tenantId: string): string {
+  if (!logoBase64 || !logoBase64.startsWith('data:image/')) {
+    return logoBase64; // Return as-is if it's already a URL, empty, or not a base64 data uri
+  }
+
+  try {
+    const matches = logoBase64.match(/^data:image\/([a-zA-Z0-9+]+);base64,(.+)$/);
+    if (!matches || matches.length !== 3) {
+      return logoBase64;
+    }
+
+    const extension = matches[1];
+    const dataBuffer = Buffer.from(matches[2], 'base64');
+    
+    // Create unique filename based on tenant ID
+    const filename = `logo-${tenantId}.${extension}`;
+    const uploadsDir = path.join(__dirname, '../../uploads');
+    
+    if (!fs.existsSync(uploadsDir)) {
+      fs.mkdirSync(uploadsDir, { recursive: true });
+    }
+
+    const filePath = path.join(uploadsDir, filename);
+    fs.writeFileSync(filePath, dataBuffer);
+
+    console.log(`💾 Saved logo file to disk: ${filePath}`);
+    return `/uploads/${filename}`;
+  } catch (err) {
+    console.error('❌ Error saving logo file to disk:', err);
+    return logoBase64;
+  }
+}
 
 const router = Router();
 
@@ -57,6 +93,8 @@ router.post('/', async (req: AuthRequest, res: Response) => {
       return res.status(400).json({ error: 'Banner image is too large. Please use an image under 1.5MB.' });
     }
 
+    const logoDiskPath = logoBase64 ? saveLogoToDisk(logoBase64, tenantId) : '';
+
     const business = new Business({
       tenantId,
       name: name.trim(),
@@ -75,7 +113,7 @@ router.post('/', async (req: AuthRequest, res: Response) => {
       gstNumber: gstNumber?.trim().toUpperCase(),
       panNumber: panNumber?.trim().toUpperCase(),
       taxRegistrationNumber: taxRegistrationNumber?.trim(),
-      logoBase64,
+      logoBase64: logoDiskPath,
       bannerBase64,
       invoicePrefix: invoicePrefix?.trim().toUpperCase() || 'INV',
       invoiceNextNumber: Math.max(1, parseInt(invoiceNextNumber) || 1),
@@ -147,7 +185,7 @@ router.put('/', async (req: AuthRequest, res: Response) => {
     if (gstNumber !== undefined) business.gstNumber = gstNumber.trim().toUpperCase();
     if (panNumber !== undefined) business.panNumber = panNumber.trim().toUpperCase();
     if (taxRegistrationNumber !== undefined) business.taxRegistrationNumber = taxRegistrationNumber.trim();
-    if (logoBase64 !== undefined) business.logoBase64 = logoBase64;
+    if (logoBase64 !== undefined) business.logoBase64 = logoBase64 ? saveLogoToDisk(logoBase64, tenantId) : '';
     if (bannerBase64 !== undefined) business.bannerBase64 = bannerBase64;
     if (invoicePrefix !== undefined) business.invoicePrefix = invoicePrefix.trim().toUpperCase();
     if (invoiceNextNumber !== undefined) business.invoiceNextNumber = Math.max(1, parseInt(invoiceNextNumber) || 1);

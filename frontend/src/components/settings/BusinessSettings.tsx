@@ -1,6 +1,6 @@
 import React, { useState, useRef, useEffect } from 'react';
 import API from '../../utils/api';
-import { useBusinessProfile } from '../../context/BusinessContext';
+import { useBusinessProfile, getLogoUrl } from '../../context/BusinessContext';
 import {
   Building2, User, Briefcase, MapPin, Upload, X,
   Save, CheckCircle, AlertCircle, Banknote, FileText,
@@ -448,7 +448,7 @@ const BusinessSettings: React.FC = () => {
                 <label className={labelClass}>Business Logo</label>
                 {logoPreview ? (
                   <div className="flex items-center gap-3 p-3 bg-[#FAFCFB] rounded-2xl border border-navy/10 relative">
-                    <img src={logoPreview} alt="Logo" className="h-12 w-12 object-contain rounded-xl border bg-white p-1" />
+                    <img src={getLogoUrl(logoPreview)} alt="Logo" className="h-12 w-12 object-contain rounded-xl border bg-white p-1" />
                     <div className="flex-1 min-w-0">
                       <p className="text-xs font-bold text-navy truncate">Logo active</p>
                       <p className="text-[10px] text-text-secondary truncate">Printed on invoices</p>
@@ -472,7 +472,7 @@ const BusinessSettings: React.FC = () => {
                 <label className={labelClass}>Invoice Brand Banner</label>
                 {bannerPreview ? (
                   <div className="flex items-center gap-3 p-3 bg-[#FAFCFB] rounded-2xl border border-navy/10 relative">
-                    <img src={bannerPreview} alt="Banner" className="h-10 w-20 object-cover rounded-xl border bg-white" />
+                    <img src={getLogoUrl(bannerPreview)} alt="Banner" className="h-10 w-20 object-cover rounded-xl border bg-white" />
                     <div className="flex-1 min-w-0">
                       <p className="text-xs font-bold text-navy truncate">Banner active</p>
                       <p className="text-[10px] text-text-secondary truncate">Max 1.5MB size</p>
