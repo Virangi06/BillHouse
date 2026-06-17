@@ -33,7 +33,11 @@ interface LineItem {
   amount: number; // quantity * rate
 }
 
-export const InvoiceForm: React.FC = () => {
+interface InvoiceFormProps {
+  onAddNotification?: (type: 'payment' | 'invoice' | 'client' | 'system', title: string, message: string) => void;
+}
+
+export const InvoiceForm: React.FC<InvoiceFormProps> = ({ onAddNotification }) => {
   const [searchParams, setSearchParams] = useSearchParams();
   const invoiceId = searchParams.get('id');
   const action = searchParams.get('action'); // 'create' or 'edit'
@@ -182,6 +186,9 @@ export const InvoiceForm: React.FC = () => {
       setClients(prev => [newClient, ...prev]);
       setSelectedClientId(newClient._id);
       setIsClientModalOpen(false);
+      if (onAddNotification) {
+        onAddNotification('client', 'New Client Registered', `${clientForm.name} was registered via Invoice Form.`);
+      }
       setClientForm({ name: '', email: '', phone: '', taxId: '', address: '' });
       // Proceed automatically to Step 2
       setStep(2);
@@ -220,10 +227,17 @@ export const InvoiceForm: React.FC = () => {
         status
       };
 
+      let response;
       if (action === 'edit' && invoiceId) {
-        await API.put(`/invoices/${invoiceId}`, payload);
+        response = await API.put(`/invoices/${invoiceId}`, payload);
+        if (onAddNotification) {
+          onAddNotification('invoice', 'Invoice Updated', `Invoice ${response.data.invoice.number} details were updated successfully.`);
+        }
       } else {
-        await API.post('/invoices', payload);
+        response = await API.post('/invoices', payload);
+        if (onAddNotification) {
+          onAddNotification('invoice', 'New Invoice Issued', `Invoice ${response.data.invoice.number} was compiled successfully for ₹${response.data.invoice.totalAmount}.`);
+        }
       }
 
       // Redirect back to list

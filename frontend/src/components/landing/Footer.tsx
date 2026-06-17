@@ -1,6 +1,6 @@
 import React from 'react';
 import { Link } from 'react-router-dom';
-import logo from '../../assets/Logo.png';
+import logo from '../../assets/Logo_transparent.png';
 
 export const Footer: React.FC = () => {
   const currentYear = new Date().getFullYear();
@@ -17,12 +17,12 @@ export const Footer: React.FC = () => {
         <div className="grid grid-cols-1 md:grid-cols-4 gap-12 mb-16">
           
           {/* Logo & Tagline column */}
-          <div className="md:col-span-2 flex flex-col gap-6">
-            <Link to="/" onClick={handleScrollTop} className="flex items-center">
+          <div className="md:col-span-2 flex flex-col items-center md:items-start text-center md:text-left gap-6">
+            <Link to="/" onClick={handleScrollTop} className="flex items-center justify-center md:justify-start">
               <img 
                 src={logo} 
                 alt="BillHouse Logo" 
-                className="h-18 w-auto rounded-lg" 
+                className="h-8 sm:h-9 md:h-10 lg:h-12 w-auto object-contain" 
               />
             </Link>
             <p className="text-text-secondary text-sm leading-relaxed max-w-sm">
@@ -34,9 +34,9 @@ export const Footer: React.FC = () => {
           </div>
 
           {/* Links Column 1: Product */}
-          <div className="flex flex-col gap-4">
+          <div className="flex flex-col items-center md:items-start text-center md:text-left gap-4">
             <h4 className="text-xs font-bold uppercase tracking-wider text-green">Product</h4>
-            <ul className="flex flex-col gap-2.5 text-sm text-text-secondary">
+            <ul className="flex flex-col items-center md:items-start gap-2.5 text-sm text-text-secondary">
               <li><a href="#features" className="hover:text-white transition-colors duration-200">Features</a></li>
               <li><a href="#benefits" className="hover:text-white transition-colors duration-200">Invoicing</a></li>
               <li><a href="#pricing" className="hover:text-white transition-colors duration-200">Pricing Tiers</a></li>
@@ -45,9 +45,9 @@ export const Footer: React.FC = () => {
           </div>
 
           {/* Links Column 2: Legal */}
-          <div className="flex flex-col gap-4">
+          <div className="flex flex-col items-center md:items-start text-center md:text-left gap-4">
             <h4 className="text-xs font-bold uppercase tracking-wider text-green">Legal</h4>
-            <ul className="flex flex-col gap-2.5 text-sm text-text-secondary">
+            <ul className="flex flex-col items-center md:items-start gap-2.5 text-sm text-text-secondary">
               <li><Link to="/privacy" className="hover:text-white transition-colors duration-200">Privacy Policy</Link></li>
               <li><Link to="/terms" className="hover:text-white transition-colors duration-200">Terms of Service</Link></li>
               <li><Link to="/gdpr" className="hover:text-white transition-colors duration-200">GDPR Compliance</Link></li>

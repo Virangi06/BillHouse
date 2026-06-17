@@ -30,7 +30,11 @@ export interface InvoiceData {
   amountDue: number;
 }
 
-export const InvoiceList: React.FC = () => {
+interface InvoiceListProps {
+  onAddNotification?: (type: 'payment' | 'invoice' | 'client' | 'system', title: string, message: string) => void;
+}
+
+export const InvoiceList: React.FC<InvoiceListProps> = ({ onAddNotification }) => {
   const [, setSearchParams] = useSearchParams();
   const [invoices, setInvoices] = useState<InvoiceData[]>([]);
   const [loading, setLoading] = useState<boolean>(true);
@@ -112,9 +116,13 @@ export const InvoiceList: React.FC = () => {
       return;
     }
 
+    const targetInvoice = invoices.find(inv => inv._id === id);
     try {
       await API.delete(`/invoices/${id}`);
       setInvoices(prev => prev.filter(inv => inv._id !== id));
+      if (onAddNotification && targetInvoice) {
+        onAddNotification('invoice', 'Invoice Deleted', `Invoice ${targetInvoice.number} has been permanently deleted.`);
+      }
     } catch (err: any) {
       alert(err.response?.data?.error || 'Failed to delete invoice');
     }
@@ -122,6 +130,7 @@ export const InvoiceList: React.FC = () => {
 
   const handleStatusChange = async (id: string, newStatus: string, e: React.MouseEvent) => {
     e.stopPropagation();
+    const targetInvoice = invoices.find(inv => inv._id === id);
     try {
       await API.patch(`/invoices/${id}/status`, { status: newStatus });
       setInvoices(prev => prev.map(inv => inv._id === id ? { 
@@ -130,6 +139,13 @@ export const InvoiceList: React.FC = () => {
         amountPaid: newStatus === 'Paid' ? inv.totalAmount : 0,
         amountDue: newStatus === 'Paid' ? 0 : inv.totalAmount
       } : inv));
+      if (onAddNotification && targetInvoice) {
+        onAddNotification(
+          newStatus === 'Paid' ? 'payment' : 'invoice',
+          `Invoice ${newStatus}`,
+          `Invoice ${targetInvoice.number} has been set to ${newStatus}.`
+        );
+      }
       setActiveMenuId(null);
     } catch (err: any) {
       const msg = err.response?.data?.error 

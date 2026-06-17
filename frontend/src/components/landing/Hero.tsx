@@ -19,7 +19,7 @@ export const Hero: React.FC = () => {
         </div>
 
         {/* Headline */}
-        <h1 className="text-5xl md:text-7xl font-extrabold tracking-tight text-navy max-w-4xl mx-auto leading-[1.1] mb-6">
+        <h1 className="text-4xl sm:text-5xl md:text-7xl font-extrabold tracking-tight text-navy max-w-4xl mx-auto leading-[1.1] mb-6">
           Create Professional Invoices. <br />
           <span className="text-gradient-green">Get Paid Faster.</span>
         </h1>

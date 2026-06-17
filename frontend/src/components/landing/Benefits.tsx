@@ -13,7 +13,7 @@ export const Benefits: React.FC = () => {
             <div className="absolute -top-12 -left-12 w-72 h-72 bg-green-mint/20 rounded-full blur-[80px] z-0"></div>
             
             {/* Real aesthetic dashboard card preview */}
-            <div className="relative z-10 p-8 rounded-3xl bg-white border border-navy/5 shadow-xl flex flex-col gap-6">
+            <div className="relative z-10 p-6 sm:p-8 rounded-3xl bg-white border border-navy/5 shadow-xl flex flex-col gap-6">
               <div className="flex justify-between items-center pb-4 border-b border-navy/5">
                 <div>
                   <h4 className="font-bold text-navy text-sm">Monthly Retainer</h4>

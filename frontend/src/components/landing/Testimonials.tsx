@@ -48,7 +48,7 @@ export const Testimonials: React.FC = () => {
           {testimonials.map((t, idx) => (
             <GlassCard 
               key={idx} 
-              className="p-8 flex flex-col justify-between border-navy/5 bg-white shadow-sm hover:shadow-md transition-all duration-300"
+              className="p-6 sm:p-8 flex flex-col justify-between border-navy/5 bg-white shadow-sm hover:shadow-md transition-all duration-300"
               hoverEffect
             >
               <div>

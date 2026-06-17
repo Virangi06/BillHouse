@@ -59,7 +59,7 @@ export const Features: React.FC = () => {
           {featuresList.map((feat, idx) => (
             <GlassCard
               key={idx}
-              className="p-8 border-navy/5 bg-white shadow-sm hover:shadow-md transition-all duration-300 flex flex-col gap-4"
+              className="p-6 sm:p-8 border-navy/5 bg-white shadow-sm hover:shadow-md transition-all duration-300 flex flex-col gap-4"
               hoverEffect
             >
               <div className="p-3 bg-green/10 text-green rounded-2xl w-fit">

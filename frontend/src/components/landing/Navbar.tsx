@@ -124,46 +124,50 @@ export const Navbar: React.FC = () => {
         </div>
 
         {/* Mobile Navigation Drawer */}
-        {isOpen && (
-          <div className="md:hidden mt-4 py-4 px-2 bg-cream-dark/95 backdrop-blur-lg rounded-2xl border border-navy/5 shadow-lg flex flex-col gap-4 animate-float-fast">
+        <div
+          className={`md:hidden overflow-hidden transition-all duration-300 ease-in-out ${
+            isOpen ? 'max-h-[500px] opacity-100 mt-4' : 'max-h-0 opacity-0 pointer-events-none'
+          }`}
+        >
+          <div className="py-4 px-2 bg-cream-dark/95 backdrop-blur-lg rounded-2xl border border-navy/5 shadow-lg flex flex-col gap-2">
             <button
               onClick={() => scrollToSection('features')}
-              className="text-left px-4 py-2 text-base font-semibold text-text-secondary hover:text-navy"
+              className="text-left px-4 py-3 text-base font-semibold text-text-secondary hover:text-navy rounded-xl transition-colors duration-200 hover:bg-navy/5"
             >
               Features
             </button>
             <button
               onClick={() => scrollToSection('benefits')}
-              className="text-left px-4 py-2 text-base font-semibold text-text-secondary hover:text-navy"
+              className="text-left px-4 py-3 text-base font-semibold text-text-secondary hover:text-navy rounded-xl transition-colors duration-200 hover:bg-navy/5"
             >
               Invoicing
             </button>
             <button
               onClick={() => scrollToSection('pricing')}
-              className="text-left px-4 py-2 text-base font-semibold text-text-secondary hover:text-navy"
+              className="text-left px-4 py-3 text-base font-semibold text-text-secondary hover:text-navy rounded-xl transition-colors duration-200 hover:bg-navy/5"
             >
               Pricing
             </button>
             <button
               onClick={() => scrollToSection('faq')}
-              className="text-left px-4 py-2 text-base font-semibold text-text-secondary hover:text-navy"
+              className="text-left px-4 py-3 text-base font-semibold text-text-secondary hover:text-navy rounded-xl transition-colors duration-200 hover:bg-navy/5"
             >
               Resources
             </button>
-            <hr className="border-navy/5" />
-            <div className="flex flex-col gap-3 px-4">
+            <hr className="border-navy/5 my-2" />
+            <div className="flex flex-col gap-3 px-4 pb-2">
               {user ? (
                 <>
                   <Link
                     to="/dashboard"
-                    className="text-center font-bold text-navy"
+                    className="w-full text-center py-3.5 bg-green text-white hover:bg-green-dark rounded-xl shadow-sm font-bold text-base transition-all duration-200 active:scale-98"
                     onClick={() => setIsOpen(false)}
                   >
                     Go to Dashboard
                   </Link>
                   <button
                     onClick={() => { logout(); setIsOpen(false); }}
-                    className="w-full text-center py-2.5 border border-navy/15 text-navy hover:bg-navy/5 rounded-xl transition-all font-semibold"
+                    className="w-full text-center py-3 border border-navy/15 text-navy hover:bg-navy/5 rounded-xl font-semibold text-base transition-all duration-200 active:scale-98"
                   >
                     Sign Out
                   </button>
@@ -172,14 +176,14 @@ export const Navbar: React.FC = () => {
                 <>
                   <Link
                     to="/login"
-                    className="text-center py-2 text-text-secondary hover:text-navy font-semibold"
+                    className="w-full text-center py-3 border border-navy/15 text-navy hover:bg-navy/5 rounded-xl font-semibold text-base transition-all duration-200 active:scale-98"
                     onClick={() => setIsOpen(false)}
                   >
                     Sign In
                   </Link>
                   <Link
                     to="/register"
-                    className="text-center py-2.5 bg-navy text-white hover:bg-green-dark rounded-xl shadow-md font-semibold"
+                    className="w-full text-center py-3.5 bg-navy text-white hover:bg-green-dark rounded-xl shadow-md font-bold text-base transition-all duration-200 active:scale-98"
                     onClick={() => setIsOpen(false)}
                   >
                     Start Free
@@ -188,7 +192,7 @@ export const Navbar: React.FC = () => {
               )}
             </div>
           </div>
-        )}
+        </div>
       </div>
     </nav>
   );

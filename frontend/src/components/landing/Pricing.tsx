@@ -78,10 +78,10 @@ export const Pricing: React.FC = () => {
             <GlassCard
               key={idx}
               variant={plan.variant}
-              className={`p-8 md:p-10 flex flex-col justify-between relative border-navy/10 ${
+              className={`p-6 sm:p-8 md:p-10 flex flex-col justify-between relative border-navy/10 ${
                 plan.isPopular 
                   ? 'ring-2 ring-green shadow-xl scale-100 md:scale-105 z-10' 
-                  : 'shadow-md scale-95 md:scale-100 z-0'
+                  : 'shadow-md scale-100 md:scale-100 z-0'
               }`}
             >
               {/* Most Popular Badge */}

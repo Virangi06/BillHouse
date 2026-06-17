@@ -152,6 +152,72 @@ export const DashboardStub: React.FC = () => {
   const [activeMenuId, setActiveMenuId] = useState<string | null>(null);
   const actionMenuRef = useRef<HTMLDivElement | null>(null);
 
+  // Global unified search state & refs
+  const [globalSearchQuery, setGlobalSearchQuery] = useState<string>('');
+  const [isSearchFocused, setIsSearchFocused] = useState<boolean>(false);
+  const searchRef = useRef<HTMLDivElement | null>(null);
+  const searchInputRef = useRef<HTMLInputElement | null>(null);
+
+  // Dynamic notification state & refs
+  interface NotificationItem {
+    id: string;
+    type: 'payment' | 'invoice' | 'client' | 'system';
+    title: string;
+    message: string;
+    time: string;
+    read: boolean;
+  }
+
+  const [isNotificationsOpen, setIsNotificationsOpen] = useState<boolean>(false);
+  const notificationsRef = useRef<HTMLDivElement | null>(null);
+  const [notifications, setNotifications] = useState<NotificationItem[]>([
+    {
+      id: 'n-1',
+      type: 'payment',
+      title: 'Payment Received',
+      message: 'Received ₹45,000.00 from TechCorp Solutions for INV-000001.',
+      time: '2 hours ago',
+      read: false
+    },
+    {
+      id: 'n-2',
+      type: 'invoice',
+      title: 'Invoice Overdue Warning',
+      message: 'Invoice INV-000002 for Acme Corp is 3 days overdue.',
+      time: 'Yesterday',
+      read: false
+    },
+    {
+      id: 'n-3',
+      type: 'client',
+      title: 'New Client Registered',
+      message: 'CloudScale Inc. was registered successfully.',
+      time: '2 days ago',
+      read: false
+    },
+    {
+      id: 'n-4',
+      type: 'system',
+      title: 'Profile Completion 70%',
+      message: 'Complete your tax & branding settings to unlock professional templates.',
+      time: '3 days ago',
+      read: true
+    }
+  ]);
+
+  // Unified global keyboard shortcut for Cmd/Ctrl+K
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if ((e.metaKey || e.ctrlKey) && e.key === 'k') {
+        e.preventDefault();
+        searchInputRef.current?.focus();
+        setIsSearchFocused(true);
+      }
+    };
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, []);
+
   // Fetch Stats (Dashboard metrics)
   const fetchDashboardStats = async () => {
     setStatsLoading(true);
@@ -195,6 +261,14 @@ export const DashboardStub: React.FC = () => {
       // Row Menu click outside
       if (actionMenuRef.current && !actionMenuRef.current.contains(event.target as Node)) {
         setActiveMenuId(null);
+      }
+      // Global Search dropdown click outside
+      if (searchRef.current && !searchRef.current.contains(event.target as Node)) {
+        setIsSearchFocused(false);
+      }
+      // Notifications dropdown click outside
+      if (notificationsRef.current && !notificationsRef.current.contains(event.target as Node)) {
+        setIsNotificationsOpen(false);
       }
     };
     document.addEventListener('mousedown', handleClickOutside);
@@ -253,11 +327,13 @@ export const DashboardStub: React.FC = () => {
         const response = await API.put(`/clients/${editingClient._id}`, clientForm);
         setSuccessMsg('Client details updated successfully!');
         setClients(prev => prev.map(c => c._id === editingClient._id ? response.data.client : c));
+        addNotification('client', 'Client Profile Updated', `${clientForm.name} details were updated successfully.`);
       } else {
         // POST create
         const response = await API.post('/clients', clientForm);
         setSuccessMsg('New client added successfully!');
         setClients(prev => [response.data.client, ...prev]);
+        addNotification('client', 'New Client Registered', `${clientForm.name} was registered in the database.`);
       }
       setIsClientModalOpen(false);
       fetchDashboardStats(); // Refresh stats counters
@@ -275,12 +351,83 @@ export const DashboardStub: React.FC = () => {
       await API.delete(`/clients/${isDeletingClient._id}`);
       setSuccessMsg('Client deleted successfully');
       setClients(prev => prev.filter(c => c._id !== isDeletingClient._id));
+      addNotification('client', 'Client Deleted', `${isDeletingClient.name} was removed from the database.`);
       setIsDeletingClient(null);
       setActiveMenuId(null);
       fetchDashboardStats(); // Refresh stats counters
     } catch (err: any) {
       console.error(err);
       setErrorMsg(err.response?.data?.error || 'Error deleting client record');
+    }
+  };
+
+  // Global search filters
+  const getSearchResults = () => {
+    if (!globalSearchQuery.trim()) return { clients: [], invoices: [], actions: [] };
+    const query = globalSearchQuery.toLowerCase().trim();
+
+    const matchedClients = clients.filter(c => 
+      c.name.toLowerCase().includes(query) || 
+      c.email.toLowerCase().includes(query)
+    ).slice(0, 3);
+
+    const matchedInvoices = (stats?.recentInvoices || []).filter(inv => 
+      inv.number.toLowerCase().includes(query) || 
+      inv.clientName.toLowerCase().includes(query)
+    ).slice(0, 3);
+
+    const allActions = [
+      { label: 'Create New Invoice', tab: 'invoices', action: 'create', keywords: ['invoice', 'new', 'create', 'billing'] },
+      { label: 'Add New Client', tab: 'clients', modal: 'client', keywords: ['client', 'new', 'add', 'register'] },
+      { label: 'View Business Profile', tab: 'profile', keywords: ['profile', 'business', 'logo', 'branding', 'tax'] },
+      { label: 'Open Settings', tab: 'settings', keywords: ['settings', 'config', 'setup'] }
+    ];
+
+    const matchedActions = allActions.filter(act => 
+      act.label.toLowerCase().includes(query) || 
+      act.keywords.some(kw => kw.includes(query))
+    );
+
+    return { clients: matchedClients, invoices: matchedInvoices, actions: matchedActions };
+  };
+
+  const searchResults = getSearchResults();
+  const hasSearchResults = searchResults.clients.length > 0 || searchResults.invoices.length > 0 || searchResults.actions.length > 0;
+
+  // Helper to add notifications dynamically
+  const addNotification = (type: 'payment' | 'invoice' | 'client' | 'system', title: string, message: string) => {
+    const newNotif: NotificationItem = {
+      id: `n-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
+      type,
+      title,
+      message,
+      time: 'Just now',
+      read: false
+    };
+    setNotifications(prev => [newNotif, ...prev]);
+  };
+
+  // Notification action handlers
+  const handleMarkAllNotificationsRead = () => {
+    setNotifications(prev => prev.map(n => ({ ...n, read: true })));
+  };
+
+  const handleClearAllNotifications = () => {
+    setNotifications([]);
+  };
+
+  const handleNotificationClick = (notif: any) => {
+    // Mark as read
+    setNotifications(prev => prev.map(n => n.id === notif.id ? { ...n, read: true } : n));
+    setIsNotificationsOpen(false);
+
+    // Context navigation based on type
+    if (notif.type === 'payment' || notif.type === 'invoice') {
+      handleTabChange('invoices');
+    } else if (notif.type === 'client') {
+      handleTabChange('clients');
+    } else if (notif.type === 'system') {
+      handleTabChange('profile');
     }
   };
 
@@ -495,24 +642,211 @@ export const DashboardStub: React.FC = () => {
           <div className="flex items-center gap-5 w-full sm:w-auto justify-end">
             
             {/* Search Bar matching screenshot */}
-            <div className="relative max-w-xs w-full hidden md:block">
+            <div className="relative max-w-xs w-full hidden md:block" ref={searchRef}>
               <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 h-4 w-4 text-text-secondary" />
               <input
+                ref={searchInputRef}
                 type="text"
                 placeholder="Search..."
+                value={globalSearchQuery}
+                onChange={e => setGlobalSearchQuery(e.target.value)}
+                onFocus={() => setIsSearchFocused(true)}
                 className="w-full pl-10 pr-12 py-2 text-xs rounded-xl border border-navy/10 bg-[#F8FAFC] text-navy focus:outline-none focus:border-green focus:bg-white transition-all font-semibold"
               />
-              <span className="absolute right-3 top-1/2 -translate-y-1/2 text-[10px] bg-navy/5 text-text-secondary px-1.5 py-0.5 rounded font-mono font-bold select-none border border-navy/5">
-                ⌘K
-              </span>
+              {globalSearchQuery ? (
+                <button
+                  type="button"
+                  onClick={() => setGlobalSearchQuery('')}
+                  className="absolute right-3 top-1/2 -translate-y-1/2 text-text-secondary hover:text-navy"
+                >
+                  <X className="h-3.5 w-3.5" />
+                </button>
+              ) : (
+                <span className="absolute right-3 top-1/2 -translate-y-1/2 text-[10px] bg-navy/5 text-text-secondary px-1.5 py-0.5 rounded font-mono font-bold select-none border border-navy/5">
+                  ⌘K
+                </span>
+              )}
+
+              {/* Dynamic Global Search Dropdown */}
+              {isSearchFocused && globalSearchQuery && (
+                <div className="absolute right-0 top-11 z-50 w-[320px] bg-white border border-navy/5 shadow-2xl rounded-2xl p-4 flex flex-col gap-4 animate-float-fast max-h-80 overflow-y-auto">
+                  {!hasSearchResults ? (
+                    <div className="text-center py-6 text-text-secondary/60">
+                      <Search className="h-6 w-6 mx-auto mb-1.5 opacity-40" />
+                      <p className="text-xs font-bold">No results found for "{globalSearchQuery}"</p>
+                    </div>
+                  ) : (
+                    <>
+                      {/* Matching Actions */}
+                      {searchResults.actions.length > 0 && (
+                        <div className="flex flex-col gap-1.5">
+                          <p className="text-[10px] font-bold text-text-secondary uppercase tracking-wider">Quick Actions</p>
+                          {searchResults.actions.map((act, i) => (
+                            <button
+                              key={i}
+                              type="button"
+                              onClick={() => {
+                                setGlobalSearchQuery('');
+                                setIsSearchFocused(false);
+                                if (act.modal === 'client') {
+                                  handleTabChange('clients');
+                                  setTimeout(() => openAddClientModal(), 150);
+                                } else {
+                                  if (act.action) {
+                                    setSearchParams({ tab: act.tab, action: act.action });
+                                  } else {
+                                    handleTabChange(act.tab as any);
+                                  }
+                                }
+                              }}
+                              className="text-left text-xs font-bold text-navy hover:text-green hover:bg-green/5 p-2 rounded-xl transition-all"
+                            >
+                              ⚡ {act.label}
+                            </button>
+                          ))}
+                        </div>
+                      )}
+
+                      {/* Matching Clients */}
+                      {searchResults.clients.length > 0 && (
+                        <div className="flex flex-col gap-1.5">
+                          <p className="text-[10px] font-bold text-text-secondary uppercase tracking-wider">Clients</p>
+                          {searchResults.clients.map((c) => (
+                            <button
+                              key={c._id}
+                              type="button"
+                              onClick={() => {
+                                setGlobalSearchQuery('');
+                                setIsSearchFocused(false);
+                                handleTabChange('clients');
+                                setClientSearchQuery(c.name);
+                              }}
+                              className="text-left text-xs font-bold text-navy hover:bg-green/5 p-2 rounded-xl transition-all flex flex-col gap-0.5"
+                            >
+                              <span className="font-extrabold">{c.name}</span>
+                              <span className="text-[9px] font-semibold text-text-secondary lowercase">{c.email}</span>
+                            </button>
+                          ))}
+                        </div>
+                      )}
+
+                      {/* Matching Invoices */}
+                      {searchResults.invoices.length > 0 && (
+                        <div className="flex flex-col gap-1.5">
+                          <p className="text-[10px] font-bold text-text-secondary uppercase tracking-wider">Invoices</p>
+                          {searchResults.invoices.map((inv) => (
+                            <button
+                              key={inv._id}
+                              type="button"
+                              onClick={() => {
+                                setGlobalSearchQuery('');
+                                setIsSearchFocused(false);
+                                setSearchParams({ tab: 'invoices', action: 'detail', id: inv._id });
+                              }}
+                              className="text-left text-xs font-bold text-navy hover:bg-green/5 p-2 rounded-xl transition-all flex justify-between items-center"
+                            >
+                              <div>
+                                <span className="font-mono text-green-dark font-black">{inv.number}</span>
+                                <span className="text-[10px] text-text-secondary font-semibold ml-2">to {inv.clientName}</span>
+                              </div>
+                              <span className="text-[10px] font-extrabold">{formatINR(inv.totalAmount)}</span>
+                            </button>
+                          ))}
+                        </div>
+                      )}
+                    </>
+                  )}
+                </div>
+              )}
             </div>
 
-            {/* Notification Badge */}
-            <div className="relative p-2 hover:bg-navy/5 rounded-xl cursor-pointer transition-all text-navy shrink-0">
-              <Bell className="h-5 w-5" />
-              <span className="absolute top-1 right-1 w-4 h-4 bg-[#E76F51] text-[9px] text-white font-bold rounded-full flex items-center justify-center shadow-sm">
-                3
-              </span>
+            {/* Dynamic Notification Dropdown */}
+            <div className="relative" ref={notificationsRef}>
+              <button
+                type="button"
+                onClick={() => setIsNotificationsOpen(!isNotificationsOpen)}
+                className="relative p-2 hover:bg-navy/5 rounded-xl cursor-pointer transition-all text-navy shrink-0 focus:outline-none"
+                aria-label="Toggle notifications"
+              >
+                <Bell className="h-5 w-5" />
+                {notifications.filter(n => !n.read).length > 0 && (
+                  <span className="absolute top-1 right-1 w-4 h-4 bg-[#E76F51] text-[9px] text-white font-bold rounded-full flex items-center justify-center shadow-sm">
+                    {notifications.filter(n => !n.read).length}
+                  </span>
+                )}
+              </button>
+
+              {isNotificationsOpen && (
+                <div className="absolute right-0 top-12 z-50 w-[340px] bg-white border border-navy/5 shadow-2xl rounded-2xl p-4 flex flex-col gap-3.5 animate-float-fast">
+                  <div className="flex justify-between items-center pb-2 border-b border-navy/5">
+                    <span className="text-xs font-black text-navy uppercase tracking-wider">Notifications</span>
+                    {notifications.some(n => !n.read) && (
+                      <button
+                        type="button"
+                        onClick={handleMarkAllNotificationsRead}
+                        className="text-[10px] font-bold text-green hover:underline"
+                      >
+                        Mark all as read
+                      </button>
+                    )}
+                  </div>
+
+                  <div className="max-h-60 overflow-y-auto flex flex-col gap-2.5 pr-1">
+                    {notifications.length === 0 ? (
+                      <div className="text-center py-8 text-text-secondary/60">
+                        <Bell className="h-6 w-6 mx-auto mb-1.5 opacity-40" />
+                        <span className="text-xs font-bold">No notifications</span>
+                      </div>
+                    ) : (
+                      notifications.map((notif) => (
+                        <div
+                          key={notif.id}
+                          onClick={() => handleNotificationClick(notif)}
+                          className={`flex items-start gap-3 p-2.5 rounded-xl cursor-pointer transition-all hover:bg-navy/5 relative ${
+                            !notif.read ? 'bg-green/5' : 'bg-transparent'
+                          }`}
+                        >
+                          {!notif.read && (
+                            <span className="absolute top-3.5 right-3 w-1.5 h-1.5 bg-green rounded-full"></span>
+                          )}
+                          <div className={`p-1.5 rounded-full shrink-0 mt-0.5 ${
+                            notif.type === 'payment'
+                              ? 'bg-green/10 text-green'
+                              : notif.type === 'invoice'
+                                ? 'bg-red-500/10 text-red-500'
+                                : notif.type === 'client'
+                                  ? 'bg-blue-500/10 text-blue-500'
+                                  : 'bg-yellow-500/10 text-yellow-600'
+                          }`}>
+                            <span className="text-xs">
+                              {notif.type === 'payment' ? '💰' : notif.type === 'invoice' ? '⚠️' : notif.type === 'client' ? '👤' : '⚙️'}
+                            </span>
+                          </div>
+                          <div className="flex-1 text-left">
+                            <p className="text-xs font-black text-navy">{notif.title}</p>
+                            <p className="text-[10px] text-text-secondary leading-normal mt-0.5 font-semibold">
+                              {notif.message}
+                            </p>
+                            <span className="text-[9px] text-text-secondary/40 block mt-1 font-bold">{notif.time}</span>
+                          </div>
+                        </div>
+                      ))
+                    )}
+                  </div>
+
+                  {notifications.length > 0 && (
+                    <div className="border-t border-navy/5 pt-2 flex justify-center">
+                      <button
+                        type="button"
+                        onClick={handleClearAllNotifications}
+                        className="text-[10px] font-bold text-red-400 hover:text-red-600 transition-colors"
+                      >
+                        Clear all notifications
+                      </button>
+                    </div>
+                  )}
+                </div>
+              )}
             </div>
 
             <hr className="h-6 border-r border-navy/10 hidden sm:block shrink-0" />
@@ -1078,11 +1412,11 @@ export const DashboardStub: React.FC = () => {
           ) : activeTab === 'invoices' ? (
             <div className="flex flex-col gap-8 max-w-7xl mx-auto animate-fade-in">
               {action === 'create' || action === 'edit' ? (
-                <InvoiceForm />
+                <InvoiceForm onAddNotification={addNotification} />
               ) : action === 'detail' ? (
                 <InvoiceDetail />
               ) : (
-                <InvoiceList />
+                <InvoiceList onAddNotification={addNotification} />
               )}
             </div>
           ) : activeTab === 'clients' ? (
