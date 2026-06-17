@@ -10,6 +10,7 @@ import InvoiceDetail from '../components/invoices/InvoiceDetail';
 import OnboardingWizard from '../components/onboarding/OnboardingWizard';
 import BusinessSettings from '../components/settings/BusinessSettings';
 import BusinessProfilePage from '../components/profile/BusinessProfilePage';
+import ClientDetail from '../components/clients/ClientDetail';
 import logo from '../assets/Logo_transparent.png';
 import { useBusinessProfile } from '../context/BusinessContext';
 import {
@@ -55,10 +56,19 @@ import {
 interface ClientData {
   _id: string;
   name: string;
+  companyName?: string;
   email: string;
   phone?: string;
   address?: string;
+  country?: string;
   taxId?: string;
+  gstNumber?: string;
+  notes?: string;
+  // Financial aggregates (populated from with-financials endpoint)
+  totalBilled?: number;
+  totalPaid?: number;
+  totalOutstanding?: number;
+  invoiceCount?: number;
   createdAt: string;
 }
 
@@ -135,15 +145,26 @@ export const DashboardStub: React.FC = () => {
 
   // Modals state
   const [isClientModalOpen, setIsClientModalOpen] = useState<boolean>(false);
+  const [isReportsModalOpen, setIsReportsModalOpen] = useState<boolean>(false);
+  const [activeStatusInvoiceId, setActiveStatusInvoiceId] = useState<string | null>(null);
   const [editingClient, setEditingClient] = useState<ClientData | null>(null);
   const [clientForm, setClientForm] = useState({
     name: '',
+    companyName: '',
     email: '',
     phone: '',
     taxId: '',
-    address: ''
+    gstNumber: '',
+    address: '',
+    country: 'India',
+    notes: ''
   });
   const [isDeletingClient, setIsDeletingClient] = useState<ClientData | null>(null);
+  // Selected client for detail view
+  const [selectedClientId, setSelectedClientId] = useState<string | null>(null);
+  // Client list sort/filter
+  const [clientSortBy, setClientSortBy] = useState<'name' | 'date' | 'outstanding'>('name');
+  const [clientCountryFilter, setClientCountryFilter] = useState<string>('All');
 
   // Profile Dropdown and row menus Refs
   const [isProfileDropdownOpen, setIsProfileDropdownOpen] = useState<boolean>(false);
@@ -232,11 +253,14 @@ export const DashboardStub: React.FC = () => {
     }
   };
 
-  // Fetch Clients
+  // Fetch Clients with financial aggregation (single query)
   const fetchClients = async () => {
     setLoading(true);
     try {
-      const response = await API.get<ClientData[]>('/clients');
+      const params: any = {};
+      if (clientSortBy !== 'name') params.sortBy = clientSortBy;
+      if (clientCountryFilter !== 'All') params.country = clientCountryFilter;
+      const response = await API.get<ClientData[]>('/clients/with-financials', { params });
       setClients(response.data);
     } catch (err: any) {
       console.error(err);
@@ -288,10 +312,14 @@ export const DashboardStub: React.FC = () => {
     setEditingClient(null);
     setClientForm({
       name: '',
+      companyName: '',
       email: '',
       phone: '',
       taxId: '',
-      address: ''
+      gstNumber: '',
+      address: '',
+      country: 'India',
+      notes: ''
     });
     setErrorMsg(null);
     setIsClientModalOpen(true);
@@ -301,10 +329,14 @@ export const DashboardStub: React.FC = () => {
     setEditingClient(client);
     setClientForm({
       name: client.name,
+      companyName: client.companyName || '',
       email: client.email,
       phone: client.phone || '',
       taxId: client.taxId || '',
-      address: client.address || ''
+      gstNumber: client.gstNumber || '',
+      address: client.address || '',
+      country: client.country || 'India',
+      notes: client.notes || ''
     });
     setErrorMsg(null);
     setIsClientModalOpen(true);
@@ -358,6 +390,40 @@ export const DashboardStub: React.FC = () => {
     } catch (err: any) {
       console.error(err);
       setErrorMsg(err.response?.data?.error || 'Error deleting client record');
+    }
+  };
+
+  const handleUpdateInvoiceStatus = async (invoiceId: string, newStatus: string) => {
+    setErrorMsg(null);
+    setSuccessMsg(null);
+    try {
+      await API.patch(`/invoices/${invoiceId}/status`, { status: newStatus });
+      setSuccessMsg(`Invoice status updated to ${newStatus}`);
+      addNotification('invoice', 'Invoice Status Updated', `Invoice status changed to ${newStatus}.`);
+      
+      // Update local state and refetch stats to keep charts in sync
+      if (stats) {
+        const updatedInvoices = stats.recentInvoices.map(inv => {
+          if (inv._id === invoiceId) {
+            const total = inv.totalAmount;
+            const amountPaid = newStatus === 'Paid' ? total : 0;
+            const amountDue = total - amountPaid;
+            return {
+              ...inv,
+              status: newStatus as any,
+              amountPaid,
+              amountDue
+            };
+          }
+          return inv;
+        });
+        setStats(prev => prev ? { ...prev, recentInvoices: updatedInvoices } : null);
+      }
+      fetchDashboardStats();
+      setActiveStatusInvoiceId(null);
+    } catch (err: any) {
+      console.error(err);
+      setErrorMsg(err.response?.data?.error || 'Error updating invoice status');
     }
   };
 
@@ -431,11 +497,13 @@ export const DashboardStub: React.FC = () => {
     }
   };
 
-  // Filter clients based on search query
-  const filteredClients = clients.filter(c => 
+  // Filter clients based on search query (searches name, email, companyName, gstNumber)
+  const filteredClients = clients.filter(c =>
     c.name.toLowerCase().includes(clientSearchQuery.toLowerCase()) ||
     c.email.toLowerCase().includes(clientSearchQuery.toLowerCase()) ||
-    (c.taxId && c.taxId.toLowerCase().includes(clientSearchQuery.toLowerCase()))
+    (c.companyName && c.companyName.toLowerCase().includes(clientSearchQuery.toLowerCase())) ||
+    (c.taxId && c.taxId.toLowerCase().includes(clientSearchQuery.toLowerCase())) ||
+    (c.gstNumber && c.gstNumber.toLowerCase().includes(clientSearchQuery.toLowerCase()))
   );
 
   // Formatting utility to INR (₹)
@@ -467,7 +535,7 @@ export const DashboardStub: React.FC = () => {
   }
 
   return (
-    <div className="min-h-screen bg-[#F8FAFC] flex font-sans text-navy">
+    <div className="min-h-screen bg-gradient-mesh bg-[#F8FAFC]/90 flex font-sans text-navy">
       
       {/* Sidebar Mobile Backdrop */}
       {isMobileSidebarOpen && (
@@ -478,7 +546,7 @@ export const DashboardStub: React.FC = () => {
       )}
 
       {/* 1. LEFT SIDEBAR - Zero Trust design */}
-      <aside className={`fixed inset-y-0 left-0 w-64 bg-white border-r border-navy/5 text-navy flex flex-col justify-between shrink-0 z-40 transition-transform duration-300 transform lg:relative lg:translate-x-0 ${
+      <aside className={`fixed inset-y-0 left-0 w-64 bg-white/95 backdrop-blur-md border-r border-navy/5 text-navy flex flex-col justify-between shrink-0 z-40 transition-transform duration-300 transform lg:relative lg:translate-x-0 ${
         isMobileSidebarOpen ? 'translate-x-0' : '-translate-x-full'
       }`}>
         
@@ -509,7 +577,7 @@ export const DashboardStub: React.FC = () => {
             onClick={() => handleTabChange('dashboard')}
             className={`w-full flex items-center gap-3 px-4 py-3 rounded-2xl text-sm font-semibold transition-all duration-200 ${
               activeTab === 'dashboard'
-                ? 'bg-[#0C4737] text-white shadow-md border-l-4 border-green'
+                ? 'bg-green/10 text-green-dark border-l-4 border-green font-bold shadow-sm'
                 : 'text-navy/70 hover:text-navy hover:bg-navy/5'
             }`}
           >
@@ -522,7 +590,7 @@ export const DashboardStub: React.FC = () => {
             onClick={() => handleTabChange('invoices')}
             className={`w-full flex items-center gap-3 px-4 py-3 rounded-2xl text-sm font-semibold transition-all duration-200 ${
               activeTab === 'invoices'
-                ? 'bg-[#0C4737] text-white shadow-md border-l-4 border-green'
+                ? 'bg-green/10 text-green-dark border-l-4 border-green font-bold shadow-sm'
                 : 'text-navy/70 hover:text-navy hover:bg-navy/5'
             }`}
           >
@@ -535,7 +603,7 @@ export const DashboardStub: React.FC = () => {
             onClick={() => handleTabChange('clients')}
             className={`w-full flex items-center gap-3 px-4 py-3 rounded-2xl text-sm font-semibold transition-all duration-200 ${
               activeTab === 'clients'
-                ? 'bg-[#0C4737] text-white shadow-md border-l-4 border-green'
+                ? 'bg-green/10 text-green-dark border-l-4 border-green font-bold shadow-sm'
                 : 'text-navy/70 hover:text-navy hover:bg-navy/5'
             }`}
           >
@@ -550,13 +618,13 @@ export const DashboardStub: React.FC = () => {
 
           {/* Module 6: Reports & Analytics */}
           <button
-            className="w-full flex items-center gap-3 px-4 py-3 rounded-2xl text-sm font-semibold text-navy/40 hover:bg-navy/5 cursor-not-allowed opacity-50"
-            title="Reports Module (Module 6)"
-            disabled
+            onClick={() => setIsReportsModalOpen(true)}
+            className="w-full flex items-center gap-3 px-4 py-3 rounded-2xl text-sm font-semibold text-navy/70 hover:text-navy hover:bg-navy/5 transition-all duration-200"
+            title="Reports & Analytics"
           >
-            <BarChart3 className="h-5 w-5 text-navy/30" />
+            <BarChart3 className="h-5 w-5 text-green" />
             Reports
-            <span className="text-[9px] bg-navy/5 text-navy/60 px-1.5 py-0.5 rounded-full ml-auto font-bold">Mod 6</span>
+            <span className="text-[9px] bg-green/10 text-green px-1.5 py-0.5 rounded-full ml-auto font-bold">Pro</span>
           </button>
 
           {/* Business Profile tab link */}
@@ -564,7 +632,7 @@ export const DashboardStub: React.FC = () => {
             onClick={() => handleTabChange('profile')}
             className={`w-full flex items-center gap-3 px-4 py-3 rounded-2xl text-sm font-semibold transition-all duration-200 ${
               activeTab === 'profile'
-                ? 'bg-[#0C4737] text-white shadow-md border-l-4 border-green'
+                ? 'bg-green/10 text-green-dark border-l-4 border-green font-bold shadow-sm'
                 : 'text-navy/70 hover:text-navy hover:bg-navy/5'
             }`}
           >
@@ -577,7 +645,7 @@ export const DashboardStub: React.FC = () => {
             onClick={() => handleTabChange('settings')}
             className={`w-full flex items-center gap-3 px-4 py-3 rounded-2xl text-sm font-semibold transition-all duration-200 ${
               activeTab === 'settings'
-                ? 'bg-[#0C4737] text-white shadow-md border-l-4 border-green'
+                ? 'bg-green/10 text-green-dark border-l-4 border-green font-bold shadow-sm'
                 : 'text-navy/70 hover:text-navy hover:bg-navy/5'
             }`}
           >
@@ -591,12 +659,12 @@ export const DashboardStub: React.FC = () => {
           <div className="p-4 bg-gradient-to-br from-[#F8FAFC] to-green/5 border border-green/15 rounded-2xl flex flex-col gap-3">
             <div className="flex items-center gap-2 text-green-dark">
               <span className="text-yellow-500 text-sm">👑</span>
-              <span className="text-xs font-bold uppercase tracking-wider text-[#0C4737]">Upgrade to Pro</span>
+              <span className="text-xs font-bold uppercase tracking-wider text-navy">Upgrade to Pro</span>
             </div>
             <p className="text-[11px] text-text-secondary leading-relaxed">
               Unlock advanced features like recurring invoices, custom branding & reminders.
             </p>
-            <button className="w-full py-2 bg-[#0C4737] hover:bg-[#0A3B2F] text-white transition-all rounded-xl text-xs font-bold shadow-sm">
+            <button className="w-full py-2 bg-navy hover:bg-green-dark text-white transition-all rounded-xl text-xs font-bold shadow-sm active:scale-98">
               Upgrade Now
             </button>
           </div>
@@ -616,30 +684,30 @@ export const DashboardStub: React.FC = () => {
       <div className="flex-1 flex flex-col min-w-0 overflow-y-auto">
         
         {/* Top Header Navigation panel */}
-        <header className="bg-white border-b border-navy/5 py-4 px-8 flex flex-col sm:flex-row gap-4 items-center justify-between shadow-sm shrink-0 sticky top-0 z-10">
+        <header className="bg-white border-b border-navy/5 py-3 px-4 md:px-8 flex flex-row items-center justify-between shadow-sm shrink-0 sticky top-0 z-10">
           
           {/* Welcome Greeting context with responsive hamburger toggler */}
-          <div className="flex items-center gap-3 w-full sm:w-auto">
+          <div className="flex items-center gap-2.5 min-w-0">
             <button 
               type="button"
               onClick={() => setIsMobileSidebarOpen(true)}
-              className="p-2 -ml-2 hover:bg-navy/5 rounded-xl text-navy lg:hidden focus:outline-none shrink-0"
+              className="p-1.5 -ml-1 hover:bg-navy/5 rounded-xl text-navy lg:hidden focus:outline-none shrink-0"
               aria-label="Open sidebar"
             >
-              <Menu className="h-6 w-6 text-navy" />
+              <Menu className="h-5.5 w-5.5 text-navy" />
             </button>
-            <div className="flex flex-col text-left">
-              <h1 className="text-xl sm:text-2xl font-extrabold text-navy tracking-tight">
-                Welcome back, {user?.name?.split(' ')[0] || 'Alex'}! 👋
+            <div className="flex flex-col text-left min-w-0">
+              <h1 className="text-base sm:text-xl md:text-2xl font-extrabold text-navy tracking-tight truncate max-w-[140px] xs:max-w-[200px] sm:max-w-xs">
+                Hello, {user?.name?.split(' ')[0] || 'Alex'}! 👋
               </h1>
-              <p className="text-[11px] sm:text-xs text-text-secondary font-semibold mt-0.5">
-                Here's what's happening with your business today.
+              <p className="text-[10px] sm:text-xs text-text-secondary font-semibold mt-0.5 hidden xs:block">
+                Here's what's happening today.
               </p>
             </div>
           </div>
 
           {/* Quick Actions Search, Profile, Notification */}
-          <div className="flex items-center gap-5 w-full sm:w-auto justify-end">
+          <div className="flex items-center gap-3 sm:gap-5 shrink-0 justify-end">
             
             {/* Search Bar matching screenshot */}
             <div className="relative max-w-xs w-full hidden md:block" ref={searchRef}>
@@ -858,7 +926,7 @@ export const DashboardStub: React.FC = () => {
                 onClick={() => setIsProfileDropdownOpen(!isProfileDropdownOpen)}
               >
                 {/* Dynamic Initial Avatar */}
-                <div className="h-9 w-9 bg-[#0C4737] text-white font-extrabold rounded-xl flex items-center justify-center uppercase shadow-sm shrink-0">
+                <div className="h-9 w-9 bg-navy text-white font-extrabold rounded-xl flex items-center justify-center uppercase shadow-sm shrink-0">
                   {user?.name ? user.name.slice(0, 2) : 'AJ'}
                 </div>
                 <div className="hidden lg:flex flex-col text-left">
@@ -906,7 +974,7 @@ export const DashboardStub: React.FC = () => {
         )}
 
         {/* 3. CORE VIEWS SWITCH */}
-        <main className="p-8 flex-grow">
+        <main className="p-4 sm:p-6 md:p-8 flex-grow">
           
           {activeTab === 'dashboard' ? (
             /* ========================================================
@@ -931,7 +999,7 @@ export const DashboardStub: React.FC = () => {
               {!hasCompletedOnboarding && (
                 <div className="bg-gradient-to-r from-green/10 to-green-mint/10 border border-green/20 rounded-2xl p-5 flex flex-col sm:flex-row gap-4 items-center justify-between shadow-sm animate-fade-in">
                   <div className="flex items-center gap-3.5 text-left">
-                    <div className="p-2.5 bg-[#0C4737] text-white rounded-xl text-base shrink-0 shadow-inner">
+                    <div className="p-2.5 bg-green text-white rounded-xl text-base shrink-0 shadow-inner">
                       🏢
                     </div>
                     <div>
@@ -953,9 +1021,9 @@ export const DashboardStub: React.FC = () => {
 
               {/* Onboarding steps walkthrough card */}
               {stats && (stats.clientsCount === 0 || !stats.recentInvoices || stats.recentInvoices.length === 0) && (
-                <div className="bg-gradient-to-r from-[#0C4737]/10 to-[#2F8F7A]/10 border border-[#2F8F7A]/25 rounded-2xl p-6 flex flex-col sm:flex-row gap-4 items-center justify-between shadow-sm my-6">
+                <div className="bg-gradient-to-r from-green/10 to-green-mint/10 border border-green/20 rounded-2xl p-6 flex flex-col sm:flex-row gap-4 items-center justify-between shadow-sm my-6">
                   <div className="flex items-center gap-4 text-left">
-                    <div className="p-3 bg-[#0C4737] text-white rounded-2xl shrink-0 shadow-inner text-base">
+                    <div className="p-3 bg-green text-white rounded-2xl shrink-0 shadow-inner text-base">
                       🚀
                     </div>
                     <div>
@@ -990,10 +1058,35 @@ export const DashboardStub: React.FC = () => {
               )}
 
               {statsLoading ? (
-                /* Stats Loading Spinner */
-                <div className="flex flex-col gap-4 justify-center items-center py-20 bg-white border border-navy/5 rounded-2xl">
-                  <div className="w-10 h-10 border-4 border-green/20 border-t-green rounded-full animate-spin"></div>
-                  <span className="text-xs font-bold text-text-secondary animate-pulse">Calculating tenant dashboard metrics...</span>
+                <div className="flex flex-col gap-8">
+                  {/* Stats Cards Skeleton */}
+                  <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
+                    {[1, 2, 3, 4].map((i) => (
+                      <div key={i} className="glass-card p-6 rounded-3xl flex justify-between items-center animate-pulse">
+                        <div className="flex flex-col gap-3 w-2/3">
+                          <div className="h-4 bg-navy/10 rounded w-1/2"></div>
+                          <div className="h-7 bg-navy/15 rounded w-3/4 mt-1"></div>
+                          <div className="h-3 bg-navy/5 rounded w-full"></div>
+                        </div>
+                        <div className="w-16 h-10 bg-green/10 rounded-xl"></div>
+                      </div>
+                    ))}
+                  </div>
+                  {/* Charts Row Skeleton */}
+                  <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
+                    <div className="lg:col-span-2 glass-card p-6 rounded-3xl animate-pulse flex flex-col gap-4">
+                      <div className="flex justify-between">
+                        <div className="h-5 bg-navy/10 rounded w-1/4"></div>
+                        <div className="h-8 bg-navy/10 rounded w-20"></div>
+                      </div>
+                      <div className="h-60 bg-navy/5 rounded-2xl w-full"></div>
+                    </div>
+                    <div className="glass-card p-6 rounded-3xl animate-pulse flex flex-col justify-between gap-4">
+                      <div className="h-5 bg-navy/10 rounded w-1/3"></div>
+                      <div className="h-40 bg-navy/5 rounded-full w-40 mx-auto"></div>
+                      <div className="h-10 bg-navy/5 rounded w-full"></div>
+                    </div>
+                  </div>
                 </div>
               ) : (
                 <>
@@ -1001,15 +1094,15 @@ export const DashboardStub: React.FC = () => {
                   <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
                     
                     {/* Stat 1: Total Revenue */}
-                    <div className="bg-white border border-navy/5 p-6 rounded-2xl shadow-sm flex justify-between items-center">
-                      <div className="flex flex-col gap-1.5 font-semibold">
+                    <div className="glass-card p-4 sm:p-6 rounded-3xl flex justify-between items-center hover:-translate-y-1 hover:shadow-md transition-all duration-300">
+                      <div className="flex flex-col gap-1.5 font-semibold min-w-0">
                         <div className="flex items-center gap-2 text-xs text-text-secondary font-bold">
                           <div className="p-1.5 bg-green/10 text-green rounded-lg shrink-0">
                             <DollarSign className="h-4 w-4" />
                           </div>
                           Total Revenue
                         </div>
-                        <span className="text-2xl font-extrabold text-navy mt-1">
+                        <span className="text-xl sm:text-2xl font-extrabold text-navy mt-1 truncate">
                           {formatINR(stats?.totalRevenue || 0)}
                         </span>
                         {stats?.trends ? (
@@ -1022,7 +1115,7 @@ export const DashboardStub: React.FC = () => {
                         )}
                       </div>
                       {/* Micro sparkline */}
-                      <div className="w-20 h-10 select-none">
+                      <div className="w-16 sm:w-20 h-10 select-none shrink-0">
                         <ResponsiveContainer width="100%" height="100%">
                           <AreaChart data={sparkRevenue} margin={{ top: 2, bottom: 2, left: 2, right: 2 }}>
                             <defs>
@@ -1038,15 +1131,15 @@ export const DashboardStub: React.FC = () => {
                     </div>
 
                     {/* Stat 2: Outstanding */}
-                    <div className="bg-white border border-navy/5 p-6 rounded-2xl shadow-sm flex justify-between items-center">
-                      <div className="flex flex-col gap-1.5 font-semibold">
+                    <div className="glass-card p-4 sm:p-6 rounded-3xl flex justify-between items-center hover:-translate-y-1 hover:shadow-md transition-all duration-300">
+                      <div className="flex flex-col gap-1.5 font-semibold min-w-0">
                         <div className="flex items-center gap-2 text-xs text-text-secondary font-bold">
                           <div className="p-1.5 bg-yellow-500/10 text-yellow-600 rounded-lg shrink-0">
                             <Clock className="h-4 w-4" />
                           </div>
                           Outstanding
                         </div>
-                        <span className="text-2xl font-extrabold text-navy mt-1">
+                        <span className="text-xl sm:text-2xl font-extrabold text-navy mt-1 truncate">
                           {formatINR(stats?.outstanding || 0)}
                         </span>
                         {stats?.trends ? (
@@ -1059,7 +1152,7 @@ export const DashboardStub: React.FC = () => {
                         )}
                       </div>
                       {/* Micro sparkline */}
-                      <div className="w-20 h-10 select-none">
+                      <div className="w-16 sm:w-20 h-10 select-none shrink-0">
                         <ResponsiveContainer width="100%" height="100%">
                           <AreaChart data={sparkOutstanding} margin={{ top: 2, bottom: 2, left: 2, right: 2 }}>
                             <defs>
@@ -1075,15 +1168,15 @@ export const DashboardStub: React.FC = () => {
                     </div>
 
                     {/* Stat 3: Paid Invoices */}
-                    <div className="bg-white border border-navy/5 p-6 rounded-2xl shadow-sm flex justify-between items-center">
-                      <div className="flex flex-col gap-1.5 font-semibold">
+                    <div className="glass-card p-4 sm:p-6 rounded-3xl flex justify-between items-center hover:-translate-y-1 hover:shadow-md transition-all duration-300">
+                      <div className="flex flex-col gap-1.5 font-semibold min-w-0">
                         <div className="flex items-center gap-2 text-xs text-text-secondary font-bold">
                           <div className="p-1.5 bg-green/10 text-green rounded-lg shrink-0">
                             <CheckCircle className="h-4 w-4" />
                           </div>
                           Paid Invoices
                         </div>
-                        <span className="text-2xl font-extrabold text-navy mt-1">
+                        <span className="text-xl sm:text-2xl font-extrabold text-navy mt-1 truncate">
                           {stats?.paidInvoicesCount || 0}
                         </span>
                         {stats?.trends ? (
@@ -1096,7 +1189,7 @@ export const DashboardStub: React.FC = () => {
                         )}
                       </div>
                       {/* Micro sparkline */}
-                      <div className="w-20 h-10 select-none">
+                      <div className="w-16 sm:w-20 h-10 select-none shrink-0">
                         <ResponsiveContainer width="100%" height="100%">
                           <AreaChart data={sparkPaid} margin={{ top: 2, bottom: 2, left: 2, right: 2 }}>
                             <defs>
@@ -1112,15 +1205,15 @@ export const DashboardStub: React.FC = () => {
                     </div>
 
                     {/* Stat 4: Overdue Invoices */}
-                    <div className="bg-white border border-navy/5 p-6 rounded-2xl shadow-sm flex justify-between items-center">
-                      <div className="flex flex-col gap-1.5 font-semibold">
+                    <div className="glass-card p-4 sm:p-6 rounded-3xl flex justify-between items-center hover:-translate-y-1 hover:shadow-md transition-all duration-300">
+                      <div className="flex flex-col gap-1.5 font-semibold min-w-0">
                         <div className="flex items-center gap-2 text-xs text-text-secondary font-bold">
                           <div className="p-1.5 bg-red-500/10 text-red-500 rounded-lg shrink-0">
                             <AlertTriangle className="h-4 w-4" />
                           </div>
                           Overdue Invoices
                         </div>
-                        <span className="text-2xl font-extrabold text-navy mt-1">
+                        <span className="text-xl sm:text-2xl font-extrabold text-navy mt-1 truncate">
                           {stats?.overdueInvoicesCount || 0}
                         </span>
                         {stats?.trends ? (
@@ -1133,7 +1226,7 @@ export const DashboardStub: React.FC = () => {
                         )}
                       </div>
                       {/* Micro sparkline red */}
-                      <div className="w-20 h-10 select-none">
+                      <div className="w-16 sm:w-20 h-10 select-none shrink-0">
                         <ResponsiveContainer width="100%" height="100%">
                           <AreaChart data={sparkOverdue} margin={{ top: 2, bottom: 2, left: 2, right: 2 }}>
                             <defs>
@@ -1154,7 +1247,7 @@ export const DashboardStub: React.FC = () => {
                   <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
                     
                     {/* 1. Revenue Overview Graph */}
-                    <div className="lg:col-span-2 bg-white border border-navy/5 p-6 rounded-2xl shadow-sm">
+                    <div className="lg:col-span-2 glass-card p-6 rounded-3xl hover:shadow-md transition-all duration-300">
                       <div className="flex justify-between items-center mb-6">
                         <div>
                           <h3 className="text-sm font-bold text-navy">Revenue Overview (INR)</h3>
@@ -1191,7 +1284,7 @@ export const DashboardStub: React.FC = () => {
                     </div>
 
                     {/* 2. Donut Distribution Chart */}
-                    <div className="bg-white border border-navy/5 p-6 rounded-2xl shadow-sm flex flex-col justify-between">
+                    <div className="glass-card p-6 rounded-3xl flex flex-col justify-between hover:shadow-md transition-all duration-300">
                       <div>
                         <h3 className="text-sm font-bold text-navy">Invoice Status</h3>
                         <p className="text-[10px] text-text-secondary mt-0.5">Current cycle summary</p>
@@ -1249,7 +1342,7 @@ export const DashboardStub: React.FC = () => {
                   <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
                     
                     {/* 1. Left Grid: Recent Invoices Table - INR values */}
-                    <div className="lg:col-span-2 bg-white border border-navy/5 p-6 rounded-2xl shadow-sm flex flex-col justify-between">
+                    <div className="lg:col-span-2 glass-card p-6 rounded-3xl flex flex-col justify-between hover:shadow-md transition-all duration-300">
                       <div>
                         <div className="flex justify-between items-center mb-6">
                           <div>
@@ -1261,7 +1354,8 @@ export const DashboardStub: React.FC = () => {
                           </span>
                         </div>
 
-                        <div className="overflow-x-auto">
+                        {/* Desktop View Table */}
+                        <div className="hidden sm:block overflow-x-auto">
                           <table className="w-full text-left text-xs border-collapse">
                             <thead>
                               <tr className="border-b border-navy/5 text-text-secondary uppercase text-[10px] tracking-wider font-extrabold">
@@ -1303,18 +1397,47 @@ export const DashboardStub: React.FC = () => {
                                       {new Date(inv.dueDate).toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric' })}
                                     </td>
                                     <td className="py-3.5 pr-2 font-extrabold">{formatINR(inv.totalAmount)}</td>
-                                    <td className="py-3.5 pr-2">
-                                      <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-[10px] font-extrabold ${
-                                        inv.status === 'Paid'
-                                          ? 'bg-green/10 text-green'
-                                          : inv.status === 'Sent'
-                                            ? 'bg-blue-500/10 text-blue-500'
-                                            : inv.status === 'Viewed'
-                                              ? 'bg-teal-500/10 text-teal-600'
-                                              : 'bg-red-500/10 text-red-500'
-                                      }`}>
-                                        {inv.status}
-                                      </span>
+                                    <td className="py-3.5 pr-2 relative">
+                                      <div className="relative inline-block text-left">
+                                        <button
+                                          type="button"
+                                          onClick={() => setActiveStatusInvoiceId(activeStatusInvoiceId === inv._id ? null : inv._id)}
+                                          className={`inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[10px] font-extrabold cursor-pointer transition-all hover:scale-105 active:scale-95 ${
+                                            inv.status === 'Paid'
+                                              ? 'bg-green/10 text-green'
+                                              : inv.status === 'Sent'
+                                                ? 'bg-blue-500/10 text-blue-500'
+                                                : inv.status === 'Viewed'
+                                                  ? 'bg-teal-500/10 text-teal-600'
+                                                  : inv.status === 'Overdue'
+                                                    ? 'bg-red-500/10 text-red-500'
+                                                    : 'bg-navy/10 text-navy/70'
+                                          }`}
+                                          title="Update status"
+                                        >
+                                          {inv.status}
+                                          <ChevronDown className="h-2.5 w-2.5 opacity-60" />
+                                        </button>
+
+                                        {activeStatusInvoiceId === inv._id && (
+                                          <div className="absolute left-0 mt-1.5 z-30 w-32 bg-white border border-navy/5 shadow-2xl rounded-2xl p-1.5 flex flex-col gap-1 text-left animate-float-fast">
+                                            {['Draft', 'Sent', 'Paid', 'Overdue'].map((st) => (
+                                              <button
+                                                key={st}
+                                                type="button"
+                                                onClick={() => handleUpdateInvoiceStatus(inv._id, st)}
+                                                className={`w-full text-[10px] font-extrabold p-2 rounded-xl text-left transition-colors ${
+                                                  inv.status === st 
+                                                    ? 'bg-green/10 text-green' 
+                                                    : 'text-navy hover:bg-navy/5'
+                                                }`}
+                                              >
+                                                {st}
+                                              </button>
+                                            ))}
+                                          </div>
+                                        )}
+                                      </div>
                                     </td>
                                     <td className="py-3.5 text-center">
                                       <button 
@@ -1330,6 +1453,100 @@ export const DashboardStub: React.FC = () => {
                               )}
                             </tbody>
                           </table>
+                        </div>
+
+                        {/* Mobile Cards View (under 640px) */}
+                        <div className="block sm:hidden flex flex-col gap-4 mt-2">
+                          {!stats?.recentInvoices || stats.recentInvoices.length === 0 ? (
+                            <div className="py-10 text-center flex flex-col items-center justify-center gap-2">
+                              <FileText className="h-8 w-8 text-text-secondary/40" />
+                              <span className="text-xs font-bold text-text-secondary">No invoices found</span>
+                              <Button
+                                onClick={() => setSearchParams({ tab: 'invoices', action: 'create' })}
+                                variant="primary"
+                                className="text-xs font-bold py-1.5 px-3 rounded-xl mt-1.5 shadow-sm"
+                              >
+                                Create First Invoice
+                              </Button>
+                            </div>
+                          ) : (
+                            stats.recentInvoices.map((inv) => (
+                              <div key={inv._id} className="p-4 bg-white/50 border border-navy/5 rounded-2xl flex flex-col gap-3 relative hover:border-green/20 transition-all">
+                                
+                                <div className="flex justify-between items-center">
+                                  <span className="font-mono font-bold text-green-dark text-xs">{inv.number}</span>
+                                  
+                                  <div className="relative">
+                                    <button
+                                      type="button"
+                                      onClick={() => setActiveStatusInvoiceId(activeStatusInvoiceId === inv._id ? null : inv._id)}
+                                      className={`inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[10px] font-extrabold cursor-pointer ${
+                                        inv.status === 'Paid'
+                                          ? 'bg-green/10 text-green'
+                                          : inv.status === 'Sent'
+                                            ? 'bg-blue-500/10 text-blue-500'
+                                            : inv.status === 'Viewed'
+                                              ? 'bg-teal-500/10 text-teal-600'
+                                              : inv.status === 'Overdue'
+                                                ? 'bg-red-500/10 text-red-500'
+                                                : 'bg-navy/10 text-navy/70'
+                                      }`}
+                                    >
+                                      {inv.status}
+                                      <ChevronDown className="h-2.5 w-2.5 opacity-60" />
+                                    </button>
+
+                                    {activeStatusInvoiceId === inv._id && (
+                                      <div className="absolute right-0 mt-1.5 z-30 w-32 bg-white border border-navy/5 shadow-2xl rounded-2xl p-1.5 flex flex-col gap-1 text-left animate-float-fast">
+                                        {['Draft', 'Sent', 'Paid', 'Overdue'].map((st) => (
+                                          <button
+                                            key={st}
+                                            type="button"
+                                            onClick={() => handleUpdateInvoiceStatus(inv._id, st)}
+                                            className={`w-full text-[10px] font-extrabold p-2 rounded-xl text-left transition-colors ${
+                                              inv.status === st 
+                                                ? 'bg-green/10 text-green' 
+                                                : 'text-navy hover:bg-navy/5'
+                                            }`}
+                                          >
+                                            {st}
+                                          </button>
+                                        ))}
+                                      </div>
+                                    )}
+                                  </div>
+                                </div>
+
+                                <div className="flex flex-col gap-1 text-[11px] text-text-secondary font-semibold">
+                                  <div className="flex justify-between">
+                                    <span>Client:</span>
+                                    <span className="text-navy font-extrabold">{inv.clientName}</span>
+                                  </div>
+                                  <div className="flex justify-between">
+                                    <span>Date:</span>
+                                    <span>{new Date(inv.date).toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric' })}</span>
+                                  </div>
+                                  <div className="flex justify-between">
+                                    <span>Due Date:</span>
+                                    <span>{new Date(inv.dueDate).toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric' })}</span>
+                                  </div>
+                                </div>
+
+                                <hr className="border-navy/5 my-0.5" />
+
+                                <div className="flex justify-between items-center">
+                                  <span className="font-extrabold text-sm text-navy">{formatINR(inv.totalAmount)}</span>
+                                  <button 
+                                    onClick={() => setSearchParams({ tab: 'invoices', action: 'detail', id: inv._id })}
+                                    className="p-1.5 hover:bg-navy/5 rounded-xl text-text-secondary hover:text-navy flex items-center gap-1.5 text-[10px] font-bold"
+                                  >
+                                    <Eye className="h-4 w-4" /> View Details
+                                  </button>
+                                </div>
+
+                              </div>
+                            ))
+                          )}
                         </div>
                       </div>
                     </div>
@@ -1348,7 +1565,7 @@ export const DashboardStub: React.FC = () => {
                       </Button>
 
                       {/* Quick Actions List card - Aligned to core plan modules */}
-                      <div className="bg-white border border-navy/5 p-6 rounded-2xl shadow-sm flex flex-col gap-4">
+                      <div className="glass-card p-6 rounded-3xl flex flex-col gap-4 hover:shadow-md transition-all duration-300">
                         <h4 className="text-xs font-bold uppercase tracking-wider text-text-secondary">Quick Actions</h4>
                         <div className="flex flex-col gap-1 text-xs font-semibold">
                           
@@ -1376,7 +1593,7 @@ export const DashboardStub: React.FC = () => {
                       </div>
 
                       {/* Recent Activity timeline widget */}
-                      <div className="bg-white border border-navy/5 p-6 rounded-2xl shadow-sm flex flex-col gap-4">
+                      <div className="glass-card p-6 rounded-3xl flex flex-col gap-4 hover:shadow-md transition-all duration-300">
                         <h4 className="text-xs font-bold uppercase tracking-wider text-text-secondary">Recent Payments Activity</h4>
                         <div className="flex flex-col gap-3.5 text-xs text-text-secondary font-semibold">
                           
@@ -1424,186 +1641,242 @@ export const DashboardStub: React.FC = () => {
                CLIENTS MANAGEMENT TAB VIEW (CRUD INTEGRATION)
                ======================================================== */
             <div className="flex flex-col gap-8 max-w-7xl mx-auto">
-              
-              {/* Clients Page Title Section */}
-              <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center bg-white border border-navy/5 p-6 rounded-2xl shadow-sm gap-4">
-                <div>
-                  <h2 className="text-xl font-extrabold text-navy tracking-tight">Clients Directory</h2>
-                  <p className="text-xs text-text-secondary font-semibold mt-0.5">
-                    Manage client profiles, addresses, tax IDs, and billing contacts.
-                  </p>
-                </div>
-                <Button 
-                  onClick={openAddClientModal}
-                  variant="primary" 
-                  className="flex items-center gap-2 text-xs font-bold py-2.5 px-4 shadow-md hover:shadow-lg rounded-xl"
-                >
-                  <UserPlus className="h-4.5 w-4.5" />
-                  Add Client
-                </Button>
-              </div>
 
-              {/* Client List Grid Search / Metrics */}
-              <div className="grid grid-cols-1 lg:grid-cols-4 gap-6">
-                
-                {/* Search & Actions Panel */}
-                <div className="lg:col-span-1 flex flex-col gap-6">
-                  
-                  {/* Filter Search */}
-                  <GlassCard className="p-6 bg-white border-navy/5 shadow-sm flex flex-col gap-4">
-                    <h3 className="text-xs font-extrabold uppercase tracking-wider text-text-secondary">Search & Filters</h3>
-                    <div className="relative">
-                      <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 h-4 w-4 text-text-secondary" />
-                      <input
-                        type="text"
-                        placeholder="Search clients..."
-                        value={clientSearchQuery}
-                        onChange={(e) => setClientSearchQuery(e.target.value)}
-                        className="w-full pl-10 pr-4 py-2.5 text-xs rounded-xl border border-navy/10 bg-[#F8FAFC] text-navy focus:outline-none focus:border-green focus:bg-white transition-all font-semibold"
-                      />
+              {/* ── If a client is selected, show ClientDetail. Otherwise show list. ── */}
+              {selectedClientId ? (
+                <ClientDetail
+                  clientId={selectedClientId}
+                  onBack={() => setSelectedClientId(null)}
+                  onEdit={(client) => { openEditClientModal(client as any); setSelectedClientId(null); }}
+                  onNavigateToInvoice={(invoiceId) => {
+                    setSelectedClientId(null);
+                    setSearchParams({ tab: 'invoices', action: 'detail', id: invoiceId });
+                  }}
+                  onAddNotification={addNotification}
+                />
+              ) : (
+                <>
+                  {/* Clients Page Title Section */}
+                  <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center bg-white border border-navy/5 p-6 rounded-2xl shadow-sm gap-4">
+                    <div>
+                      <h2 className="text-xl font-extrabold text-navy tracking-tight">Clients Directory</h2>
+                      <p className="text-xs text-text-secondary font-semibold mt-0.5">
+                        Manage client profiles, addresses, tax IDs, and billing contacts.
+                      </p>
                     </div>
+                    <Button 
+                      onClick={openAddClientModal}
+                      variant="primary" 
+                      className="flex items-center gap-2 text-xs font-bold py-2.5 px-4 shadow-md hover:shadow-lg rounded-xl"
+                    >
+                      <UserPlus className="h-4.5 w-4.5" />
+                      Add Client
+                    </Button>
+                  </div>
+
+                  {/* Client List Grid Search / Metrics */}
+                  <div className="grid grid-cols-1 lg:grid-cols-4 gap-6">
                     
-                    {clientSearchQuery && (
-                      <button
-                        onClick={() => setClientSearchQuery('')}
-                        className="text-left text-xs font-bold text-red-500 hover:underline flex items-center gap-1.5"
-                      >
-                        <X className="h-3.5 w-3.5" /> Clear search filter
-                      </button>
-                    )}
-                  </GlassCard>
-
-                  {/* Summary Metric card */}
-                  <GlassCard className="p-6 bg-gradient-to-br from-white to-green-mint/5 border-green/20 shadow-sm flex flex-col gap-3">
-                    <h4 className="text-xs font-extrabold uppercase tracking-wider text-text-secondary">Clients Summary</h4>
-                    <div className="flex items-baseline gap-2">
-                      <span className="text-4xl font-extrabold text-navy">{filteredClients.length}</span>
-                      <span className="text-xs font-bold text-text-secondary">Total matching</span>
-                    </div>
-                    <p className="text-[11px] text-text-secondary leading-relaxed">
-                      All metrics and tables are strictly isolated. No database query spills exist across tenants.
-                    </p>
-                  </GlassCard>
-
-                </div>
-
-                {/* Clients Table Card list */}
-                <div className="lg:col-span-3">
-                  <GlassCard className="p-6 bg-white border-navy/5 shadow-sm min-h-[400px] flex flex-col">
-                    
-                    {loading ? (
-                      /* Loading Skeletons */
-                      <div className="flex-1 flex flex-col gap-4 justify-center items-center py-10">
-                        <div className="w-10 h-10 border-4 border-green/20 border-t-green rounded-full animate-spin"></div>
-                        <span className="text-xs font-bold text-text-secondary animate-pulse">Retrieving isolated tenant lists...</span>
-                      </div>
-                    ) : filteredClients.length === 0 ? (
-                      /* Empty State */
-                      <div className="flex-1 flex flex-col items-center justify-center text-center py-12 px-6">
-                        <div className="p-4 bg-green/10 rounded-full text-green mb-4 animate-float-medium">
-                          <Users className="h-10 w-10" />
+                    {/* Search & Actions Panel */}
+                    <div className="lg:col-span-1 flex flex-col gap-6">
+                      
+                      {/* Filter Search */}
+                      <GlassCard className="p-6 bg-white border-navy/5 shadow-sm flex flex-col gap-4">
+                        <h3 className="text-xs font-extrabold uppercase tracking-wider text-text-secondary">Search & Filters</h3>
+                        <div className="relative">
+                          <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 h-4 w-4 text-text-secondary" />
+                          <input
+                            type="text"
+                            placeholder="Search clients..."
+                            value={clientSearchQuery}
+                            onChange={(e) => setClientSearchQuery(e.target.value)}
+                            className="w-full pl-10 pr-4 py-2.5 text-xs rounded-xl border border-navy/10 bg-[#F8FAFC] text-navy focus:outline-none focus:border-green focus:bg-white transition-all font-semibold"
+                          />
                         </div>
-                        <h3 className="text-base font-bold text-navy">No clients found</h3>
-                        <p className="text-xs text-text-secondary max-w-sm mt-1.5 leading-relaxed font-semibold">
-                          {clientSearchQuery 
-                            ? "No profiles match your search criteria. Try modifying the spelling or filters."
-                            : "Your tenant workspace client register is currently empty. Get started by adding your first client."}
-                        </p>
-                        {!clientSearchQuery && (
-                          <Button 
-                            onClick={openAddClientModal}
-                            variant="primary" 
-                            className="mt-6 text-xs font-bold py-2.5 px-5 shadow rounded-xl flex items-center gap-2"
+                        
+                        {clientSearchQuery && (
+                          <button
+                            onClick={() => setClientSearchQuery('')}
+                            className="text-left text-xs font-bold text-red-500 hover:underline flex items-center gap-1.5"
                           >
-                            <Plus className="h-4 w-4" /> Add First Client
-                          </Button>
+                            <X className="h-3.5 w-3.5" /> Clear search filter
+                          </button>
                         )}
-                      </div>
-                    ) : (
-                      /* Clients Directory Table */
-                      <div className="overflow-x-auto flex-1">
-                        <table className="w-full text-left text-xs border-collapse">
-                          <thead>
-                            <tr className="border-b border-navy/5 text-text-secondary uppercase text-[10px] tracking-wider font-extrabold">
-                              <th className="pb-3 pr-2">Client Details</th>
-                              <th className="pb-3 pr-2">Tax ID</th>
-                              <th className="pb-3 pr-2">Phone</th>
-                              <th className="pb-3 pr-2">Address</th>
-                              <th className="pb-3 pr-2">Joined</th>
-                              <th className="pb-3 text-center">Action</th>
-                            </tr>
-                          </thead>
-                          <tbody className="divide-y divide-navy/5 text-navy font-semibold">
-                            {filteredClients.map((client) => (
-                              <tr key={client._id} className="hover:bg-cream/40 transition-colors">
-                                <td className="py-4 pr-2">
-                                  <div className="flex flex-col gap-0.5">
-                                    <span className="font-extrabold text-sm">{client.name}</span>
-                                    <span className="text-[10px] font-semibold text-text-secondary lowercase">{client.email}</span>
-                                  </div>
-                                </td>
-                                <td className="py-4 pr-2">
-                                  {client.taxId ? (
-                                    <span className="font-mono text-[10px] bg-green/10 text-green-dark border border-green/20 px-2 py-0.5 rounded-full font-bold">
-                                      {client.taxId}
-                                    </span>
-                                  ) : (
-                                    <span className="text-[10px] text-text-secondary font-medium italic">Not set</span>
-                                  )}
-                                </td>
-                                <td className="py-4 pr-2 text-text-secondary font-mono">
-                                  {client.phone || '-'}
-                                </td>
-                                <td className="py-4 pr-2 text-text-secondary max-w-[150px] truncate" title={client.address}>
-                                  {client.address || '-'}
-                                </td>
-                                <td className="py-4 pr-2 text-text-secondary text-[11px]">
-                                  {new Date(client.createdAt).toLocaleDateString(undefined, { 
-                                    year: 'numeric', 
-                                    month: 'short', 
-                                    day: 'numeric' 
-                                  })}
-                                </td>
-                                <td className="py-4 text-center relative">
-                                  <button
-                                    onClick={() => setActiveMenuId(activeMenuId === client._id ? null : client._id)}
-                                    className="p-1.5 hover:bg-navy/5 rounded-xl text-text-secondary cursor-pointer transition-all inline-block"
+
+                        {/* Sort Control */}
+                        <div className="flex flex-col gap-1.5">
+                          <label className="text-[10px] font-extrabold uppercase tracking-wider text-text-secondary">Sort By</label>
+                          <select
+                            value={clientSortBy}
+                            onChange={(e) => { setClientSortBy(e.target.value as any); fetchClients(); }}
+                            className="w-full px-3 py-2.5 text-xs rounded-xl border border-navy/10 bg-[#F8FAFC] text-navy focus:outline-none focus:border-green focus:bg-white transition-all font-semibold cursor-pointer"
+                          >
+                            <option value="name">Name (A–Z)</option>
+                            <option value="date">Date Added (Newest)</option>
+                            <option value="outstanding">Outstanding (Highest)</option>
+                          </select>
+                        </div>
+
+                        {/* Country Filter */}
+                        <div className="flex flex-col gap-1.5">
+                          <label className="text-[10px] font-extrabold uppercase tracking-wider text-text-secondary">Country</label>
+                          <select
+                            value={clientCountryFilter}
+                            onChange={(e) => { setClientCountryFilter(e.target.value); fetchClients(); }}
+                            className="w-full px-3 py-2.5 text-xs rounded-xl border border-navy/10 bg-[#F8FAFC] text-navy focus:outline-none focus:border-green focus:bg-white transition-all font-semibold cursor-pointer"
+                          >
+                            <option value="All">All Countries</option>
+                            <option value="India">India</option>
+                            <option value="USA">USA</option>
+                            <option value="UK">UK</option>
+                            <option value="UAE">UAE</option>
+                            <option value="Others">Others</option>
+                          </select>
+                        </div>
+                      </GlassCard>
+
+                      {/* Summary Metric card */}
+                      <GlassCard className="p-6 bg-gradient-to-br from-white to-green-mint/5 border-green/20 shadow-sm flex flex-col gap-3">
+                        <h4 className="text-xs font-extrabold uppercase tracking-wider text-text-secondary">Clients Summary</h4>
+                        <div className="flex items-baseline gap-2">
+                          <span className="text-4xl font-extrabold text-navy">{filteredClients.length}</span>
+                          <span className="text-xs font-bold text-text-secondary">Total matching</span>
+                        </div>
+                        <p className="text-[11px] text-text-secondary leading-relaxed">
+                          All metrics and tables are strictly isolated. No database query spills exist across tenants.
+                        </p>
+                      </GlassCard>
+                    </div>
+
+                    {/* Clients Table Card list */}
+                    <div className="lg:col-span-3">
+                      <GlassCard className="p-6 bg-white border-navy/5 shadow-sm min-h-[400px] flex flex-col">
+                        
+                        {loading ? (
+                          <div className="flex-1 flex flex-col gap-4 justify-center items-center py-10">
+                            <div className="w-10 h-10 border-4 border-green/20 border-t-green rounded-full animate-spin"></div>
+                            <span className="text-xs font-bold text-text-secondary animate-pulse">Retrieving isolated tenant lists...</span>
+                          </div>
+                        ) : filteredClients.length === 0 ? (
+                          <div className="flex-1 flex flex-col items-center justify-center text-center py-12 px-6">
+                            <div className="p-4 bg-green/10 rounded-full text-green mb-4 animate-float-medium">
+                              <Users className="h-10 w-10" />
+                            </div>
+                            <h3 className="text-base font-bold text-navy">No clients found</h3>
+                            <p className="text-xs text-text-secondary max-w-sm mt-1.5 leading-relaxed font-semibold">
+                              {clientSearchQuery 
+                                ? "No profiles match your search criteria. Try modifying the spelling or filters."
+                                : "Your tenant workspace client register is currently empty. Get started by adding your first client."}
+                            </p>
+                            {!clientSearchQuery && (
+                              <Button 
+                                onClick={openAddClientModal}
+                                variant="primary" 
+                                className="mt-6 text-xs font-bold py-2.5 px-5 shadow rounded-xl flex items-center gap-2"
+                              >
+                                <Plus className="h-4 w-4" /> Add First Client
+                              </Button>
+                            )}
+                          </div>
+                        ) : (
+                          <div className="overflow-x-auto flex-1">
+                            <table className="w-full text-left text-xs border-collapse">
+                              <thead>
+                                <tr className="border-b border-navy/5 text-text-secondary uppercase text-[10px] tracking-wider font-extrabold">
+                                  <th className="pb-3 pr-3">Client</th>
+                                  <th className="pb-3 pr-3">GST / Tax ID</th>
+                                  <th className="pb-3 pr-3 text-right">Billed</th>
+                                  <th className="pb-3 pr-3 text-right">Paid</th>
+                                  <th className="pb-3 pr-3 text-right">Outstanding</th>
+                                  <th className="pb-3 text-center">Action</th>
+                                </tr>
+                              </thead>
+                              <tbody className="divide-y divide-navy/5 text-navy font-semibold">
+                                {filteredClients.map((client) => (
+                                  <tr
+                                    key={client._id}
+                                    className="hover:bg-cream/50 transition-colors cursor-pointer"
+                                    onClick={() => setSelectedClientId(client._id)}
                                   >
-                                    <MoreHorizontal className="h-4.5 w-4.5" />
-                                  </button>
-
-                                  {/* Floating Actions overlay */}
-                                  {activeMenuId === client._id && (
-                                    <div 
-                                      ref={actionMenuRef}
-                                      className="absolute right-0 top-12 z-30 w-32 bg-white border border-navy/5 shadow-lg rounded-2xl p-2 flex flex-col gap-1.5 animate-float-fast text-left"
-                                    >
+                                    <td className="py-4 pr-3">
+                                      <div className="flex items-center gap-3">
+                                        <div className="shrink-0 w-8 h-8 rounded-xl bg-gradient-to-br from-green/20 to-green-mint/30 flex items-center justify-center text-green-dark font-extrabold text-[10px]">
+                                          {client.name.split(' ').map((w: string) => w[0]).join('').toUpperCase().slice(0, 2)}
+                                        </div>
+                                        <div className="flex flex-col gap-0.5 min-w-0">
+                                          <span className="font-extrabold text-sm truncate">{client.name}</span>
+                                          {client.companyName && (
+                                            <span className="text-[10px] font-semibold text-green-dark truncate">{client.companyName}</span>
+                                          )}
+                                          <span className="text-[10px] font-semibold text-text-secondary lowercase truncate">{client.email}</span>
+                                        </div>
+                                      </div>
+                                    </td>
+                                    <td className="py-4 pr-3">
+                                      {(client.gstNumber || client.taxId) ? (
+                                        <span className="font-mono text-[10px] bg-green/10 text-green-dark border border-green/20 px-2 py-0.5 rounded-full font-bold">
+                                          {client.gstNumber || client.taxId}
+                                        </span>
+                                      ) : (
+                                        <span className="text-[10px] text-text-secondary font-medium italic">Not set</span>
+                                      )}
+                                    </td>
+                                    <td className="py-4 pr-3 text-right font-bold text-navy">
+                                      {client.totalBilled !== undefined ? formatINR(client.totalBilled) : '—'}
+                                    </td>
+                                    <td className="py-4 pr-3 text-right font-semibold text-green-dark">
+                                      {client.totalPaid !== undefined ? formatINR(client.totalPaid) : '—'}
+                                    </td>
+                                    <td className="py-4 pr-3 text-right">
+                                      <span className={`font-bold ${(client.totalOutstanding ?? 0) > 0 ? 'text-danger' : 'text-text-secondary'}`}>
+                                        {client.totalOutstanding !== undefined ? formatINR(client.totalOutstanding) : '—'}
+                                      </span>
+                                    </td>
+                                    <td className="py-4 text-center relative" onClick={(e) => e.stopPropagation()}>
                                       <button
-                                        onClick={() => openEditClientModal(client)}
-                                        className="w-full text-xs font-bold text-navy hover:text-green hover:bg-green/5 p-2 rounded-xl flex items-center gap-2 text-left transition-colors"
+                                        onClick={() => setActiveMenuId(activeMenuId === client._id ? null : client._id)}
+                                        className="p-1.5 hover:bg-navy/5 rounded-xl text-text-secondary cursor-pointer transition-all inline-block"
                                       >
-                                        <Edit2 className="h-3.5 w-3.5" /> Edit
+                                        <MoreHorizontal className="h-4.5 w-4.5" />
                                       </button>
-                                      <hr className="border-navy/5" />
-                                      <button
-                                        onClick={() => setIsDeletingClient(client)}
-                                        className="w-full text-xs font-bold text-red-500 hover:bg-red-500/5 p-2 rounded-xl flex items-center gap-2 text-left transition-colors"
-                                      >
-                                        <Trash2 className="h-3.5 w-3.5" /> Delete
-                                      </button>
-                                    </div>
-                                  )}
-                                </td>
-                              </tr>
-                            ))}
-                          </tbody>
-                        </table>
-                      </div>
-                    )}
-                  </GlassCard>
-                </div>
-
-              </div>
+                                      {activeMenuId === client._id && (
+                                        <div 
+                                          ref={actionMenuRef}
+                                          className="absolute right-0 top-12 z-30 w-36 bg-white border border-navy/5 shadow-lg rounded-2xl p-2 flex flex-col gap-1.5 animate-float-fast text-left"
+                                        >
+                                          <button
+                                            onClick={() => { setSelectedClientId(client._id); setActiveMenuId(null); }}
+                                            className="w-full text-xs font-bold text-navy hover:text-green hover:bg-green/5 p-2 rounded-xl flex items-center gap-2 text-left transition-colors"
+                                          >
+                                            <Eye className="h-3.5 w-3.5" /> View Details
+                                          </button>
+                                          <button
+                                            onClick={() => openEditClientModal(client)}
+                                            className="w-full text-xs font-bold text-navy hover:text-green hover:bg-green/5 p-2 rounded-xl flex items-center gap-2 text-left transition-colors"
+                                          >
+                                            <Edit2 className="h-3.5 w-3.5" /> Edit
+                                          </button>
+                                          <hr className="border-navy/5" />
+                                          <button
+                                            onClick={() => setIsDeletingClient(client)}
+                                            className="w-full text-xs font-bold text-red-500 hover:bg-red-500/5 p-2 rounded-xl flex items-center gap-2 text-left transition-colors"
+                                          >
+                                            <Trash2 className="h-3.5 w-3.5" /> Delete
+                                          </button>
+                                        </div>
+                                      )}
+                                    </td>
+                                  </tr>
+                                ))}
+                              </tbody>
+                            </table>
+                          </div>
+                        )}
+                      </GlassCard>
+                    </div>
+                  </div>
+                </>
+              )}
 
             </div>
           ) : activeTab === 'profile' ? (
@@ -1645,17 +1918,32 @@ export const DashboardStub: React.FC = () => {
             {/* Modal Input Form */}
             <form onSubmit={handleClientSubmit} className="flex flex-col gap-4 text-xs font-semibold">
               
-              {/* Name field */}
-              <div className="flex flex-col gap-1.5">
-                <label className="text-text-secondary">Client Full Name *</label>
-                <input
-                  type="text"
-                  required
-                  placeholder="e.g. Acme Corporation or Jane Doe"
-                  value={clientForm.name}
-                  onChange={(e) => setClientForm({ ...clientForm, name: e.target.value })}
-                  className="w-full px-4 py-3 rounded-2xl border border-navy/10 bg-[#F8FAFC] text-navy focus:outline-none focus:border-green focus:bg-white transition-all font-semibold"
-                />
+              {/* Name & Company Name grid */}
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                {/* Name field */}
+                <div className="flex flex-col gap-1.5">
+                  <label className="text-text-secondary">Contact Full Name *</label>
+                  <input
+                    type="text"
+                    required
+                    placeholder="e.g. Ramesh Kumar"
+                    value={clientForm.name}
+                    onChange={(e) => setClientForm({ ...clientForm, name: e.target.value })}
+                    className="w-full px-4 py-3 rounded-2xl border border-navy/10 bg-[#F8FAFC] text-navy focus:outline-none focus:border-green focus:bg-white transition-all font-semibold"
+                  />
+                </div>
+
+                {/* Company Name field */}
+                <div className="flex flex-col gap-1.5">
+                  <label className="text-text-secondary">Company / Org Name</label>
+                  <input
+                    type="text"
+                    placeholder="e.g. Acme Corp Pvt Ltd"
+                    value={clientForm.companyName}
+                    onChange={(e) => setClientForm({ ...clientForm, companyName: e.target.value })}
+                    className="w-full px-4 py-3 rounded-2xl border border-navy/10 bg-[#F8FAFC] text-navy focus:outline-none focus:border-green focus:bg-white transition-all font-semibold"
+                  />
+                </div>
               </div>
 
               {/* Email field */}
@@ -1684,12 +1972,42 @@ export const DashboardStub: React.FC = () => {
                   />
                 </div>
 
-                {/* Tax ID field */}
+                {/* Country field */}
                 <div className="flex flex-col gap-1.5">
-                  <label className="text-text-secondary">Tax ID / GSTIN / VAT</label>
+                  <label className="text-text-secondary">Country</label>
+                  <select
+                    value={clientForm.country}
+                    onChange={(e) => setClientForm({ ...clientForm, country: e.target.value })}
+                    className="w-full px-4 py-3 rounded-2xl border border-navy/10 bg-[#F8FAFC] text-navy focus:outline-none focus:border-green focus:bg-white transition-all font-semibold cursor-pointer"
+                  >
+                    <option value="India">India</option>
+                    <option value="USA">USA</option>
+                    <option value="UK">UK</option>
+                    <option value="UAE">UAE</option>
+                    <option value="Others">Others</option>
+                  </select>
+                </div>
+              </div>
+
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                {/* GST Number field */}
+                <div className="flex flex-col gap-1.5">
+                  <label className="text-text-secondary">GST Number (GSTIN)</label>
                   <input
                     type="text"
-                    placeholder="27AAAAA1111A1Z1"
+                    placeholder="27AAACR5055K1Z5"
+                    value={clientForm.gstNumber}
+                    onChange={(e) => setClientForm({ ...clientForm, gstNumber: e.target.value.toUpperCase() })}
+                    className="w-full px-4 py-3 rounded-2xl border border-navy/10 bg-[#F8FAFC] text-navy focus:outline-none focus:border-green focus:bg-white transition-all font-semibold font-mono"
+                  />
+                </div>
+
+                {/* Tax ID field */}
+                <div className="flex flex-col gap-1.5">
+                  <label className="text-text-secondary">Tax ID / VAT (Other)</label>
+                  <input
+                    type="text"
+                    placeholder="Generic tax identifier"
                     value={clientForm.taxId}
                     onChange={(e) => setClientForm({ ...clientForm, taxId: e.target.value })}
                     className="w-full px-4 py-3 rounded-2xl border border-navy/10 bg-[#F8FAFC] text-navy focus:outline-none focus:border-green focus:bg-white transition-all font-semibold"
@@ -1702,9 +2020,21 @@ export const DashboardStub: React.FC = () => {
                 <label className="text-text-secondary">Physical Billing Address</label>
                 <textarea
                   placeholder="Street, City, State, ZIP, Country"
-                  rows={3}
+                  rows={2}
                   value={clientForm.address}
                   onChange={(e) => setClientForm({ ...clientForm, address: e.target.value })}
+                  className="w-full px-4 py-3 rounded-2xl border border-navy/10 bg-[#F8FAFC] text-navy focus:outline-none focus:border-green focus:bg-white transition-all font-semibold resize-none"
+                />
+              </div>
+
+              {/* Notes field */}
+              <div className="flex flex-col gap-1.5">
+                <label className="text-text-secondary">Internal Notes / Special Instructions</label>
+                <textarea
+                  placeholder="e.g. Always include PO number on invoices, net-30 terms..."
+                  rows={2}
+                  value={clientForm.notes}
+                  onChange={(e) => setClientForm({ ...clientForm, notes: e.target.value })}
                   className="w-full px-4 py-3 rounded-2xl border border-navy/10 bg-[#F8FAFC] text-navy focus:outline-none focus:border-green focus:bg-white transition-all font-semibold resize-none"
                 />
               </div>
@@ -1768,6 +2098,49 @@ export const DashboardStub: React.FC = () => {
               </Button>
             </div>
 
+          </div>
+        </div>
+      )}
+
+      {/* 3. Reports locked feature overview Modal */}
+      {isReportsModalOpen && (
+        <div className="fixed inset-0 bg-[#06121E]/60 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+          <div className="w-full max-w-md bg-white rounded-3xl border border-navy/5 shadow-2xl p-6 md:p-8 flex flex-col gap-5 text-center animate-float-fast">
+            <div className="p-4 bg-green/10 text-green rounded-full mx-auto w-16 h-16 flex items-center justify-center text-2xl">
+              📊
+            </div>
+            <div>
+              <h3 className="text-lg font-extrabold text-navy">Reports & Advanced Analytics</h3>
+              <span className="text-[10px] bg-green/15 text-green-dark border border-green/20 px-2 py-0.5 rounded-full font-bold uppercase tracking-wider mt-1.5 inline-block">
+                Premium Pro Feature
+              </span>
+              <p className="text-xs text-text-secondary font-semibold mt-3.5 leading-relaxed">
+                Unlock advanced financial reporting tools designed to simplify your bookkeeping and business analytics:
+              </p>
+              <ul className="text-left text-xs font-semibold text-navy/80 mt-4 flex flex-col gap-2 bg-[#F8FAFC] p-4 rounded-2xl border border-navy/5">
+                <li className="flex items-center gap-2">
+                  <span className="text-green font-bold">✓</span> GST/Tax ready report exports
+                </li>
+                <li className="flex items-center gap-2">
+                  <span className="text-green font-bold">✓</span> Dynamic Profit & Loss statements
+                </li>
+                <li className="flex items-center gap-2">
+                  <span className="text-green font-bold">✓</span> Multi-currency invoicing charts
+                </li>
+                <li className="flex items-center gap-2">
+                  <span className="text-green font-bold">✓</span> Automatic CSV & PDF invoice backups
+                </li>
+              </ul>
+            </div>
+            <div className="flex flex-col gap-2.5 pt-3">
+              <Button
+                variant="primary"
+                onClick={() => setIsReportsModalOpen(false)}
+                className="w-full py-3 text-xs font-bold shadow-md"
+              >
+                Close Preview
+              </Button>
+            </div>
           </div>
         </div>
       )}

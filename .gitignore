@@ -30,6 +30,7 @@ build/
 *.jpg
 *.jpeg
 *.webp
+*.txt
 
 # Planning files
 Raw_Plan*

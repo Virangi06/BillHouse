@@ -3,6 +3,7 @@ import bcryptjs from 'bcryptjs';
 
 export interface IUser extends Document {
   name: string;
+  businessName?: string;  // Optional business/company name collected at registration
   email: string;
   passwordHash: string;
   tenantId: string;
@@ -19,6 +20,7 @@ export interface IUser extends Document {
 const UserSchema: Schema = new Schema(
   {
     name: { type: String, required: true, trim: true },
+    businessName: { type: String, trim: true },  // Optional business name from registration
     email: { 
       type: String, 
       required: true, 

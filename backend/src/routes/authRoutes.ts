@@ -37,7 +37,7 @@ const validatePassword = (pwd: string): string | null => {
 // 1. SIGN UP
 router.post('/signup', async (req: any, res: any) => {
   try {
-    const { name, email, password } = req.body;
+    const { name, email, password, businessName } = req.body;
 
     if (!name || !email || !password) {
       return res.status(400).json({ error: 'All fields are required' });
@@ -68,6 +68,7 @@ router.post('/signup', async (req: any, res: any) => {
 
     const user = new User({
       name,
+      businessName: businessName?.trim() || '',
       email: email.toLowerCase(),
       passwordHash,
       tenantId,
@@ -157,6 +158,7 @@ router.post('/login', async (req: any, res: any) => {
       user: {
         id: user._id,
         name: user.name,
+        businessName: user.businessName || '',
         email: user.email,
         tenantId: user.tenantId
       }

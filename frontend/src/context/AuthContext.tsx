@@ -4,6 +4,7 @@ import API from '../utils/api';
 export interface UserProfile {
   id: string;
   name: string;
+  businessName?: string;
   email: string;
   tenantId: string;
 }
@@ -41,6 +42,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
             const freshUser = {
               id: response.data.user._id,
               name: response.data.user.name,
+              businessName: response.data.user.businessName || '',
               email: response.data.user.email,
               tenantId: response.data.user.tenantId
             };
@@ -80,6 +82,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         const freshUser = {
           id: response.data.user._id,
           name: response.data.user.name,
+          businessName: response.data.user.businessName || '',
           email: response.data.user.email,
           tenantId: response.data.user.tenantId
         };

@@ -1,7 +1,9 @@
 import React, { useState, useRef } from 'react';
+import { Link } from 'react-router-dom';
 import API from '../../utils/api';
 import { useBusinessProfile, type BusinessProfile } from '../../context/BusinessContext';
 import { useAuth } from '../../context/AuthContext';
+import logoTransparent from '../../assets/Logo_transparent.png';
 import {
   Building2, User, Briefcase,
   MapPin, FileText, CheckCircle,
@@ -57,7 +59,7 @@ const OnboardingWizard: React.FC = () => {
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   const [form, setForm] = useState<FormData>({
-    name: user?.name ? `${user.name}'s Business` : '',
+    name: user?.businessName || (user?.name ? `${user.name}'s Business` : ''),
     type: 'freelancer',
     email: user?.email || '',
     phone: '',
@@ -134,6 +136,13 @@ const OnboardingWizard: React.FC = () => {
 
 
 
+  const handleSkipStep = () => {
+    // Only callable on Step 3 (Branding) and Step 4 (Bank Details)
+    setErrorMsg(null);
+    if (currentStep === 3) setCurrentStep(4);
+    else if (currentStep === 4) handleSave(); // Skip bank details and save immediately
+  };
+
   const handleSave = async () => {
     if (!validateStep()) return;
     setSaving(true);
@@ -167,46 +176,65 @@ const OnboardingWizard: React.FC = () => {
     }
   };
 
-  const inputClass = `w-full bg-white border border-navy/10 rounded-xl px-4 py-3 text-sm text-navy 
-    placeholder:text-text-secondary/50 focus:outline-none focus:ring-2 focus:ring-green/30 
+  const inputClass = `w-full bg-white border border-navy/10 rounded-xl px-4 py-3 text-base text-navy 
+    placeholder:text-navy/40 shadow-sm focus:outline-none focus:ring-2 focus:ring-green/30 
     focus:border-green/40 transition-all`;
   const labelClass = `block text-xs font-bold text-navy/70 mb-1.5 uppercase tracking-wide`;
 
   return (
-    <div className="fixed inset-0 z-[100] bg-navy/95 backdrop-blur-md flex items-center justify-center p-4">
-      <div className="w-full max-w-2xl bg-cream-50 rounded-3xl shadow-2xl overflow-hidden flex flex-col max-h-[95vh]">
+    <div className="fixed inset-0 z-[100] bg-cream flex flex-col items-center justify-start py-8 md:py-16 px-4 overflow-y-auto bg-gradient-mesh font-sans">
+      {/* Blur Background Elements */}
+      <div className="absolute top-0 right-0 w-[400px] h-[400px] bg-green-mint/15 rounded-full blur-[100px] pointer-events-none z-0"></div>
+      <div className="absolute bottom-0 left-0 w-[300px] h-[300px] bg-green/5 rounded-full blur-[80px] pointer-events-none z-0"></div>
+
+      <div className="w-full max-w-2xl bg-white border border-navy/5 rounded-3xl shadow-2xl flex flex-col relative z-10 my-auto">
 
         {/* Header */}
-        <div className="bg-navy px-8 pt-8 pb-6 shrink-0">
-          <div className="flex items-center gap-3 mb-6">
-            <div className="w-10 h-10 bg-green rounded-xl flex items-center justify-center">
-              <span className="text-xl">⚡</span>
+        <div className="px-8 pt-8 pb-6 border-b border-navy/5 shrink-0 bg-white rounded-t-3xl">
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-6">
+            <div className="flex items-center gap-3">
+              <Link to="/">
+                <img 
+                  src={logoTransparent} 
+                  alt="BillHouse Logo" 
+                  className="h-10 w-auto object-contain" 
+                />
+              </Link>
+              <div className="h-6 w-px bg-navy/10 hidden sm:block"></div>
+              <div>
+                <h1 className="text-navy font-extrabold text-base tracking-tight">Setup Wizard</h1>
+                <p className="text-text-secondary text-xs">Let's configure your business defaults</p>
+              </div>
             </div>
-            <div>
-              <h1 className="text-white font-black text-lg tracking-tight">Welcome to BillHouse!</h1>
-              <p className="text-white/60 text-xs">Let's set up your business profile to get started</p>
+            <div className="px-3.5 py-1.5 bg-green-mint/10 border border-green-mint/20 text-green-dark rounded-xl text-xs font-black self-start sm:self-auto flex items-center gap-1.5">
+              <span className="w-2 h-2 rounded-full bg-green animate-pulse"></span>
+              First Time Setup
             </div>
           </div>
 
           {/* Step indicators */}
-          <div className="flex items-center gap-2">
+          <div className="flex items-center gap-2 overflow-x-auto pb-1 no-scrollbar">
             {STEPS.map((step, i) => {
               const Icon = step.icon;
               const isCompleted = currentStep > step.id;
               const isActive = currentStep === step.id;
               return (
                 <React.Fragment key={step.id}>
-                  <div className={`flex items-center gap-2 px-3 py-2 rounded-xl transition-all text-xs font-bold
-                    ${isActive ? 'bg-green text-white' : isCompleted ? 'bg-green/20 text-green' : 'bg-white/10 text-white/40'}`}>
+                  <div className={`flex items-center gap-2 px-3.5 py-2 rounded-xl transition-all text-xs font-bold shrink-0
+                    ${isActive 
+                      ? 'bg-navy text-white shadow-sm' 
+                      : isCompleted 
+                        ? 'bg-green/10 text-green border border-green/20' 
+                        : 'bg-navy/5 text-navy/40 border border-navy/5'}`}>
                     {isCompleted
-                      ? <CheckCircle className="h-3.5 w-3.5" />
+                      ? <CheckCircle className="h-3.5 w-3.5 text-green" />
                       : <Icon className="h-3.5 w-3.5" />
                     }
                     <span className="hidden sm:inline">{step.title}</span>
                     <span className="sm:hidden">{step.id}</span>
                   </div>
                   {i < STEPS.length - 1 && (
-                    <div className={`h-px flex-1 transition-all ${isCompleted ? 'bg-green/50' : 'bg-white/10'}`} />
+                    <div className={`h-0.5 flex-1 min-w-[12px] transition-all ${isCompleted ? 'bg-green/35' : 'bg-navy/10'}`} />
                   )}
                 </React.Fragment>
               );
@@ -247,15 +275,15 @@ const OnboardingWizard: React.FC = () => {
                       key={value}
                       type="button"
                       onClick={() => set('type', value)}
-                      className={`flex flex-col items-start gap-2 p-4 rounded-2xl border-2 text-left transition-all
+                      className={`flex flex-col items-start gap-2.5 p-4 rounded-2xl border-2 text-left transition-all active:scale-98
                         ${form.type === value
-                          ? 'border-green bg-green/8 shadow-sm'
-                          : 'border-navy/10 bg-white hover:border-navy/20'}`}
+                          ? 'border-green bg-green/5 shadow-sm text-navy'
+                          : 'border-navy/10 bg-white hover:border-navy/20 text-navy'}`}
                     >
                       <Icon className={`h-5 w-5 ${form.type === value ? 'text-green' : 'text-navy/40'}`} />
                       <div>
-                        <div className={`text-xs font-extrabold ${form.type === value ? 'text-green' : 'text-navy'}`}>{label}</div>
-                        <div className="text-[10px] text-text-secondary leading-tight">{desc}</div>
+                        <div className={`text-xs font-black ${form.type === value ? 'text-green-dark' : 'text-navy'}`}>{label}</div>
+                        <div className="text-[10px] text-text-secondary font-medium leading-tight mt-0.5">{desc}</div>
                       </div>
                     </button>
                   ))}
@@ -480,24 +508,35 @@ const OnboardingWizard: React.FC = () => {
         </div>
 
         {/* Footer Navigation */}
-        <div className="px-8 py-5 bg-white border-t border-navy/8 flex items-center justify-between gap-4 shrink-0">
+        <div className="px-8 py-5 bg-white border-t border-navy/5 flex items-center justify-between gap-4 shrink-0 rounded-b-3xl">
           <button
             onClick={handleBack}
             disabled={currentStep === 1}
-            className={`flex items-center gap-2 px-4 py-2.5 rounded-xl text-sm font-bold transition-all
-              ${currentStep === 1 ? 'opacity-0 pointer-events-none' : 'text-navy/60 hover:text-navy hover:bg-navy/5'}`}
+            className={`flex items-center gap-2 px-4 py-2.5 rounded-xl text-sm font-extrabold transition-all duration-200
+              ${currentStep === 1 ? 'opacity-0 pointer-events-none' : 'text-navy/60 hover:text-navy hover:bg-navy/5 active:scale-98'}`}
           >
             <ChevronLeft className="h-4 w-4" />
             Back
           </button>
 
           <div className="flex items-center gap-3">
+            {/* Skip button — only shown on optional steps (3 & 4) */}
+            {(currentStep === 3 || currentStep === 4) && (
+              <button
+                type="button"
+                onClick={handleSkipStep}
+                disabled={saving}
+                className="text-xs font-bold text-navy/50 hover:text-navy/80 transition-colors px-3 py-2 rounded-xl hover:bg-navy/5 disabled:opacity-50"
+              >
+                {currentStep === 3 ? 'Skip for now →' : 'Skip & Finish'}
+              </button>
+            )}
             {/* Next / Finish */}
             {currentStep < 4 ? (
               <button
                 id="ob-next-btn"
                 onClick={handleNext}
-                className="flex items-center gap-2 bg-navy text-white px-6 py-2.5 rounded-xl text-sm font-extrabold hover:bg-navy/90 transition-all shadow-sm"
+                className="flex items-center gap-2 bg-navy hover:bg-green-dark text-white px-6 py-2.5 rounded-xl text-sm font-extrabold transition-all duration-200 shadow shadow-sm active:scale-98"
               >
                 Next
                 <ChevronRight className="h-4 w-4" />
@@ -507,7 +546,7 @@ const OnboardingWizard: React.FC = () => {
                 id="ob-save-btn"
                 onClick={handleSave}
                 disabled={saving}
-                className="flex items-center gap-2 bg-green text-white px-6 py-2.5 rounded-xl text-sm font-extrabold hover:bg-green/90 transition-all shadow-sm disabled:opacity-60"
+                className="flex items-center gap-2 bg-green hover:bg-green-dark text-white px-6 py-2.5 rounded-xl text-sm font-extrabold transition-all duration-200 shadow shadow-sm active:scale-98 disabled:opacity-60"
               >
                 {saving ? (
                   <>

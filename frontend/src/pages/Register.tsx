@@ -10,6 +10,7 @@ import { MailOpen } from 'lucide-react';
 
 interface RegisterFormInputs {
   name: string;
+  businessName?: string;
   email: string;
   passwordHash: string;
   confirmPassword: string;
@@ -33,6 +34,7 @@ export const Register: React.FC = () => {
         name: data.name,
         email: data.email,
         password: data.passwordHash,
+        businessName: data.businessName,
       });
 
       setSuccessMsg(response.data.message || 'Registration successful! Verification email has been sent.');
@@ -100,6 +102,14 @@ export const Register: React.FC = () => {
             placeholder="Enter Your Full Name"
             error={errors.name?.message}
             {...register('name', { required: 'Name is required' })}
+          />
+
+          {/* Business / Company Name field */}
+          <Input
+            label="Business / Company Name"
+            placeholder="Your company or freelance brand name (optional)"
+            error={errors.businessName?.message}
+            {...register('businessName')}
           />
 
           {/* Email field */}
