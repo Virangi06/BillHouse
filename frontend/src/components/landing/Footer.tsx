@@ -1,6 +1,6 @@
 import React from 'react';
 import { Link } from 'react-router-dom';
-import logo from '../../assets/Logo_transparent.png';
+import logo from '../../assets/Logo_white.png';
 
 export const Footer: React.FC = () => {
   const currentYear = new Date().getFullYear();
@@ -22,8 +22,7 @@ export const Footer: React.FC = () => {
               <img 
                 src={logo} 
                 alt="BillHouse Logo" 
-                className="h-[29px] sm:h-[33px] md:h-[37px] lg:h-[41px] w-auto object-contain" 
-                style={{ filter: 'brightness(0) invert(1)' }}
+                className="h-[31px] sm:h-[35px] md:h-[39px] lg:h-[43px] w-auto object-contain" 
               />
             </Link>
             <p className="text-text-secondary text-sm leading-relaxed max-w-sm">
@@ -59,13 +58,8 @@ export const Footer: React.FC = () => {
         </div>
 
         {/* Footer Bottom */}
-        <div className="border-t border-white/5 pt-8 flex flex-col md:flex-row items-center justify-between gap-4 text-xs text-text-secondary font-medium">
+        <div className="border-t border-white/5 pt-8 text-center text-xs text-text-secondary font-medium">
           <p>© {currentYear} BillHouse Technologies Inc. All rights reserved.</p>
-          <div className="flex gap-6">
-            <a href="#" className="hover:text-white transition-colors">Twitter</a>
-            <a href="#" className="hover:text-white transition-colors">GitHub</a>
-            <a href="#" className="hover:text-white transition-colors">LinkedIn</a>
-          </div>
         </div>
 
       </div>

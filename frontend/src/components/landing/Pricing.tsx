@@ -73,12 +73,12 @@ export const Pricing: React.FC = () => {
         </div>
 
         {/* Pricing Cards Grid */}
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-8 max-w-4xl mx-auto items-stretch">
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-5 md:gap-8 max-w-4xl mx-auto items-stretch">
           {plans.map((plan, idx) => (
             <GlassCard
               key={idx}
               variant={plan.variant}
-              className={`p-6 sm:p-8 md:p-10 flex flex-col justify-between relative border-navy/10 ${
+              className={`p-5 sm:p-8 md:p-10 flex flex-col justify-between relative border-navy/10 ${
                 plan.isPopular 
                   ? 'ring-2 ring-green shadow-xl scale-100 md:scale-105 z-10' 
                   : 'shadow-md scale-100 md:scale-100 z-0'
@@ -93,19 +93,19 @@ export const Pricing: React.FC = () => {
 
               <div>
                 {/* Plan Header */}
-                <div className="mb-6">
-                  <h3 className="text-xl font-bold uppercase tracking-wider mb-2">{plan.name}</h3>
-                  <p className="text-xs opacity-70 mb-4">{plan.description}</p>
+                <div className="mb-4 md:mb-6">
+                  <h3 className="text-lg md:text-xl font-bold uppercase tracking-wider mb-1.5 md:mb-2">{plan.name}</h3>
+                  <p className="text-xs opacity-70 mb-3 md:mb-4">{plan.description}</p>
                   <div className="flex items-baseline">
-                    <span className="text-5xl font-extrabold">{plan.price}</span>
+                    <span className="text-4xl md:text-5xl font-extrabold">{plan.price}</span>
                     <span className="text-sm font-medium ml-1">/{plan.period}</span>
                   </div>
                 </div>
 
-                <hr className={`border-t mb-8 ${plan.variant === 'dark' ? 'border-white/10' : 'border-navy/5'}`} />
+                <hr className={`border-t mb-5 md:mb-8 ${plan.variant === 'dark' ? 'border-white/10' : 'border-navy/5'}`} />
 
                 {/* Features List */}
-                <ul className="flex flex-col gap-4 mb-8">
+                <ul className="flex flex-col gap-2.5 md:gap-4 mb-6 md:mb-8">
                   {plan.features.map((feat, fIdx) => (
                     <li 
                       key={fIdx} 
@@ -127,7 +127,7 @@ export const Pricing: React.FC = () => {
               {/* Action Button */}
               <Link
                 to={plan.ctaLink}
-                className={`w-full text-center py-4 rounded-xl font-bold transition-all duration-200 active:scale-98 text-sm md:text-base ${
+                className={`w-full text-center py-3 md:py-4 rounded-xl font-bold transition-all duration-200 active:scale-98 text-sm md:text-base ${
                   plan.isPopular
                     ? 'bg-green text-white hover:bg-green-light shadow-md'
                     : 'bg-navy text-white hover:bg-green-dark shadow'
