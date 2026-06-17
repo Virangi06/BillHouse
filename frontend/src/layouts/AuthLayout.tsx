@@ -18,8 +18,8 @@ export const AuthLayout: React.FC<AuthLayoutProps> = ({
   return (
     <div className="min-h-screen grid grid-cols-1 lg:grid-cols-12 bg-cream font-sans">
       
-      {/* Back to Home floating action */}
-      <div className="absolute top-6 left-6 z-30">
+      {/* Back to Home floating action (Desktop only) */}
+      <div className="hidden lg:block absolute top-6 left-6 z-30">
         <Link
           to="/"
           className="inline-flex items-center gap-2 px-4 py-2 border border-navy/15 text-navy hover:bg-navy/5 rounded-xl text-sm font-semibold transition-all duration-200"
@@ -61,11 +61,22 @@ export const AuthLayout: React.FC<AuthLayoutProps> = ({
       </div>
 
       {/* Right side panel (Auth Form panel) */}
-      <div className="col-span-1 lg:col-span-7 flex items-center justify-center p-6 pt-24 md:p-12 relative overflow-hidden bg-gradient-mesh">
+      <div className="col-span-1 lg:col-span-7 flex flex-col items-center justify-center p-4 py-12 sm:p-6 md:p-12 relative overflow-hidden bg-gradient-mesh min-h-screen lg:min-h-0">
         {/* Blur backgrounds */}
         <div className="absolute top-1/4 right-1/4 w-[350px] h-[350px] bg-green-mint/15 rounded-full blur-[100px] pointer-events-none z-0"></div>
 
         <div className="w-full max-w-md relative z-10 flex flex-col gap-6">
+          {/* Mobile Back Button */}
+          <div className="flex lg:hidden justify-start">
+            <Link
+              to="/"
+              className="inline-flex items-center gap-2 px-3.5 py-1.5 border border-navy/15 text-navy hover:bg-navy/5 rounded-xl text-xs font-semibold transition-all duration-200"
+            >
+              <ArrowLeft className="h-3.5 w-3.5" />
+              Back Home
+            </Link>
+          </div>
+
           <div className="text-center lg:text-left">
             {/* Mobile Logo Branding */}
             <div className="flex justify-center lg:hidden mb-6">
@@ -77,8 +88,8 @@ export const AuthLayout: React.FC<AuthLayoutProps> = ({
                 />
               </Link>
             </div>
-            <h1 className="text-3xl font-extrabold text-navy tracking-tight">{title}</h1>
-            <p className="text-text-secondary text-sm font-semibold mt-1">{subtitle}</p>
+            <h1 className="text-3xl sm:text-2xl lg:text-3xl font-extrabold text-navy tracking-tight">{title}</h1>
+            <p className="text-text-secondary text-sm sm:text-xs lg:text-sm font-semibold mt-1.5">{subtitle}</p>
           </div>
           
           {children}

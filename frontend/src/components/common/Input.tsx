@@ -4,22 +4,26 @@ import { Eye, EyeOff } from 'lucide-react';
 interface InputProps extends React.InputHTMLAttributes<HTMLInputElement> {
   label: string;
   error?: string;
+  rightLabel?: React.ReactNode;
 }
 
 export const Input = forwardRef<HTMLInputElement, InputProps>(
-  ({ label, error, type = 'text', className = '', id, ...props }, ref) => {
+  ({ label, error, type = 'text', className = '', id, rightLabel, ...props }, ref) => {
     const [showPassword, setShowPassword] = useState(false);
     const inputId = id || `input-${label.toLowerCase().replace(/\s+/g, '-')}`;
     const isPasswordType = type === 'password';
 
     return (
       <div className="flex flex-col gap-1.5 w-full">
-        <label
-          htmlFor={inputId}
-          className="text-xs font-semibold uppercase tracking-wider text-text-secondary select-none"
-        >
-          {label}
-        </label>
+        <div className="flex justify-between items-center w-full">
+          <label
+            htmlFor={inputId}
+            className="text-xs font-semibold uppercase tracking-wider text-text-secondary select-none"
+          >
+            {label}
+          </label>
+          {rightLabel}
+        </div>
         <div className="relative w-full">
           <input
             id={inputId}

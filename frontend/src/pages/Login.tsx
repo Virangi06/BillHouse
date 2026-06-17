@@ -62,7 +62,7 @@ export const Login: React.FC = () => {
       title="Welcome back"
       subtitle="Sign in to your BillHouse invoicing dashboard"
     >
-      <GlassCard className="p-8 border-navy/5 bg-white shadow-xl flex flex-col gap-6">
+      <GlassCard className="p-5 sm:p-6 md:p-8 border-navy/5 bg-white shadow-xl flex flex-col gap-6">
         
         {/* Error Notification Alert */}
         {errorMsg && (
@@ -88,38 +88,27 @@ export const Login: React.FC = () => {
           />
 
           {/* Password field */}
-          <div>
-            <div className="flex justify-between items-center mb-1">
-              <label className="text-xs font-semibold uppercase tracking-wider text-text-secondary select-none">
-                Password
-              </label>
+          <Input
+            label="Password"
+            type="password"
+            placeholder="••••••••"
+            error={errors.password?.message}
+            rightLabel={
               <Link
                 to="/forgot-password"
                 className="text-xs font-bold text-green hover:underline"
               >
                 Forgot?
               </Link>
-            </div>
-            <input
-              type="password"
-              placeholder="••••••••"
-              className={`glass-input px-4 py-3 rounded-xl text-navy placeholder-navy/40 text-base shadow-sm focus:outline-none w-full ${
-                errors.password ? 'border-danger focus:border-danger' : ''
-              }`}
-              {...register('password', {
-                required: 'Password is required',
-                minLength: {
-                  value: 6,
-                  message: 'Password must be at least 6 characters',
-                },
-              })}
-            />
-            {errors.password && (
-              <span className="text-sm font-medium text-danger mt-1 block">
-                {errors.password.message}
-              </span>
-            )}
-          </div>
+            }
+            {...register('password', {
+              required: 'Password is required',
+              minLength: {
+                value: 6,
+                message: 'Password must be at least 6 characters',
+              },
+            })}
+          />
 
           {/* Remember me options */}
           <div className="flex items-center justify-between select-none">

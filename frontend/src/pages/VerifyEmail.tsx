@@ -43,7 +43,7 @@ export const VerifyEmail: React.FC = () => {
       title="Verify account"
       subtitle="Connecting you to BillHouse"
     >
-      <GlassCard className="p-8 border-navy/5 bg-white shadow-xl flex flex-col items-center text-center gap-6">
+      <GlassCard className="p-5 sm:p-6 md:p-8 border-navy/5 bg-white shadow-xl flex flex-col items-center text-center gap-6">
         {status === 'loading' && (
           <>
             <Loader2 className="h-12 w-12 animate-spin text-green" />

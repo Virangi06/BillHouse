@@ -57,7 +57,7 @@ export const ResetPassword: React.FC = () => {
         title="Password updated"
         subtitle="Your password has been changed"
       >
-        <GlassCard className="p-8 border-green/20 bg-white shadow-xl flex flex-col items-center text-center gap-6">
+        <GlassCard className="p-5 sm:p-6 md:p-8 border-green/20 bg-white shadow-xl flex flex-col items-center text-center gap-6">
           <div className="p-4 bg-green/10 text-green rounded-full">
             <CheckCircle2 className="h-12 w-12" />
           </div>
@@ -83,7 +83,7 @@ export const ResetPassword: React.FC = () => {
       title="Create new password"
       subtitle="Password must be at least 8 characters with uppercase, lowercase, number & special character"
     >
-      <GlassCard className="p-8 border-navy/5 bg-white shadow-xl flex flex-col gap-6">
+      <GlassCard className="p-5 sm:p-6 md:p-8 border-navy/5 bg-white shadow-xl flex flex-col gap-6">
         
         {/* Error notification */}
         {errorMsg && (

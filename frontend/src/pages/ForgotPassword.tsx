@@ -45,7 +45,7 @@ export const ForgotPassword: React.FC = () => {
         title="Check your email"
         subtitle="Password recovery sent"
       >
-        <GlassCard className="p-8 border-green/20 bg-white shadow-xl flex flex-col items-center text-center gap-6">
+        <GlassCard className="p-5 sm:p-6 md:p-8 border-green/20 bg-white shadow-xl flex flex-col items-center text-center gap-6">
           <div className="p-4 bg-green/10 text-green rounded-full">
             <MailCheck className="h-12 w-12" />
           </div>
@@ -74,7 +74,7 @@ export const ForgotPassword: React.FC = () => {
       title="Reset password"
       subtitle="Enter your email to receive recovery link"
     >
-      <GlassCard className="p-8 border-navy/5 bg-white shadow-xl flex flex-col gap-6">
+      <GlassCard className="p-5 sm:p-6 md:p-8 border-navy/5 bg-white shadow-xl flex flex-col gap-6">
         
         {/* Error notification */}
         {errorMsg && (
