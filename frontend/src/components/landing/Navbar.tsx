@@ -27,10 +27,11 @@ export const Navbar: React.FC = () => {
 
   return (
     <nav
-      className={`fixed top-0 left-0 right-0 z-50 transition-all duration-300 ${scrolled
-        ? 'bg-cream/80 backdrop-blur-md border-b border-navy/5 py-2.5 lg:py-4 shadow-sm'
-        : 'bg-transparent py-3.5 lg:py-5'
-        }`}
+      className={`fixed top-0 left-0 right-0 z-50 transition-all duration-300 ${
+        scrolled || isOpen
+          ? 'bg-cream/95 backdrop-blur-md border-b border-navy/5 py-2.5 lg:py-4 shadow-sm'
+          : 'bg-transparent py-3.5 lg:py-5'
+      }`}
     >
       <div className="max-w-7xl mx-auto px-6 lg:px-8">
         <div className="flex items-center justify-between">
@@ -126,10 +127,10 @@ export const Navbar: React.FC = () => {
         {/* Mobile Navigation Drawer */}
         <div
           className={`md:hidden overflow-hidden transition-all duration-300 ease-in-out ${
-            isOpen ? 'max-h-[500px] opacity-100 mt-4' : 'max-h-0 opacity-0 pointer-events-none'
+            isOpen ? 'max-h-[500px] opacity-100 mt-2 pb-4' : 'max-h-0 opacity-0 pointer-events-none'
           }`}
         >
-          <div className="py-4 px-2 bg-cream-dark/95 backdrop-blur-lg rounded-2xl border border-navy/5 shadow-lg flex flex-col gap-2">
+          <div className="flex flex-col gap-2 pt-2 border-t border-navy/5 mt-2">
             <button
               onClick={() => scrollToSection('features')}
               className="text-left px-4 py-3 text-base font-semibold text-text-secondary hover:text-navy rounded-xl transition-colors duration-200 hover:bg-navy/5"

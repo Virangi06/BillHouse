@@ -118,19 +118,27 @@ export const Register: React.FC = () => {
           />
 
           {/* Password field */}
-          <Input
-            label="Password"
-            type="password"
-            placeholder="••••••••"
-            error={errors.passwordHash?.message}
-            {...register('passwordHash', {
-              required: 'Password is required',
-              minLength: {
-                value: 6,
-                message: 'Password must be at least 6 characters',
-              },
-            })}
-          />
+          <div className="flex flex-col gap-1.5 w-full">
+            <Input
+              label="Password"
+              type="password"
+              placeholder="••••••••"
+              error={errors.passwordHash?.message}
+              {...register('passwordHash', {
+                required: 'Password is required',
+                validate: {
+                  minLength: (v) => v.length >= 8 || 'Password must be at least 8 characters',
+                  uppercase: (v) => /[A-Z]/.test(v) || 'Password must contain at least one uppercase letter',
+                  lowercase: (v) => /[a-z]/.test(v) || 'Password must contain at least one lowercase letter',
+                  number: (v) => /[0-9]/.test(v) || 'Password must contain at least one number',
+                  special: (v) => /[^A-Za-z0-9]/.test(v) || 'Password must contain at least one special character',
+                }
+              })}
+            />
+            <p className="text-[11px] text-text-secondary font-medium leading-normal px-1">
+              Password must be at least 8 characters, including 1 uppercase, 1 lowercase, 1 number, and 1 special symbol.
+            </p>
+          </div>
 
           {/* Confirm Password field */}
           <Input

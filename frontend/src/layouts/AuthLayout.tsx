@@ -2,6 +2,7 @@ import React from 'react';
 import { Link } from 'react-router-dom';
 import { ShieldCheck, ArrowLeft } from 'lucide-react';
 import logo from '../assets/Logo_white.png';
+import logoTransparent from '../assets/Logo_transparent.png';
 
 interface AuthLayoutProps {
   children: React.ReactNode;
@@ -60,12 +61,22 @@ export const AuthLayout: React.FC<AuthLayoutProps> = ({
       </div>
 
       {/* Right side panel (Auth Form panel) */}
-      <div className="col-span-1 lg:col-span-7 flex items-center justify-center p-6 md:p-12 relative overflow-hidden bg-gradient-mesh">
+      <div className="col-span-1 lg:col-span-7 flex items-center justify-center p-6 pt-24 md:p-12 relative overflow-hidden bg-gradient-mesh">
         {/* Blur backgrounds */}
         <div className="absolute top-1/4 right-1/4 w-[350px] h-[350px] bg-green-mint/15 rounded-full blur-[100px] pointer-events-none z-0"></div>
 
         <div className="w-full max-w-md relative z-10 flex flex-col gap-6">
           <div className="text-center lg:text-left">
+            {/* Mobile Logo Branding */}
+            <div className="flex justify-center lg:hidden mb-6">
+              <Link to="/">
+                <img 
+                  src={logoTransparent} 
+                  alt="BillHouse Logo" 
+                  className="h-10 w-auto object-contain" 
+                />
+              </Link>
+            </div>
             <h1 className="text-3xl font-extrabold text-navy tracking-tight">{title}</h1>
             <p className="text-text-secondary text-sm font-semibold mt-1">{subtitle}</p>
           </div>

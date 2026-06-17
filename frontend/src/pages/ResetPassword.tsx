@@ -81,7 +81,7 @@ export const ResetPassword: React.FC = () => {
   return (
     <AuthLayout
       title="Create new password"
-      subtitle="Password must be at least 6 characters long"
+      subtitle="Password must be at least 8 characters with uppercase, lowercase, number & special character"
     >
       <GlassCard className="p-8 border-navy/5 bg-white shadow-xl flex flex-col gap-6">
         
@@ -115,10 +115,13 @@ export const ResetPassword: React.FC = () => {
               error={errors.passwordHash?.message}
               {...register('passwordHash', {
                 required: 'Password is required',
-                minLength: {
-                  value: 6,
-                  message: 'Password must be at least 6 characters',
-                },
+                validate: {
+                  minLength: (v) => v.length >= 8 || 'Password must be at least 8 characters',
+                  uppercase: (v) => /[A-Z]/.test(v) || 'Password must contain at least one uppercase letter',
+                  lowercase: (v) => /[a-z]/.test(v) || 'Password must contain at least one lowercase letter',
+                  number: (v) => /[0-9]/.test(v) || 'Password must contain at least one number',
+                  special: (v) => /[^A-Za-z0-9]/.test(v) || 'Password must contain at least one special character',
+                }
               })}
             />
 
