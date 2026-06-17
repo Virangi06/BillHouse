@@ -62,7 +62,9 @@ export const InvoiceForm: React.FC<InvoiceFormProps> = ({ onAddNotification }) =
   const [clientError, setClientError] = useState<string | null>(null);
 
   // Form State
-  const [selectedClientId, setSelectedClientId] = useState<string>('');
+  const [selectedClientId, setSelectedClientId] = useState<string>(() => {
+    return searchParams.get('clientId') || '';
+  });
   const [invoiceNumber, setInvoiceNumber] = useState<string>('INV-XXXXXX');
   const [date, setDate] = useState<string>(new Date().toISOString().split('T')[0]);
   const [dueDate, setDueDate] = useState<string>(() => {
@@ -124,6 +126,11 @@ export const InvoiceForm: React.FC<InvoiceFormProps> = ({ onAddNotification }) =
     fetchClients();
     if (action === 'edit' && invoiceId) {
       fetchInvoiceForEdit(invoiceId);
+    } else if (action === 'create') {
+      const cid = searchParams.get('clientId');
+      if (cid) {
+        setSelectedClientId(cid);
+      }
     }
   }, [action, invoiceId]);
 

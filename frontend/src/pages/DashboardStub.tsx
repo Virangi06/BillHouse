@@ -273,7 +273,7 @@ export const DashboardStub: React.FC = () => {
   useEffect(() => {
     fetchClients();
     fetchDashboardStats();
-  }, [activeTab]);
+  }, [activeTab, clientSortBy, clientCountryFilter]);
 
   // Handle click outside hooks
   useEffect(() => {
@@ -1640,7 +1640,7 @@ export const DashboardStub: React.FC = () => {
             /* ========================================================
                CLIENTS MANAGEMENT TAB VIEW (CRUD INTEGRATION)
                ======================================================== */
-            <div className="flex flex-col gap-8 max-w-7xl mx-auto">
+            <div className="flex flex-col gap-8 w-full max-w-full px-1">
 
               {/* ── If a client is selected, show ClientDetail. Otherwise show list. ── */}
               {selectedClientId ? (
@@ -1651,6 +1651,10 @@ export const DashboardStub: React.FC = () => {
                   onNavigateToInvoice={(invoiceId) => {
                     setSelectedClientId(null);
                     setSearchParams({ tab: 'invoices', action: 'detail', id: invoiceId });
+                  }}
+                  onNavigateToInvoiceCreate={(clientId) => {
+                    setSelectedClientId(null);
+                    setSearchParams({ tab: 'invoices', action: 'create', clientId: clientId });
                   }}
                   onAddNotification={addNotification}
                 />
@@ -1674,210 +1678,212 @@ export const DashboardStub: React.FC = () => {
                     </Button>
                   </div>
 
-                  {/* Client List Grid Search / Metrics */}
-                  <div className="grid grid-cols-1 lg:grid-cols-4 gap-6">
-                    
-                    {/* Search & Actions Panel */}
-                    <div className="lg:col-span-1 flex flex-col gap-6">
-                      
-                      {/* Filter Search */}
-                      <GlassCard className="p-6 bg-white border-navy/5 shadow-sm flex flex-col gap-4">
-                        <h3 className="text-xs font-extrabold uppercase tracking-wider text-text-secondary">Search & Filters</h3>
-                        <div className="relative">
-                          <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 h-4 w-4 text-text-secondary" />
-                          <input
-                            type="text"
-                            placeholder="Search clients..."
-                            value={clientSearchQuery}
-                            onChange={(e) => setClientSearchQuery(e.target.value)}
-                            className="w-full pl-10 pr-4 py-2.5 text-xs rounded-xl border border-navy/10 bg-[#F8FAFC] text-navy focus:outline-none focus:border-green focus:bg-white transition-all font-semibold"
-                          />
+                  {/* Top Stats Summary Strip */}
+                  <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+                    {/* Total Clients */}
+                    <GlassCard className="p-5 bg-gradient-to-br from-white to-slate-50/80 border border-navy/5 shadow-sm flex flex-col gap-2 hover:-translate-y-1 hover:border-navy/15 hover:shadow-[0_8px_30px_rgba(0,0,0,0.04)] transition-all duration-300">
+                      <div className="flex items-center justify-between">
+                        <span className="text-[10px] font-extrabold uppercase tracking-wider text-text-secondary">Total Clients</span>
+                        <div className="p-1.5 bg-navy/5 rounded-lg">
+                          <Users className="h-3.5 w-3.5 text-navy/60" />
                         </div>
-                        
-                        {clientSearchQuery && (
-                          <button
-                            onClick={() => setClientSearchQuery('')}
-                            className="text-left text-xs font-bold text-red-500 hover:underline flex items-center gap-1.5"
-                          >
-                            <X className="h-3.5 w-3.5" /> Clear search filter
-                          </button>
-                        )}
+                      </div>
+                      <p className="text-2xl font-extrabold text-navy">{filteredClients.length}</p>
+                      <p className="text-[11px] font-semibold text-text-secondary">Registered profiles</p>
+                    </GlassCard>
 
-                        {/* Sort Control */}
-                        <div className="flex flex-col gap-1.5">
-                          <label className="text-[10px] font-extrabold uppercase tracking-wider text-text-secondary">Sort By</label>
-                          <select
-                            value={clientSortBy}
-                            onChange={(e) => { setClientSortBy(e.target.value as any); fetchClients(); }}
-                            className="w-full px-3 py-2.5 text-xs rounded-xl border border-navy/10 bg-[#F8FAFC] text-navy focus:outline-none focus:border-green focus:bg-white transition-all font-semibold cursor-pointer"
-                          >
-                            <option value="name">Name (A–Z)</option>
-                            <option value="date">Date Added (Newest)</option>
-                            <option value="outstanding">Outstanding (Highest)</option>
-                          </select>
+                    {/* Total Billed */}
+                    <GlassCard className="p-5 bg-gradient-to-br from-white to-green/5 border border-green/10 shadow-sm flex flex-col gap-2 hover:-translate-y-1 hover:border-green/20 hover:shadow-[0_8px_30px_rgba(16,185,129,0.08)] transition-all duration-300">
+                      <div className="flex items-center justify-between">
+                        <span className="text-[10px] font-extrabold uppercase tracking-wider text-text-secondary">Total Billed Portfolio</span>
+                        <div className="p-1.5 bg-green/10 rounded-lg">
+                          <FileText className="h-3.5 w-3.5 text-green" />
                         </div>
+                      </div>
+                      <p className="text-2xl font-extrabold text-green-dark">
+                        {formatINR(filteredClients.reduce((sum, c) => sum + (c.totalBilled || 0), 0))}
+                      </p>
+                      <p className="text-[11px] font-semibold text-text-secondary">Total invoiced amount</p>
+                    </GlassCard>
 
-                        {/* Country Filter */}
-                        <div className="flex flex-col gap-1.5">
-                          <label className="text-[10px] font-extrabold uppercase tracking-wider text-text-secondary">Country</label>
-                          <select
-                            value={clientCountryFilter}
-                            onChange={(e) => { setClientCountryFilter(e.target.value); fetchClients(); }}
-                            className="w-full px-3 py-2.5 text-xs rounded-xl border border-navy/10 bg-[#F8FAFC] text-navy focus:outline-none focus:border-green focus:bg-white transition-all font-semibold cursor-pointer"
-                          >
-                            <option value="All">All Countries</option>
-                            <option value="India">India</option>
-                            <option value="USA">USA</option>
-                            <option value="UK">UK</option>
-                            <option value="UAE">UAE</option>
-                            <option value="Others">Others</option>
-                          </select>
+                    {/* Outstanding Receivables */}
+                    <GlassCard className={`p-5 shadow-sm flex flex-col gap-2 hover:-translate-y-1 hover:shadow-md transition-all duration-300 ${filteredClients.reduce((sum, c) => sum + (c.totalOutstanding || 0), 0) > 0 ? 'bg-gradient-to-br from-white to-amber-500/5 border border-amber-500/15 hover:border-amber-500/25 hover:shadow-[0_8px_30px_rgba(245,158,11,0.08)]' : 'bg-gradient-to-br from-white to-slate-50 border border-navy/5 hover:border-navy/15'}`}>
+                      <div className="flex items-center justify-between">
+                        <span className="text-[10px] font-extrabold uppercase tracking-wider text-text-secondary">Portfolio Outstanding</span>
+                        <div className={`p-1.5 rounded-lg ${filteredClients.reduce((sum, c) => sum + (c.totalOutstanding || 0), 0) > 0 ? 'bg-amber-500/10' : 'bg-navy/5'}`}>
+                          <Clock className={`h-3.5 w-3.5 ${filteredClients.reduce((sum, c) => sum + (c.totalOutstanding || 0), 0) > 0 ? 'text-amber-600' : 'text-navy/60'}`} />
                         </div>
-                      </GlassCard>
+                      </div>
+                      <p className={`text-2xl font-extrabold ${filteredClients.reduce((sum, c) => sum + (c.totalOutstanding || 0), 0) > 0 ? 'text-amber-600' : 'text-navy'}`}>
+                        {formatINR(filteredClients.reduce((sum, c) => sum + (c.totalOutstanding || 0), 0))}
+                      </p>
+                      <p className="text-[11px] font-semibold text-text-secondary">Outstanding balance</p>
+                    </GlassCard>
+                  </div>
 
-                      {/* Summary Metric card */}
-                      <GlassCard className="p-6 bg-gradient-to-br from-white to-green-mint/5 border-green/20 shadow-sm flex flex-col gap-3">
-                        <h4 className="text-xs font-extrabold uppercase tracking-wider text-text-secondary">Clients Summary</h4>
-                        <div className="flex items-baseline gap-2">
-                          <span className="text-4xl font-extrabold text-navy">{filteredClients.length}</span>
-                          <span className="text-xs font-bold text-text-secondary">Total matching</span>
-                        </div>
-                        <p className="text-[11px] text-text-secondary leading-relaxed">
-                          All metrics and tables are strictly isolated. No database query spills exist across tenants.
-                        </p>
-                      </GlassCard>
+                  {/* Control panel: search, sort, filters */}
+                  <div className="flex flex-col md:flex-row gap-4 justify-between items-stretch md:items-center">
+                    {/* Search bar */}
+                    <div className="relative max-w-md w-full">
+                      <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 h-4 w-4 text-text-secondary" />
+                      <input
+                        type="text"
+                        placeholder="Search clients by name, email, company, or tax ID..."
+                        value={clientSearchQuery}
+                        onChange={(e) => setClientSearchQuery(e.target.value)}
+                        className="w-full pl-10 pr-4 py-2.5 text-xs rounded-xl border border-navy/10 bg-white text-navy focus:outline-none focus:border-green focus:ring-1 focus:ring-green transition-all font-semibold"
+                      />
                     </div>
 
-                    {/* Clients Table Card list */}
-                    <div className="lg:col-span-3">
-                      <GlassCard className="p-6 bg-white border-navy/5 shadow-sm min-h-[400px] flex flex-col">
-                        
-                        {loading ? (
-                          <div className="flex-1 flex flex-col gap-4 justify-center items-center py-10">
-                            <div className="w-10 h-10 border-4 border-green/20 border-t-green rounded-full animate-spin"></div>
-                            <span className="text-xs font-bold text-text-secondary animate-pulse">Retrieving isolated tenant lists...</span>
-                          </div>
-                        ) : filteredClients.length === 0 ? (
-                          <div className="flex-1 flex flex-col items-center justify-center text-center py-12 px-6">
-                            <div className="p-4 bg-green/10 rounded-full text-green mb-4 animate-float-medium">
-                              <Users className="h-10 w-10" />
-                            </div>
-                            <h3 className="text-base font-bold text-navy">No clients found</h3>
-                            <p className="text-xs text-text-secondary max-w-sm mt-1.5 leading-relaxed font-semibold">
-                              {clientSearchQuery 
-                                ? "No profiles match your search criteria. Try modifying the spelling or filters."
-                                : "Your tenant workspace client register is currently empty. Get started by adding your first client."}
-                            </p>
-                            {!clientSearchQuery && (
-                              <Button 
-                                onClick={openAddClientModal}
-                                variant="primary" 
-                                className="mt-6 text-xs font-bold py-2.5 px-5 shadow rounded-xl flex items-center gap-2"
-                              >
-                                <Plus className="h-4 w-4" /> Add First Client
-                              </Button>
-                            )}
-                          </div>
-                        ) : (
-                          <div className="overflow-x-auto flex-1">
-                            <table className="w-full text-left text-xs border-collapse">
-                              <thead>
-                                <tr className="border-b border-navy/5 text-text-secondary uppercase text-[10px] tracking-wider font-extrabold">
-                                  <th className="pb-3 pr-3">Client</th>
-                                  <th className="pb-3 pr-3">GST / Tax ID</th>
-                                  <th className="pb-3 pr-3 text-right">Billed</th>
-                                  <th className="pb-3 pr-3 text-right">Paid</th>
-                                  <th className="pb-3 pr-3 text-right">Outstanding</th>
-                                  <th className="pb-3 text-center">Action</th>
-                                </tr>
-                              </thead>
-                              <tbody className="divide-y divide-navy/5 text-navy font-semibold">
-                                {filteredClients.map((client) => (
-                                  <tr
-                                    key={client._id}
-                                    className="hover:bg-cream/50 transition-colors cursor-pointer"
-                                    onClick={() => setSelectedClientId(client._id)}
-                                  >
-                                    <td className="py-4 pr-3">
-                                      <div className="flex items-center gap-3">
-                                        <div className="shrink-0 w-8 h-8 rounded-xl bg-gradient-to-br from-green/20 to-green-mint/30 flex items-center justify-center text-green-dark font-extrabold text-[10px]">
-                                          {client.name.split(' ').map((w: string) => w[0]).join('').toUpperCase().slice(0, 2)}
-                                        </div>
-                                        <div className="flex flex-col gap-0.5 min-w-0">
-                                          <span className="font-extrabold text-sm truncate">{client.name}</span>
-                                          {client.companyName && (
-                                            <span className="text-[10px] font-semibold text-green-dark truncate">{client.companyName}</span>
-                                          )}
-                                          <span className="text-[10px] font-semibold text-text-secondary lowercase truncate">{client.email}</span>
-                                        </div>
-                                      </div>
-                                    </td>
-                                    <td className="py-4 pr-3">
-                                      {(client.gstNumber || client.taxId) ? (
-                                        <span className="font-mono text-[10px] bg-green/10 text-green-dark border border-green/20 px-2 py-0.5 rounded-full font-bold">
-                                          {client.gstNumber || client.taxId}
-                                        </span>
-                                      ) : (
-                                        <span className="text-[10px] text-text-secondary font-medium italic">Not set</span>
-                                      )}
-                                    </td>
-                                    <td className="py-4 pr-3 text-right font-bold text-navy">
-                                      {client.totalBilled !== undefined ? formatINR(client.totalBilled) : '—'}
-                                    </td>
-                                    <td className="py-4 pr-3 text-right font-semibold text-green-dark">
-                                      {client.totalPaid !== undefined ? formatINR(client.totalPaid) : '—'}
-                                    </td>
-                                    <td className="py-4 pr-3 text-right">
-                                      <span className={`font-bold ${(client.totalOutstanding ?? 0) > 0 ? 'text-danger' : 'text-text-secondary'}`}>
-                                        {client.totalOutstanding !== undefined ? formatINR(client.totalOutstanding) : '—'}
-                                      </span>
-                                    </td>
-                                    <td className="py-4 text-center relative" onClick={(e) => e.stopPropagation()}>
-                                      <button
-                                        onClick={() => setActiveMenuId(activeMenuId === client._id ? null : client._id)}
-                                        className="p-1.5 hover:bg-navy/5 rounded-xl text-text-secondary cursor-pointer transition-all inline-block"
-                                      >
-                                        <MoreHorizontal className="h-4.5 w-4.5" />
-                                      </button>
-                                      {activeMenuId === client._id && (
-                                        <div 
-                                          ref={actionMenuRef}
-                                          className="absolute right-0 top-12 z-30 w-36 bg-white border border-navy/5 shadow-lg rounded-2xl p-2 flex flex-col gap-1.5 animate-float-fast text-left"
-                                        >
-                                          <button
-                                            onClick={() => { setSelectedClientId(client._id); setActiveMenuId(null); }}
-                                            className="w-full text-xs font-bold text-navy hover:text-green hover:bg-green/5 p-2 rounded-xl flex items-center gap-2 text-left transition-colors"
-                                          >
-                                            <Eye className="h-3.5 w-3.5" /> View Details
-                                          </button>
-                                          <button
-                                            onClick={() => openEditClientModal(client)}
-                                            className="w-full text-xs font-bold text-navy hover:text-green hover:bg-green/5 p-2 rounded-xl flex items-center gap-2 text-left transition-colors"
-                                          >
-                                            <Edit2 className="h-3.5 w-3.5" /> Edit
-                                          </button>
-                                          <hr className="border-navy/5" />
-                                          <button
-                                            onClick={() => setIsDeletingClient(client)}
-                                            className="w-full text-xs font-bold text-red-500 hover:bg-red-500/5 p-2 rounded-xl flex items-center gap-2 text-left transition-colors"
-                                          >
-                                            <Trash2 className="h-3.5 w-3.5" /> Delete
-                                          </button>
-                                        </div>
-                                      )}
-                                    </td>
-                                  </tr>
-                                ))}
-                              </tbody>
-                            </table>
-                          </div>
-                        )}
-                      </GlassCard>
+                    {/* Sorting & Filters */}
+                    <div className="flex flex-wrap sm:flex-nowrap gap-3 items-center">
+                      <div className="flex items-center gap-1.5">
+                        <span className="text-[10px] font-extrabold uppercase tracking-wider text-text-secondary whitespace-nowrap">Sort By:</span>
+                        <select
+                          value={clientSortBy}
+                          onChange={(e) => { setClientSortBy(e.target.value as any); }}
+                          className="px-3 py-2 text-xs rounded-xl border border-navy/10 bg-white text-navy focus:outline-none focus:border-green transition-all font-semibold cursor-pointer"
+                        >
+                          <option value="name">Name (A–Z)</option>
+                          <option value="date">Date Added</option>
+                          <option value="outstanding">Outstanding</option>
+                        </select>
+                      </div>
+
+                      <div className="flex items-center gap-1.5">
+                        <span className="text-[10px] font-extrabold uppercase tracking-wider text-text-secondary whitespace-nowrap">Country:</span>
+                        <select
+                          value={clientCountryFilter}
+                          onChange={(e) => { setClientCountryFilter(e.target.value); }}
+                          className="px-3 py-2.5 text-xs rounded-xl border border-navy/10 bg-white text-navy focus:outline-none focus:border-green transition-all font-semibold cursor-pointer"
+                        >
+                          <option value="All">All Countries</option>
+                          <option value="India">India</option>
+                          <option value="USA">USA</option>
+                          <option value="UK">UK</option>
+                          <option value="UAE">UAE</option>
+                          <option value="Others">Others</option>
+                        </select>
+                      </div>
                     </div>
                   </div>
+
+                  {/* Main Clients Table Card list */}
+                  <GlassCard className="overflow-hidden border-navy/5 shadow-sm min-h-[400px] flex flex-col bg-white">
+                    {loading ? (
+                      <div className="flex-1 flex flex-col gap-4 justify-center items-center py-16">
+                        <div className="w-10 h-10 border-4 border-green/20 border-t-green rounded-full animate-spin"></div>
+                        <span className="text-xs font-bold text-text-secondary animate-pulse">Retrieving isolated tenant lists...</span>
+                      </div>
+                    ) : filteredClients.length === 0 ? (
+                      <div className="flex-1 flex flex-col items-center justify-center text-center py-16 px-6">
+                        <div className="p-4 bg-green/10 rounded-full text-green mb-4 animate-float-medium">
+                          <Users className="h-10 w-10" />
+                        </div>
+                        <h3 className="text-base font-bold text-navy">No clients found</h3>
+                        <p className="text-xs text-text-secondary max-w-sm mt-1.5 leading-relaxed font-semibold">
+                          {clientSearchQuery 
+                            ? "No profiles match your search criteria. Try modifying the spelling or filters."
+                            : "Your tenant workspace client register is currently empty. Get started by adding your first client."}
+                        </p>
+                        {!clientSearchQuery && (
+                          <Button 
+                            onClick={openAddClientModal}
+                            variant="primary" 
+                            className="mt-6 text-xs font-bold py-2.5 px-5 shadow rounded-xl flex items-center gap-2"
+                          >
+                            <Plus className="h-4 w-4" /> Add First Client
+                          </Button>
+                        )}
+                      </div>
+                    ) : (
+                      <div className="overflow-x-auto w-full flex-1">
+                        <table className="w-full text-left text-xs border-collapse">
+                          <thead>
+                            <tr className="border-b border-navy/5 bg-[#F8FAFC]">
+                              <th className="py-4 px-6 text-xs font-extrabold uppercase text-text-secondary tracking-wider">Client</th>
+                              <th className="py-4 px-6 text-xs font-extrabold uppercase text-text-secondary tracking-wider">GST / Tax ID</th>
+                              <th className="py-4 px-6 text-xs font-extrabold uppercase text-text-secondary tracking-wider text-right">Billed</th>
+                              <th className="py-4 px-6 text-xs font-extrabold uppercase text-text-secondary tracking-wider text-right">Paid</th>
+                              <th className="py-4 px-6 text-xs font-extrabold uppercase text-text-secondary tracking-wider text-right">Outstanding</th>
+                              <th className="py-4 px-6 text-xs font-extrabold uppercase text-text-secondary tracking-wider text-center">Actions</th>
+                            </tr>
+                          </thead>
+                          <tbody className="divide-y divide-navy/5 text-navy font-semibold">
+                            {filteredClients.map((client) => (
+                              <tr
+                                key={client._id}
+                                className="hover:bg-navy/5 transition-colors cursor-pointer"
+                                onClick={() => setSelectedClientId(client._id)}
+                              >
+                                <td className="py-4 px-6">
+                                  <div className="flex items-center gap-3">
+                                    <div className="shrink-0 w-8 h-8 rounded-xl bg-gradient-to-br from-green/20 to-green-mint/30 flex items-center justify-center text-green-dark font-extrabold text-[10px]">
+                                      {client.name.split(' ').map((w: string) => w[0]).join('').toUpperCase().slice(0, 2)}
+                                    </div>
+                                    <div className="flex flex-col gap-0.5 min-w-0">
+                                      <span className="font-extrabold text-sm truncate">{client.name}</span>
+                                      {client.companyName && (
+                                        <span className="text-[10px] font-semibold text-green-dark truncate">{client.companyName}</span>
+                                      )}
+                                      <span className="text-[10px] font-semibold text-text-secondary lowercase truncate">{client.email}</span>
+                                    </div>
+                                  </div>
+                                </td>
+                                <td className="py-4 px-6">
+                                  {(client.gstNumber || client.taxId) ? (
+                                    <span className="font-mono text-[10px] bg-green/10 text-green-dark border border-green/20 px-2.5 py-0.5 rounded-full font-bold">
+                                      {client.gstNumber || client.taxId}
+                                    </span>
+                                  ) : (
+                                    <span className="text-[10px] text-text-secondary font-medium italic">Not set</span>
+                                  )}
+                                </td>
+                                <td className="py-4 px-6 text-right font-extrabold text-navy">
+                                  {client.totalBilled !== undefined ? formatINR(client.totalBilled) : '—'}
+                                </td>
+                                <td className="py-4 px-6 text-right font-semibold text-green-dark">
+                                  {client.totalPaid !== undefined ? formatINR(client.totalPaid) : '—'}
+                                </td>
+                                <td className="py-4 px-6 text-right">
+                                  <span className={`font-bold ${(client.totalOutstanding ?? 0) > 0 ? 'text-amber-600 font-extrabold' : 'text-navy/70'}`}>
+                                    {client.totalOutstanding !== undefined ? formatINR(client.totalOutstanding) : '—'}
+                                  </span>
+                                </td>
+                                <td className="py-4 px-6 text-center" onClick={(e) => e.stopPropagation()}>
+                                  <div className="flex items-center justify-center gap-2">
+                                    <button
+                                      onClick={() => setSelectedClientId(client._id)}
+                                      title="View Details"
+                                      className="p-1.5 hover:bg-navy/5 rounded-lg text-text-secondary hover:text-navy transition-all"
+                                    >
+                                      <Eye className="h-4.5 w-4.5" />
+                                    </button>
+                                    <button
+                                      onClick={() => openEditClientModal(client)}
+                                      title="Edit Client"
+                                      className="p-1.5 hover:bg-navy/5 rounded-lg text-text-secondary hover:text-navy transition-all"
+                                    >
+                                      <Edit2 className="h-4.5 w-4.5" />
+                                    </button>
+                                    <button
+                                      onClick={() => setIsDeletingClient(client)}
+                                      title="Delete Client"
+                                      className="p-1.5 hover:bg-red-500/10 rounded-lg text-text-secondary hover:text-red-600 transition-all"
+                                    >
+                                      <Trash2 className="h-4.5 w-4.5" />
+                                    </button>
+                                  </div>
+                                </td>
+                              </tr>
+                            ))}
+                          </tbody>
+                        </table>
+                      </div>
+                    )}
+                  </GlassCard>
                 </>
               )}
-
             </div>
           ) : activeTab === 'profile' ? (
             <BusinessProfilePage />
