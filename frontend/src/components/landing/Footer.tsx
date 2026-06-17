@@ -22,7 +22,8 @@ export const Footer: React.FC = () => {
               <img 
                 src={logo} 
                 alt="BillHouse Logo" 
-                className="h-8 sm:h-9 md:h-10 lg:h-12 w-auto object-contain" 
+                className="h-[29px] sm:h-[33px] md:h-[37px] lg:h-[41px] w-auto object-contain" 
+                style={{ filter: 'brightness(0) invert(1)' }}
               />
             </Link>
             <p className="text-text-secondary text-sm leading-relaxed max-w-sm">

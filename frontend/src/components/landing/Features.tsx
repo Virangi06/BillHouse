@@ -62,10 +62,12 @@ export const Features: React.FC = () => {
               className="p-6 sm:p-8 border-navy/5 bg-white shadow-sm hover:shadow-md transition-all duration-300 flex flex-col gap-4"
               hoverEffect
             >
-              <div className="p-3 bg-green/10 text-green rounded-2xl w-fit">
-                {feat.icon}
+              <div className="flex items-center gap-3">
+                <div className="p-3 bg-green/10 text-green rounded-2xl w-fit shrink-0">
+                  {feat.icon}
+                </div>
+                <h3 className="text-lg font-bold text-navy">{feat.title}</h3>
               </div>
-              <h3 className="text-lg font-bold text-navy">{feat.title}</h3>
               <p className="text-text-secondary text-sm leading-relaxed">{feat.description}</p>
             </GlassCard>
           ))}
