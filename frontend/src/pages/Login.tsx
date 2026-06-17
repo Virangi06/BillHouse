@@ -61,8 +61,9 @@ export const Login: React.FC = () => {
     <AuthLayout
       title="Welcome back"
       subtitle="Sign in to your BillHouse invoicing dashboard"
+      maxWidthClass="max-w-xl"
     >
-      <GlassCard className="p-5 sm:p-6 md:p-8 border-navy/5 bg-white shadow-xl flex flex-col gap-6">
+      <GlassCard className="w-full p-5 sm:p-6 md:p-8 border-navy/5 bg-white shadow-xl flex flex-col gap-6">
         
         {/* Error Notification Alert */}
         {errorMsg && (
@@ -71,7 +72,7 @@ export const Login: React.FC = () => {
           </div>
         )}
 
-        <form onSubmit={handleSubmit(onSubmit)} className="flex flex-col gap-5">
+        <form onSubmit={handleSubmit(onSubmit)} className="flex flex-col gap-4">
           {/* Email field */}
           <Input
             label="Email Address"
@@ -118,20 +119,20 @@ export const Login: React.FC = () => {
                 className="rounded border-navy/15 text-green focus:ring-green h-4.5 w-4.5"
                 {...register('rememberMe')}
               />
-              <span className="text-sm font-semibold text-text-secondary">
+              <span className="text-xs font-semibold text-text-secondary">
                 Remember me
               </span>
             </label>
           </div>
 
           {/* Submit Action */}
-          <Button type="submit" variant="primary" className="w-full py-4 mt-2" isLoading={isLoading}>
+          <Button type="submit" variant="primary" className="w-full py-3 mt-1" isLoading={isLoading}>
             Sign In
           </Button>
         </form>
 
         {/* Footer section link */}
-        <p className="text-sm text-text-secondary font-semibold text-center mt-2">
+        <p className="text-xs text-text-secondary font-semibold text-center mt-1">
           New to BillHouse?{' '}
           <Link to="/register" className="text-green hover:underline">
             Start free trial

@@ -258,17 +258,15 @@ export const InvoiceDetail: React.FC = () => {
     );
   }
 
-  const businessName = user?.name ? `${user.name.split(' ')[0]}'s Org` : 'BillHouse Partner';
-
-  return (
-    <div className="flex flex-col gap-6 max-w-4xl mx-auto">
-      {/* 1. Actions Bar - Hidden during print */}
-      <div className="flex flex-col md:flex-row justify-between items-start md:items-center bg-white border border-navy/5 p-4 rounded-2xl shadow-sm gap-4 print:hidden">
+  const businessName = user?.name ? `${user.name.split(' ')[0]}'s Org` : 'BillHouse Partner';  return (
+    <div className="flex flex-col gap-6 w-full max-w-full">
+      {/* 1. Page Header (actions bar on mobile, standard header on desktop) - Hidden during print */}
+      <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center bg-white border border-navy/5 p-4.5 rounded-2xl shadow-sm gap-4 print:hidden">
         <div className="flex items-center gap-3">
           <button
             onClick={() => setSearchParams({ tab: 'invoices' })}
-            className="p-2 bg-white border border-navy/10 rounded-xl text-navy hover:bg-navy/5 transition-all"
-            title="Back to List"
+            className="p-2 bg-white border border-navy/10 rounded-xl text-navy hover:bg-navy/5 transition-all shadow-sm"
+            title="Back to Registry"
           >
             <ChevronLeft className="h-4 w-4" />
           </button>
@@ -281,87 +279,27 @@ export const InvoiceDetail: React.FC = () => {
           </div>
         </div>
 
-        {/* Action Controls */}
-        <div className="flex flex-wrap gap-2 w-full md:w-auto">
+        {/* Quick mobile print & edit actions */}
+        <div className="flex sm:hidden gap-2 w-full">
           <Button
             variant="outline"
-            disabled={actionLoading}
             onClick={handlePrint}
-            className="flex items-center gap-1.5 text-xs font-bold py-2 px-3 border-navy/15 text-navy hover:bg-navy/5"
+            className="flex-1 flex items-center justify-center gap-1.5 text-xs font-bold py-2 border-navy/15 text-navy"
           >
-            <Printer className="h-4 w-4" />
-            Print / PDF
+            <Printer className="h-4 w-4" /> Print
           </Button>
-
-          <Button
-            variant="outline"
-            disabled={actionLoading}
-            onClick={handleDuplicate}
-            className="flex items-center gap-1.5 text-xs font-bold py-2 px-3 border-navy/15 text-navy hover:bg-navy/5"
-          >
-            <Copy className="h-4 w-4" />
-            Duplicate
-          </Button>
-
           {invoice.status === 'Draft' && (
             <Button
               variant="outline"
-              disabled={actionLoading}
               onClick={() => setSearchParams({ tab: 'invoices', action: 'edit', id: invoice._id })}
-              className="flex items-center gap-1.5 text-xs font-bold py-2 px-3 border-green/30 text-green hover:bg-green/5"
+              className="flex-1 flex items-center justify-center gap-1.5 text-xs font-bold py-2 border-green/30 text-green"
             >
-              <Edit2 className="h-4 w-4" />
-              Edit
+              <Edit2 className="h-4 w-4" /> Edit
             </Button>
-          )}
-
-          {/* Quick status transitions */}
-          <div className="flex items-center gap-1 border border-navy/10 p-1 rounded-xl bg-navy/5 flex-wrap">
-            {invoice.status === 'Draft' && (
-              <button
-                disabled={actionLoading}
-                onClick={() => handleStatusChange('Sent')}
-                className="px-2.5 py-1.5 text-[10px] font-extrabold rounded-lg bg-white text-navy hover:bg-navy/5 shadow-sm transition-all"
-              >
-                Mark Sent
-              </button>
-            )}
-
-            {(invoice.status === 'Draft' || invoice.status === 'Sent') && (
-              <button
-                disabled={actionLoading}
-                onClick={() => handleStatusChange('Paid')}
-                className="px-2.5 py-1.5 text-[10px] font-extrabold rounded-lg bg-[#0C4737] text-white hover:bg-green-dark shadow-sm transition-all"
-              >
-                Mark Paid
-              </button>
-            )}
-
-            {invoice.status !== 'Paid' && invoice.status !== 'Cancelled' && (
-              <button
-                disabled={actionLoading}
-                onClick={() => handleStatusChange('Cancelled')}
-                className="px-2.5 py-1.5 text-[10px] font-extrabold rounded-lg hover:bg-red-500/10 text-red-500 transition-all"
-              >
-                Cancel
-              </button>
-            )}
-          </div>
-
-          {invoice.status !== 'Paid' && (
-            <button
-              disabled={actionLoading}
-              onClick={handleDelete}
-              className="p-2 hover:bg-rose-500/10 text-text-secondary hover:text-red-500 rounded-xl transition-all"
-              title="Delete Invoice"
-            >
-              <Trash2 className="h-4.5 w-4.5" />
-            </button>
           )}
         </div>
       </div>
 
-      {/* Error banner for action failures (status change, delete, etc.) */}
       {errorMsg && (
         <div className="p-4 bg-red-500/10 border border-red-500/35 text-red-700 text-xs font-bold rounded-2xl flex items-center justify-between gap-3 print:hidden">
           <div className="flex items-center gap-2">
@@ -372,199 +310,307 @@ export const InvoiceDetail: React.FC = () => {
         </div>
       )}
 
-      {/* 2. PRINTABLE INVOICE SHEET */}
-      <GlassCard className="p-8 sm:p-12 border-navy/5 bg-white text-navy shadow-md print:shadow-none print:border-none print:p-0 print:m-0 flex flex-col gap-10">
-        {/* Invoice Header */}
-        <div className="flex flex-col sm:flex-row justify-between items-start gap-6 border-b border-navy/10 pb-8">
-          <div className="flex flex-col gap-2">
-            {businessProfile?.logoBase64 ? (
-              <img src={businessProfile.logoBase64} alt={businessProfile.name} className="h-12 w-auto object-contain mb-1" />
-            ) : (
-              <div className="flex items-center gap-2">
-                <span className="text-xl">⚡</span>
-                <span className="text-lg font-black tracking-tight text-navy uppercase">
-                  {businessProfile?.name || 'BillHouse'}
-                </span>
-              </div>
-            )}
-            <div className="text-xs text-text-secondary font-semibold leading-relaxed">
-              <p className="font-extrabold text-navy text-sm">{businessProfile?.name || businessName}</p>
-              <p>{businessProfile?.email || user?.email}</p>
-              {businessProfile?.phone && <p>{businessProfile.phone}</p>}
-              {businessProfile?.address ? (
-                <p>
-                  {businessProfile.address}
-                  {businessProfile.city && `, ${businessProfile.city}`}
-                  {businessProfile.state && `, ${businessProfile.state}`}
-                  {businessProfile.pincode && ` - ${businessProfile.pincode}`}
-                </p>
-              ) : (
-                <p>Mumbai, Maharashtra, India</p>
-              )}
-              {businessProfile?.gstNumber && <p className="font-bold text-navy mt-1">GSTIN: {businessProfile.gstNumber}</p>}
-              {businessProfile?.panNumber && <p className="font-bold text-navy">PAN: {businessProfile.panNumber}</p>}
-            </div>
-          </div>
-
-          <div className="flex flex-col sm:items-end text-left sm:text-right gap-1">
-            <h1 className="text-2xl font-black text-navy uppercase tracking-wider">TAX INVOICE</h1>
-            <span className="text-sm font-extrabold text-green">{invoice.number}</span>
-            <div className="grid grid-cols-2 gap-x-4 gap-y-1 mt-4 text-xs font-semibold">
-              <span className="text-text-secondary">Issue Date:</span>
-              <span className="text-navy">{formatDate(invoice.date)}</span>
-              <span className="text-text-secondary">Due Date:</span>
-              <span className="text-navy">{formatDate(invoice.dueDate)}</span>
-              <span className="text-text-secondary">Currency:</span>
-              <span className="text-navy">INR (₹)</span>
-            </div>
-          </div>
-        </div>
-
-        {/* Client Billing Info */}
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-6 bg-navy/5 border border-navy/10 rounded-2xl p-6">
-          <div className="flex flex-col gap-2">
-            <h3 className="text-xs font-extrabold uppercase tracking-wider text-text-secondary flex items-center gap-1.5">
-              <Building className="h-4 w-4 text-green" />
-              Billed To
-            </h3>
-            <div className="text-sm">
-              <p className="font-extrabold text-navy">{invoice.clientName}</p>
-              {client ? (
-                <div className="text-xs text-text-secondary font-semibold mt-1.5 flex flex-col gap-1 leading-relaxed">
-                  <p>{client.address || 'Billing address not provided'}</p>
-                  {client.phone && <p>📞 {client.phone}</p>}
-                  <p>✉ {client.email}</p>
-                  {client.taxId && <p className="mt-1 font-bold text-navy">GSTIN: {client.taxId}</p>}
-                </div>
-              ) : (
-                <p className="text-xs text-text-secondary font-semibold mt-1">Fetching client registry contact data...</p>
-              )}
-            </div>
-          </div>
-
-          <div className="flex flex-col gap-2 border-t md:border-t-0 md:border-l border-navy/10 pt-4 md:pt-0 md:pl-6">
-            <h3 className="text-xs font-extrabold uppercase tracking-wider text-text-secondary flex items-center gap-1.5">
-              <User className="h-4 w-4 text-green" />
-              Client Representative
-            </h3>
-            <div className="text-sm">
-              <p className="font-bold text-navy">{client?.name || invoice.clientName}</p>
-              <p className="text-xs text-text-secondary font-semibold mt-1">✉ {client?.email}</p>
-            </div>
-          </div>
-        </div>
-
-        {/* Line Items Table */}
-        <div className="flex flex-col">
-          <table className="w-full text-left border-collapse">
-            <thead>
-              <tr className="border-b-2 border-navy/10 text-xs font-extrabold uppercase text-text-secondary tracking-wider">
-                <th className="py-3 pr-4">Description</th>
-                <th className="py-3 px-4 text-right">Qty</th>
-                <th className="py-3 px-4 text-right">Rate</th>
-                <th className="py-3 px-4 text-right">GST %</th>
-                <th className="py-3 pl-4 text-right">Total</th>
-              </tr>
-            </thead>
-            <tbody>
-              {invoice.items.map((item, idx) => (
-                <tr key={item._id || idx} className="border-b border-navy/5 text-sm font-semibold">
-                  <td className="py-4 pr-4 text-navy font-bold leading-normal">
-                    {item.description}
-                  </td>
-                  <td className="py-4 px-4 text-right text-text-secondary font-medium">
-                    {item.quantity}
-                  </td>
-                  <td className="py-4 px-4 text-right text-navy font-medium">
-                    {formatCurrency(item.rate)}
-                  </td>
-                  <td className="py-4 px-4 text-right text-text-secondary font-medium">
-                    {item.gstRate}%
-                  </td>
-                  <td className="py-4 pl-4 text-right text-navy font-bold">
-                    {formatCurrency(item.amount)}
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
-
-        {/* Calculations Sheet & Summary */}
-        <div className="flex flex-col md:flex-row justify-between items-start gap-8 pt-4">
-          {/* Notes & Bank Details info */}
-          <div className="flex flex-col gap-6 w-full md:max-w-md text-xs font-semibold leading-relaxed">
-            {invoice.notes && (
-              <div className="flex flex-col gap-1.5">
-                <span className="text-[10px] font-extrabold uppercase tracking-wider text-text-secondary">Invoice Notes</span>
-                <p className="text-navy bg-navy/5 p-4.5 rounded-2xl border border-navy/5 whitespace-pre-wrap">{invoice.notes}</p>
-              </div>
-            )}
-
-            {invoice.terms && (
-              <div className="flex flex-col gap-1.5">
-                <span className="text-[10px] font-extrabold uppercase tracking-wider text-text-secondary">Terms & Conditions</span>
-                <p className="text-text-secondary whitespace-pre-wrap">{invoice.terms}</p>
-              </div>
-            )}
-
-            {businessProfile && (businessProfile.bankName || businessProfile.bankAccount || businessProfile.bankIfsc || businessProfile.bankUpi) && (
-              <div className="flex flex-col gap-1.5 bg-navy/5 border border-[#0C4737]/15 rounded-2xl p-4">
-                <span className="text-[10px] font-extrabold uppercase tracking-wider text-green-dark">How to Pay / Bank Details</span>
-                <div className="text-[11px] text-navy font-semibold flex flex-col gap-1">
-                  {businessProfile.bankName && <p><span className="text-text-secondary">Bank:</span> {businessProfile.bankName}</p>}
-                  {businessProfile.bankAccount && <p><span className="text-text-secondary">Account Number:</span> {businessProfile.bankAccount}</p>}
-                  {businessProfile.bankIfsc && <p><span className="text-text-secondary">IFSC:</span> {businessProfile.bankIfsc}</p>}
-                  {businessProfile.bankUpi && <p><span className="text-text-secondary">UPI ID:</span> {businessProfile.bankUpi}</p>}
+      {/* Main Content Grid */}
+      <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 w-full items-start">
+        {/* Left Side: Printable Invoice (2/3 width) */}
+        <div className="lg:col-span-8 w-full flex justify-center">
+          <GlassCard className="p-8 sm:p-12 border-navy/5 bg-white text-navy shadow-md print:shadow-none print:border-none print:p-0 print:m-0 flex flex-col gap-10 w-full max-w-4xl">
+            {/* Invoice Header */}
+            <div className="flex flex-col sm:flex-row justify-between items-start gap-6 border-b border-navy/10 pb-8">
+              <div className="flex flex-col gap-2">
+                {businessProfile?.logoBase64 ? (
+                  <img src={businessProfile.logoBase64} alt={businessProfile.name} className="h-12 w-auto object-contain mb-1" />
+                ) : (
+                  <div className="flex items-center gap-2">
+                    <span className="text-xl">⚡</span>
+                    <span className="text-lg font-black tracking-tight text-navy uppercase">
+                      {businessProfile?.name || 'BillHouse'}
+                    </span>
+                  </div>
+                )}
+                <div className="text-xs text-text-secondary font-semibold leading-relaxed">
+                  <p className="font-extrabold text-navy text-sm">{businessProfile?.name || businessName}</p>
+                  <p>{businessProfile?.email || user?.email}</p>
+                  {businessProfile?.phone && <p>{businessProfile.phone}</p>}
+                  {businessProfile?.address ? (
+                    <p>
+                      {businessProfile.address}
+                      {businessProfile.city && `, ${businessProfile.city}`}
+                      {businessProfile.state && `, ${businessProfile.state}`}
+                      {businessProfile.pincode && ` - ${businessProfile.pincode}`}
+                    </p>
+                  ) : (
+                    <p>Mumbai, Maharashtra, India</p>
+                  )}
+                  {businessProfile?.gstNumber && <p className="font-bold text-navy mt-1">GSTIN: {businessProfile.gstNumber}</p>}
+                  {businessProfile?.panNumber && <p className="font-bold text-navy">PAN: {businessProfile.panNumber}</p>}
                 </div>
               </div>
-            )}
-          </div>
 
-          {/* Math details */}
-          <div className="w-full md:w-80 flex flex-col gap-4 text-xs font-bold">
-            <div className="flex justify-between items-center text-text-secondary">
-              <span>Subtotal:</span>
-              <span className="font-semibold text-navy">{formatCurrency(invoice.subtotal)}</span>
+              <div className="flex flex-col sm:items-end text-left sm:text-right gap-1">
+                <h1 className="text-2xl font-black text-navy uppercase tracking-wider">TAX INVOICE</h1>
+                <span className="text-sm font-extrabold text-green">{invoice.number}</span>
+                <div className="grid grid-cols-2 gap-x-4 gap-y-1 mt-4 text-xs font-semibold">
+                  <span className="text-text-secondary">Issue Date:</span>
+                  <span className="text-navy">{formatDate(invoice.date)}</span>
+                  <span className="text-text-secondary">Due Date:</span>
+                  <span className="text-navy">{formatDate(invoice.dueDate)}</span>
+                  <span className="text-text-secondary">Currency:</span>
+                  <span className="text-navy">INR (₹)</span>
+                </div>
+              </div>
             </div>
 
-            <div className="flex justify-between items-center text-text-secondary">
-              <span>GST Total:</span>
-              <span className="font-semibold text-navy">{formatCurrency(invoice.gstAmount)}</span>
+            {/* Client Billing Info */}
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-6 bg-navy/5 border border-navy/10 rounded-2xl p-6">
+              <div className="flex flex-col gap-2">
+                <h3 className="text-xs font-extrabold uppercase tracking-wider text-text-secondary flex items-center gap-1.5">
+                  <Building className="h-4 w-4 text-green" />
+                  Billed To
+                </h3>
+                <div className="text-sm">
+                  <p className="font-extrabold text-navy">{invoice.clientName}</p>
+                  {client ? (
+                    <div className="text-xs text-text-secondary font-semibold mt-1.5 flex flex-col gap-1 leading-relaxed">
+                      <p>{client.address || 'Billing address not provided'}</p>
+                      {client.phone && <p>📞 {client.phone}</p>}
+                      <p>✉ {client.email}</p>
+                      {client.taxId && <p className="mt-1 font-bold text-navy">GSTIN: {client.taxId}</p>}
+                    </div>
+                  ) : (
+                    <p className="text-xs text-text-secondary font-semibold mt-1">Fetching client registry contact data...</p>
+                  )}
+                </div>
+              </div>
+
+              <div className="flex flex-col gap-2 border-t md:border-t-0 md:border-l border-navy/10 pt-4 md:pt-0 md:pl-6">
+                <h3 className="text-xs font-extrabold uppercase tracking-wider text-text-secondary flex items-center gap-1.5">
+                  <User className="h-4 w-4 text-green" />
+                  Client Representative
+                </h3>
+                <div className="text-sm">
+                  <p className="font-bold text-navy">{client?.name || invoice.clientName}</p>
+                  <p className="text-xs text-text-secondary font-semibold mt-1">✉ {client?.email}</p>
+                </div>
+              </div>
             </div>
 
-            {invoice.discountAmount > 0 && (
-              <div className="flex justify-between items-center text-rose-600">
-                <span>Discount:</span>
-                <span className="font-semibold text-rose-600">-{formatCurrency(invoice.discountAmount)}</span>
-              </div>
-            )}
-
-            <div className="flex justify-between items-center text-base font-extrabold border-t border-navy/10 pt-4 text-navy">
-              <span>Grand Total:</span>
-              <span className="text-lg font-black text-green">{formatCurrency(invoice.totalAmount)}</span>
+            {/* Line Items Table */}
+            <div className="flex flex-col">
+              <table className="w-full text-left border-collapse">
+                <thead>
+                  <tr className="border-b-2 border-navy/10 text-xs font-extrabold uppercase text-text-secondary tracking-wider">
+                    <th className="py-3 pr-4">Description</th>
+                    <th className="py-3 px-4 text-right">Qty</th>
+                    <th className="py-3 px-4 text-right">Rate</th>
+                    <th className="py-3 px-4 text-right">GST %</th>
+                    <th className="py-3 pl-4 text-right">Total</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {invoice.items.map((item, idx) => (
+                    <tr key={item._id || idx} className="border-b border-navy/5 text-sm font-semibold">
+                      <td className="py-4 pr-4 text-navy font-bold leading-normal">
+                        {item.description}
+                      </td>
+                      <td className="py-4 px-4 text-right text-text-secondary font-medium">
+                        {item.quantity}
+                      </td>
+                      <td className="py-4 px-4 text-right text-navy font-medium">
+                        {formatCurrency(item.rate)}
+                      </td>
+                      <td className="py-4 px-4 text-right text-text-secondary font-medium">
+                        {item.gstRate}%
+                      </td>
+                      <td className="py-4 pl-4 text-right text-navy font-bold">
+                        {formatCurrency(item.amount)}
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
             </div>
 
-            {invoice.status === 'Paid' ? (
-              <div className="bg-green/10 border border-green/35 text-green-dark p-3.5 rounded-2xl flex items-center justify-between mt-2">
-                <span className="text-[11px] uppercase tracking-wider font-extrabold">Payment Received</span>
-                <span className="text-sm font-bold">₹0 Due</span>
+            {/* Calculations Sheet & Summary */}
+            <div className="flex flex-col md:flex-row justify-between items-start gap-8 pt-4">
+              {/* Notes & Bank Details info */}
+              <div className="flex flex-col gap-6 w-full md:max-w-md text-xs font-semibold leading-relaxed">
+                {invoice.notes && (
+                  <div className="flex flex-col gap-1.5">
+                    <span className="text-[10px] font-extrabold uppercase tracking-wider text-text-secondary">Invoice Notes</span>
+                    <p className="text-navy bg-navy/5 p-4.5 rounded-2xl border border-navy/5 whitespace-pre-wrap">{invoice.notes}</p>
+                  </div>
+                )}
+
+                {invoice.terms && (
+                  <div className="flex flex-col gap-1.5">
+                    <span className="text-[10px] font-extrabold uppercase tracking-wider text-text-secondary">Terms & Conditions</span>
+                    <p className="text-text-secondary whitespace-pre-wrap">{invoice.terms}</p>
+                  </div>
+                )}
+
+                {businessProfile && (businessProfile.bankName || businessProfile.bankAccount || businessProfile.bankIfsc || businessProfile.bankUpi) && (
+                  <div className="flex flex-col gap-1.5 bg-navy/5 border border-[#0C4737]/15 rounded-2xl p-4">
+                    <span className="text-[10px] font-extrabold uppercase tracking-wider text-green-dark">How to Pay / Bank Details</span>
+                    <div className="text-[11px] text-navy font-semibold flex flex-col gap-1">
+                      {businessProfile.bankName && <p><span className="text-text-secondary">Bank:</span> {businessProfile.bankName}</p>}
+                      {businessProfile.bankAccount && <p><span className="text-text-secondary">Account Number:</span> {businessProfile.bankAccount}</p>}
+                      {businessProfile.bankIfsc && <p><span className="text-text-secondary">IFSC:</span> {businessProfile.bankIfsc}</p>}
+                      {businessProfile.bankUpi && <p><span className="text-text-secondary">UPI ID:</span> {businessProfile.bankUpi}</p>}
+                    </div>
+                  </div>
+                )}
               </div>
-            ) : (
-              <div className="bg-amber-500/10 border border-amber-500/35 text-amber-700 p-3.5 rounded-2xl flex items-center justify-between mt-2">
-                <span className="text-[11px] uppercase tracking-wider font-extrabold">Amount Due</span>
-                <span className="text-sm font-bold">{formatCurrency(invoice.totalAmount)}</span>
+
+              {/* Math details */}
+              <div className="w-full md:w-80 flex flex-col gap-4 text-xs font-bold">
+                <div className="flex justify-between items-center text-text-secondary">
+                  <span>Subtotal:</span>
+                  <span className="font-semibold text-navy">{formatCurrency(invoice.subtotal)}</span>
+                </div>
+
+                <div className="flex justify-between items-center text-text-secondary">
+                  <span>GST Total:</span>
+                  <span className="font-semibold text-navy">{formatCurrency(invoice.gstAmount)}</span>
+                </div>
+
+                {invoice.discountAmount > 0 && (
+                  <div className="flex justify-between items-center text-rose-600">
+                    <span>Discount:</span>
+                    <span className="font-semibold text-rose-600">-{formatCurrency(invoice.discountAmount)}</span>
+                  </div>
+                )}
+
+                <div className="flex justify-between items-center text-base font-extrabold border-t border-navy/10 pt-4 text-navy">
+                  <span>Grand Total:</span>
+                  <span className="text-lg font-black text-green">{formatCurrency(invoice.totalAmount)}</span>
+                </div>
+
+                {invoice.status === 'Paid' ? (
+                  <div className="bg-green/10 border border-green/35 text-green-dark p-3.5 rounded-2xl flex items-center justify-between mt-2">
+                    <span className="text-[11px] uppercase tracking-wider font-extrabold">Payment Received</span>
+                    <span className="text-sm font-bold">₹0 Due</span>
+                  </div>
+                ) : (
+                  <div className="bg-amber-500/10 border border-amber-500/35 text-amber-700 p-3.5 rounded-2xl flex items-center justify-between mt-2">
+                    <span className="text-[11px] uppercase tracking-wider font-extrabold">Amount Due</span>
+                    <span className="text-sm font-bold">{formatCurrency(invoice.totalAmount)}</span>
+                  </div>
+                )}
               </div>
-            )}
-          </div>
+            </div>
+
+            {/* Printable Footer */}
+            <div className="hidden print:flex justify-between items-center border-t border-navy/10 pt-8 mt-12 text-[10px] text-text-secondary font-semibold">
+              <span>Generated via BillHouse Tax Invoicing System (INR)</span>
+              <span>Page 1 of 1</span>
+            </div>
+          </GlassCard>
         </div>
 
-        {/* Printable Footer */}
-        <div className="hidden print:flex justify-between items-center border-t border-navy/10 pt-8 mt-12 text-[10px] text-text-secondary font-semibold">
-          <span>Generated via BillHouse Tax Invoicing System (INR)</span>
-          <span>Page 1 of 1</span>
+        {/* Right Side: Sidebar Actions Panel (1/3 width, hidden when printing) */}
+        <div className="lg:col-span-4 w-full flex flex-col gap-6 print:hidden sticky lg:top-24">
+          {/* Action Trigger Card */}
+          <GlassCard className="p-6 border-navy/5 bg-white shadow-sm flex flex-col gap-4">
+            <h3 className="text-sm font-extrabold text-navy border-b border-navy/5 pb-2">Invoice Actions</h3>
+            <div className="flex flex-col gap-2.5 w-full">
+              <Button
+                variant="primary"
+                disabled={actionLoading}
+                onClick={handlePrint}
+                className="w-full py-3 text-xs font-black shadow-md bg-green hover:bg-green-dark text-white rounded-xl flex items-center justify-center gap-2"
+              >
+                <Printer className="h-4.5 w-4.5" />
+                Print / Save PDF
+              </Button>
+
+              <div className="grid grid-cols-2 gap-2">
+                <Button
+                  variant="outline"
+                  disabled={actionLoading}
+                  onClick={handleDuplicate}
+                  className="w-full py-2.5 text-xs font-bold border-navy/15 text-navy hover:bg-navy/5 rounded-xl flex items-center justify-center gap-1.5"
+                >
+                  <Copy className="h-4 w-4" />
+                  Duplicate
+                </Button>
+
+                {invoice.status === 'Draft' ? (
+                  <Button
+                    variant="outline"
+                    disabled={actionLoading}
+                    onClick={() => setSearchParams({ tab: 'invoices', action: 'edit', id: invoice._id })}
+                    className="w-full py-2.5 text-xs font-bold border-green/30 text-green hover:bg-green/5 rounded-xl flex items-center justify-center gap-1.5"
+                  >
+                    <Edit2 className="h-4 w-4" />
+                    Edit Draft
+                  </Button>
+                ) : (
+                  <button
+                    disabled
+                    className="w-full py-2.5 text-xs font-bold border border-navy/5 bg-navy/5 text-navy/30 rounded-xl cursor-not-allowed flex items-center justify-center gap-1.5"
+                  >
+                    Immutable
+                  </button>
+                )}
+              </div>
+            </div>
+          </GlassCard>
+
+          {/* Quick Status Workflow transitions */}
+          <GlassCard className="p-6 border-navy/5 bg-white shadow-sm flex flex-col gap-4">
+            <h3 className="text-sm font-extrabold text-navy border-b border-navy/5 pb-2">Status Workflow</h3>
+            <div className="flex flex-col gap-2.5">
+              {invoice.status === 'Draft' && (
+                <Button
+                  variant="primary"
+                  disabled={actionLoading}
+                  onClick={() => handleStatusChange('Sent')}
+                  className="w-full py-2.5 text-xs font-bold bg-navy text-white hover:bg-navy/90 rounded-xl"
+                >
+                  Mark as Sent / Dispatched
+                </Button>
+              )}
+
+              {(invoice.status === 'Draft' || invoice.status === 'Sent') && (
+                <Button
+                  variant="secondary"
+                  disabled={actionLoading}
+                  onClick={() => handleStatusChange('Paid')}
+                  className="w-full py-2.5 text-xs font-black bg-[#0C4737] hover:bg-green-dark text-white rounded-xl"
+                >
+                  Mark as Paid / Settled
+                </Button>
+              )}
+
+              {invoice.status !== 'Paid' && invoice.status !== 'Cancelled' && (
+                <Button
+                  variant="outline"
+                  disabled={actionLoading}
+                  onClick={() => handleStatusChange('Cancelled')}
+                  className="w-full py-2.5 text-xs font-bold text-red-500 border-red-500/20 hover:bg-red-500/5 hover:border-red-500/40 rounded-xl"
+                >
+                  Cancel Invoice Statement
+                </Button>
+              )}
+
+              {invoice.status !== 'Paid' && (
+                <Button
+                  variant="ghost"
+                  disabled={actionLoading}
+                  onClick={handleDelete}
+                  className="w-full py-2.5 text-xs font-bold text-text-secondary hover:text-red-600 hover:bg-red-500/5 rounded-xl flex items-center justify-center gap-1.5"
+                >
+                  <Trash2 className="h-4 w-4" />
+                  Permanently Delete
+                </Button>
+              )}
+            </div>
+          </GlassCard>
+
+
         </div>
-      </GlassCard>
+      </div>
     </div>
   );
 };

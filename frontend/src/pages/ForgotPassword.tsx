@@ -44,23 +44,24 @@ export const ForgotPassword: React.FC = () => {
       <AuthLayout
         title="Check your email"
         subtitle="Password recovery sent"
+        maxWidthClass="max-w-xl"
       >
-        <GlassCard className="p-5 sm:p-6 md:p-8 border-green/20 bg-white shadow-xl flex flex-col items-center text-center gap-6">
+        <GlassCard className="w-full p-5 sm:p-6 md:p-8 border-green/20 bg-white shadow-xl flex flex-col items-center text-center gap-6">
           <div className="p-4 bg-green/10 text-green rounded-full">
             <MailCheck className="h-12 w-12" />
           </div>
           <div>
             <h3 className="text-xl font-bold text-navy mb-2">Check your inbox</h3>
-            <p className="text-text-secondary text-sm leading-relaxed mb-4">
+            <p className="text-text-secondary text-xs leading-relaxed mb-4">
               We have dispatched a password recovery link to your email address if it is registered in our records.
             </p>
-            <p className="text-xs text-text-secondary">
+            <p className="text-xs text-text-secondary font-medium">
               Check your spam folder if you do not receive it shortly.
             </p>
           </div>
           <Link
             to="/login"
-            className="w-full text-center py-4 bg-navy text-white hover:bg-green-dark rounded-xl font-bold transition-all shadow"
+            className="w-full text-center py-3 bg-navy text-white hover:bg-green-dark rounded-xl font-bold text-sm transition-all shadow"
           >
             Go to Login
           </Link>
@@ -73,8 +74,9 @@ export const ForgotPassword: React.FC = () => {
     <AuthLayout
       title="Reset password"
       subtitle="Enter your email to receive recovery link"
+      maxWidthClass="max-w-xl"
     >
-      <GlassCard className="p-5 sm:p-6 md:p-8 border-navy/5 bg-white shadow-xl flex flex-col gap-6">
+      <GlassCard className="w-full p-5 sm:p-6 md:p-8 border-navy/5 bg-white shadow-xl flex flex-col gap-6">
         
         {/* Error notification */}
         {errorMsg && (
@@ -83,7 +85,7 @@ export const ForgotPassword: React.FC = () => {
           </div>
         )}
 
-        <form onSubmit={handleSubmit(onSubmit)} className="flex flex-col gap-5">
+        <form onSubmit={handleSubmit(onSubmit)} className="flex flex-col gap-4">
           {/* Email field */}
           <Input
             label="Email Address"
@@ -100,13 +102,13 @@ export const ForgotPassword: React.FC = () => {
           />
 
           {/* Submit Action */}
-          <Button type="submit" variant="primary" className="w-full py-4 mt-2" isLoading={isLoading}>
+          <Button type="submit" variant="primary" className="w-full py-3 mt-1" isLoading={isLoading}>
             Send Reset Link
           </Button>
         </form>
 
         {/* Back navigation */}
-        <p className="text-sm text-text-secondary font-semibold text-center mt-2">
+        <p className="text-xs text-text-secondary font-semibold text-center mt-1">
           Remember password?{' '}
           <Link to="/login" className="text-green hover:underline">
             Sign In

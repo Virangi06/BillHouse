@@ -1627,7 +1627,7 @@ export const DashboardStub: React.FC = () => {
 
             </div>
           ) : activeTab === 'invoices' ? (
-            <div className="flex flex-col gap-8 max-w-7xl mx-auto animate-fade-in">
+            <div className="flex flex-col gap-8 w-full max-w-full px-1 animate-fade-in">
               {action === 'create' || action === 'edit' ? (
                 <InvoiceForm onAddNotification={addNotification} />
               ) : action === 'detail' ? (

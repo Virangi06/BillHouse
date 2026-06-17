@@ -8,12 +8,14 @@ interface AuthLayoutProps {
   children: React.ReactNode;
   title: string;
   subtitle: string;
+  maxWidthClass?: string;
 }
 
 export const AuthLayout: React.FC<AuthLayoutProps> = ({
   children,
   title,
   subtitle,
+  maxWidthClass = 'max-w-md'
 }) => {
   return (
     <div className="min-h-screen grid grid-cols-1 lg:grid-cols-12 bg-cream font-sans">
@@ -65,7 +67,7 @@ export const AuthLayout: React.FC<AuthLayoutProps> = ({
         {/* Blur backgrounds */}
         <div className="absolute top-1/4 right-1/4 w-[350px] h-[350px] bg-green-mint/15 rounded-full blur-[100px] pointer-events-none z-0"></div>
 
-        <div className="w-full max-w-md relative z-10 flex flex-col gap-6">
+        <div className={`w-full ${maxWidthClass} relative z-10 flex flex-col gap-6 auth-form-container`}>
           {/* Mobile Back Button */}
           <div className="flex lg:hidden justify-start">
             <Link
@@ -88,8 +90,8 @@ export const AuthLayout: React.FC<AuthLayoutProps> = ({
                 />
               </Link>
             </div>
-            <h1 className="text-3xl sm:text-2xl lg:text-3xl font-extrabold text-navy tracking-tight">{title}</h1>
-            <p className="text-text-secondary text-sm sm:text-xs lg:text-sm font-semibold mt-1.5">{subtitle}</p>
+            <h1 className="text-2xl sm:text-xl lg:text-2xl font-extrabold text-navy tracking-tight">{title}</h1>
+            <p className="text-text-secondary text-xs sm:text-[11px] lg:text-xs font-semibold mt-1.5">{subtitle}</p>
           </div>
           
           {children}

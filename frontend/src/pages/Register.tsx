@@ -84,6 +84,7 @@ export const Register: React.FC = () => {
     <AuthLayout
       title="Create account"
       subtitle="Start creating professional invoices in seconds"
+      maxWidthClass="max-w-2xl"
     >
       <GlassCard className="p-5 sm:p-6 md:p-8 border-navy/5 bg-white shadow-xl flex flex-col gap-6">
 
@@ -94,7 +95,7 @@ export const Register: React.FC = () => {
           </div>
         )}
 
-        <form onSubmit={handleSubmit(onSubmit)} className="flex flex-col gap-4">
+        <form onSubmit={handleSubmit(onSubmit)} className="grid grid-cols-1 sm:grid-cols-2 gap-x-4 gap-y-3">
 
           {/* Full Name field */}
           <Input
@@ -113,19 +114,21 @@ export const Register: React.FC = () => {
           />
 
           {/* Email field */}
-          <Input
-            label="Email Address"
-            type="email"
-            placeholder="you@company.com"
-            error={errors.email?.message}
-            {...register('email', {
-              required: 'Email is required',
-              pattern: {
-                value: /^[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}$/i,
-                message: 'Invalid email address',
-              },
-            })}
-          />
+          <div className="sm:col-span-2">
+            <Input
+              label="Email Address"
+              type="email"
+              placeholder="you@company.com"
+              error={errors.email?.message}
+              {...register('email', {
+                required: 'Email is required',
+                pattern: {
+                  value: /^[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}$/i,
+                  message: 'Invalid email address',
+                },
+              })}
+            />
+          </div>
 
           {/* Password field */}
           <div className="flex flex-col gap-1.5 w-full">
@@ -145,25 +148,30 @@ export const Register: React.FC = () => {
                 }
               })}
             />
-            <p className="text-[11px] text-text-secondary font-medium leading-normal px-1">
-              Password must be at least 8 characters, including 1 uppercase, 1 lowercase, 1 number, and 1 special symbol.
+            <p className="text-[10px] text-text-secondary font-medium leading-normal px-1 mt-0.5">
+              Must be 8+ chars: 1 uppercase, 1 lowercase, 1 number, 1 symbol.
             </p>
           </div>
 
           {/* Confirm Password field */}
-          <Input
-            label="Confirm Password"
-            type="password"
-            placeholder="••••••••"
-            error={errors.confirmPassword?.message}
-            {...register('confirmPassword', {
-              required: 'Please confirm your password',
-              validate: (value) => value === passwordValue || 'Passwords do not match',
-            })}
-          />
+          <div className="flex flex-col gap-1.5 w-full">
+            <Input
+              label="Confirm Password"
+              type="password"
+              placeholder="••••••••"
+              error={errors.confirmPassword?.message}
+              {...register('confirmPassword', {
+                required: 'Please confirm your password',
+                validate: (value) => value === passwordValue || 'Passwords do not match',
+              })}
+            />
+            <p className="text-[10px] text-text-secondary font-medium leading-normal px-1 mt-0.5">
+              Confirm Password must be the same as the Password.
+            </p>
+          </div>
 
           {/* Terms checkbox */}
-          <div className="flex flex-col gap-1 select-none">
+          <div className="flex flex-col gap-1 select-none sm:col-span-2">
             <label className="flex items-start gap-2.5 cursor-pointer mt-1">
               <input
                 type="checkbox"
@@ -185,9 +193,11 @@ export const Register: React.FC = () => {
           </div>
 
           {/* Submit Action */}
-          <Button type="submit" variant="primary" className="w-full py-4 mt-2" isLoading={isLoading}>
-            Create Account
-          </Button>
+          <div className="sm:col-span-2">
+            <Button type="submit" variant="primary" className="w-full py-3 mt-1" isLoading={isLoading}>
+              Create Account
+            </Button>
+          </div>
         </form>
 
         {/* Redirect Login */}

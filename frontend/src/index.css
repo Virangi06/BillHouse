@@ -140,3 +140,33 @@
 ::-webkit-scrollbar-thumb:hover {
   background: rgba(6, 27, 45, 0.3);
 }
+
+/* Auth Form Compacting & Font Reduction (.5 step reduction) */
+.auth-form-container input {
+  font-size: 0.875rem !important; /* Reduces from 1rem (16px) to 14px */
+  padding-top: 0.625rem !important; /* Compacts vertical padding */
+  padding-bottom: 0.625rem !important;
+}
+
+.auth-form-container label {
+  font-size: 0.6875rem !important; /* Reduces label size from text-xs to text-[11px] */
+}
+
+.auth-form-container button {
+  font-size: 0.875rem !important; /* Reduces button font size */
+  padding-top: 0.75rem !important; /* Adjust padding to match smaller size */
+  padding-bottom: 0.75rem !important;
+}
+
+.auth-form-container .text-xs {
+  font-size: 0.6875rem !important;
+}
+
+.auth-form-container .text-sm {
+  font-size: 0.75rem !important;
+}
+
+.auth-form-container .text-base {
+  font-size: 0.875rem !important;
+}
+

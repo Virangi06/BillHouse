@@ -56,20 +56,21 @@ export const ResetPassword: React.FC = () => {
       <AuthLayout
         title="Password updated"
         subtitle="Your password has been changed"
+        maxWidthClass="max-w-xl"
       >
-        <GlassCard className="p-5 sm:p-6 md:p-8 border-green/20 bg-white shadow-xl flex flex-col items-center text-center gap-6">
+        <GlassCard className="w-full p-5 sm:p-6 md:p-8 border-green/20 bg-white shadow-xl flex flex-col items-center text-center gap-6">
           <div className="p-4 bg-green/10 text-green rounded-full">
             <CheckCircle2 className="h-12 w-12" />
           </div>
           <div>
             <h3 className="text-xl font-bold text-navy mb-2">Success!</h3>
-            <p className="text-text-secondary text-sm leading-relaxed mb-4">
+            <p className="text-text-secondary text-xs leading-relaxed mb-4">
               Your password has been reset successfully. You can now use your new password to sign in.
             </p>
           </div>
           <Link
             to="/login"
-            className="w-full text-center py-4 bg-navy text-white hover:bg-green-dark rounded-xl font-bold transition-all shadow"
+            className="w-full text-center py-3 bg-navy text-white hover:bg-green-dark rounded-xl font-bold text-sm transition-all shadow"
           >
             Log In
           </Link>
@@ -82,8 +83,9 @@ export const ResetPassword: React.FC = () => {
     <AuthLayout
       title="Create new password"
       subtitle="Password must be at least 8 characters with uppercase, lowercase, number & special character"
+      maxWidthClass="max-w-xl"
     >
-      <GlassCard className="p-5 sm:p-6 md:p-8 border-navy/5 bg-white shadow-xl flex flex-col gap-6">
+      <GlassCard className="w-full p-5 sm:p-6 md:p-8 border-navy/5 bg-white shadow-xl flex flex-col gap-6">
         
         {/* Error notification */}
         {errorMsg && (
@@ -94,12 +96,12 @@ export const ResetPassword: React.FC = () => {
 
         {!token ? (
           <div className="flex flex-col gap-4">
-            <p className="text-sm text-text-secondary leading-relaxed text-center">
+            <p className="text-xs text-text-secondary leading-relaxed text-center font-semibold">
               The reset token is invalid or has expired. Please go back to recovery page and trigger a new email.
             </p>
             <Link
               to="/forgot-password"
-              className="w-full text-center py-3 border border-navy/15 text-navy hover:bg-navy/5 rounded-xl font-bold transition-all"
+              className="w-full text-center py-3 border border-navy/15 text-navy hover:bg-navy/5 rounded-xl font-bold text-xs transition-all"
             >
               Request New Link
             </Link>
@@ -126,19 +128,24 @@ export const ResetPassword: React.FC = () => {
             />
 
             {/* Confirm Password field */}
-            <Input
-              label="Confirm New Password"
-              type="password"
-              placeholder="••••••••"
-              error={errors.confirmPassword?.message}
-              {...register('confirmPassword', {
-                required: 'Please confirm your new password',
-                validate: (value) => value === passwordValue || 'Passwords do not match',
-              })}
-            />
+            <div className="flex flex-col gap-1.5 w-full">
+              <Input
+                label="Confirm New Password"
+                type="password"
+                placeholder="••••••••"
+                error={errors.confirmPassword?.message}
+                {...register('confirmPassword', {
+                  required: 'Please confirm your new password',
+                  validate: (value) => value === passwordValue || 'Passwords do not match',
+                })}
+              />
+              <p className="text-[10px] text-text-secondary font-medium leading-normal px-1 mt-0.5">
+                Confirm Password must be the same as the Password.
+              </p>
+            </div>
 
             {/* Submit Action */}
-            <Button type="submit" variant="primary" className="w-full py-4 mt-2" isLoading={isLoading}>
+            <Button type="submit" variant="primary" className="w-full py-3 mt-1" isLoading={isLoading}>
               Reset Password
             </Button>
           </form>

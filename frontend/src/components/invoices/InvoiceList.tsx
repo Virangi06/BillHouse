@@ -14,8 +14,7 @@ import {
   Clock,
   CheckCircle2,
   AlertCircle,
-  XCircle,
-  MoreVertical
+  XCircle
 } from 'lucide-react';
 
 export interface InvoiceData {
@@ -46,9 +45,6 @@ export const InvoiceList: React.FC<InvoiceListProps> = ({ onAddNotification }) =
   const [sortField, setSortField] = useState<'date' | 'totalAmount' | 'dueDate'>('date');
   const [sortOrder, setSortOrder] = useState<'asc' | 'desc'>('desc');
   
-  // Row action menu dropdown
-  const [activeMenuId, setActiveMenuId] = useState<string | null>(null);
-
   // Fetch invoices from backend
   const fetchInvoices = async () => {
     try {
@@ -74,15 +70,6 @@ export const InvoiceList: React.FC<InvoiceListProps> = ({ onAddNotification }) =
   useEffect(() => {
     fetchInvoices();
   }, [statusFilter, searchQuery]);
-
-  // Click outside to close menus
-  useEffect(() => {
-    const handleClickOutside = () => {
-      setActiveMenuId(null);
-    };
-    document.addEventListener('click', handleClickOutside);
-    return () => document.removeEventListener('click', handleClickOutside);
-  }, []);
 
   const handleSort = (field: 'date' | 'totalAmount' | 'dueDate') => {
     if (sortField === field) {
@@ -128,32 +115,7 @@ export const InvoiceList: React.FC<InvoiceListProps> = ({ onAddNotification }) =
     }
   };
 
-  const handleStatusChange = async (id: string, newStatus: string, e: React.MouseEvent) => {
-    e.stopPropagation();
-    const targetInvoice = invoices.find(inv => inv._id === id);
-    try {
-      await API.patch(`/invoices/${id}/status`, { status: newStatus });
-      setInvoices(prev => prev.map(inv => inv._id === id ? { 
-        ...inv, 
-        status: newStatus as any,
-        amountPaid: newStatus === 'Paid' ? inv.totalAmount : 0,
-        amountDue: newStatus === 'Paid' ? 0 : inv.totalAmount
-      } : inv));
-      if (onAddNotification && targetInvoice) {
-        onAddNotification(
-          newStatus === 'Paid' ? 'payment' : 'invoice',
-          `Invoice ${newStatus}`,
-          `Invoice ${targetInvoice.number} has been set to ${newStatus}.`
-        );
-      }
-      setActiveMenuId(null);
-    } catch (err: any) {
-      const msg = err.response?.data?.error 
-        || (err.message === 'Network Error' ? 'Network error — please check backend is running and supports PATCH requests.' : null)
-        || 'Failed to update status';
-      alert(msg);
-    }
-  };
+
 
   const navigateToCreate = () => {
     setSearchParams({ tab: 'invoices', action: 'create' });
@@ -224,8 +186,12 @@ export const InvoiceList: React.FC<InvoiceListProps> = ({ onAddNotification }) =
     });
   };
 
+  const totalBilled = invoices.reduce((sum, inv) => sum + (inv.totalAmount || 0), 0);
+  const totalPaid = invoices.reduce((sum, inv) => sum + (inv.amountPaid || 0), 0);
+  const totalOutstanding = invoices.reduce((sum, inv) => sum + (inv.amountDue || 0), 0);
+
   return (
-    <div className="flex flex-col gap-6 max-w-7xl mx-auto">
+    <div className="flex flex-col gap-6 w-full max-w-full">
       {/* Header Panel */}
       <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center bg-white border border-navy/5 p-6 rounded-2xl shadow-sm gap-4">
         <div>
@@ -243,6 +209,47 @@ export const InvoiceList: React.FC<InvoiceListProps> = ({ onAddNotification }) =
           <Plus className="h-4.5 w-4.5" />
           Create Invoice
         </Button>
+      </div>
+
+      {/* Stats Summary Row */}
+      <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+        {/* Total Billed */}
+        <GlassCard className="p-5 bg-gradient-to-br from-white to-slate-50/80 border border-navy/5 shadow-sm flex flex-col gap-2 hover:-translate-y-1 hover:border-navy/15 hover:shadow-[0_8px_30px_rgba(0,0,0,0.04)] transition-all duration-300">
+          <div className="flex items-center justify-between">
+            <span className="text-[10px] font-extrabold uppercase tracking-wider text-text-secondary">Total Invoiced</span>
+            <div className="p-1.5 bg-navy/5 rounded-lg">
+              <FileText className="h-3.5 w-3.5 text-navy/60" />
+            </div>
+          </div>
+          <p className="text-2xl font-extrabold text-navy">{formatCurrency(totalBilled)}</p>
+          <p className="text-[11px] font-semibold text-text-secondary">{invoices.length} invoice{invoices.length !== 1 ? 's' : ''} shown</p>
+        </GlassCard>
+
+        {/* Total Paid */}
+        <GlassCard className="p-5 bg-gradient-to-br from-white to-green/5 border border-green/10 shadow-sm flex flex-col gap-2 hover:-translate-y-1 hover:border-green/20 hover:shadow-[0_8px_30px_rgba(16,185,129,0.08)] transition-all duration-300">
+          <div className="flex items-center justify-between">
+            <span className="text-[10px] font-extrabold uppercase tracking-wider text-text-secondary">Payments Collected</span>
+            <div className="p-1.5 bg-green/10 rounded-lg">
+              <CheckCircle2 className="h-3.5 w-3.5 text-green" />
+            </div>
+          </div>
+          <p className="text-2xl font-extrabold text-green-dark">{formatCurrency(totalPaid)}</p>
+          <p className="text-[11px] font-semibold text-text-secondary">Received in INR</p>
+        </GlassCard>
+
+        {/* Total Outstanding */}
+        <GlassCard className={`p-5 shadow-sm flex flex-col gap-2 hover:-translate-y-1 hover:shadow-md transition-all duration-300 ${totalOutstanding > 0 ? 'bg-gradient-to-br from-white to-amber-500/5 border border-amber-500/15 hover:border-amber-500/25 hover:shadow-[0_8px_30px_rgba(245,158,11,0.08)]' : 'bg-gradient-to-br from-white to-slate-50 border border-navy/5 hover:border-navy/15'}`}>
+          <div className="flex items-center justify-between">
+            <span className="text-[10px] font-extrabold uppercase tracking-wider text-text-secondary">Outstanding Balance</span>
+            <div className={`p-1.5 rounded-lg ${totalOutstanding > 0 ? 'bg-amber-500/10' : 'bg-navy/5'}`}>
+              <Clock className={`h-3.5 w-3.5 ${totalOutstanding > 0 ? 'text-amber-600' : 'text-navy/60'}`} />
+            </div>
+          </div>
+          <p className={`text-2xl font-extrabold ${totalOutstanding > 0 ? 'text-amber-600' : 'text-navy'}`}>
+            {formatCurrency(totalOutstanding)}
+          </p>
+          <p className="text-[11px] font-semibold text-text-secondary">Receivables outstanding</p>
+        </GlassCard>
       </div>
 
       {/* Control panel: search, sort, filters */}
@@ -360,41 +367,34 @@ export const InvoiceList: React.FC<InvoiceListProps> = ({ onAddNotification }) =
                     onClick={() => navigateToDetail(inv._id)}
                     className="border-b border-navy/5 hover:bg-navy/5 cursor-pointer transition-colors"
                   >
-                    {/* Invoice Number */}
                     <td className="py-4.5 px-6">
                       <span className="text-sm font-extrabold text-navy hover:text-green transition-colors">
                         {inv.number}
                       </span>
                     </td>
                     
-                    {/* Client Name */}
                     <td className="py-4.5 px-6">
                       <span className="text-sm font-bold text-navy">
                         {inv.clientName}
                       </span>
                     </td>
 
-                    {/* Date */}
                     <td className="py-4.5 px-6 text-xs font-semibold text-text-secondary">
                       {formatDate(inv.date)}
                     </td>
 
-                    {/* Due Date */}
                     <td className="py-4.5 px-6 text-xs font-semibold text-text-secondary">
                       {formatDate(inv.dueDate)}
                     </td>
 
-                    {/* Amount */}
                     <td className="py-4.5 px-6 text-sm font-extrabold text-navy text-right">
                       {formatCurrency(inv.totalAmount)}
                     </td>
 
-                    {/* Status badge */}
                     <td className="py-4.5 px-6" onClick={(e) => e.stopPropagation()}>
                       {getStatusBadge(inv.status)}
                     </td>
 
-                    {/* Actions cell */}
                     <td className="py-4.5 px-6 text-right" onClick={(e) => e.stopPropagation()}>
                       <div className="flex items-center justify-end gap-2">
                         <button
@@ -426,39 +426,6 @@ export const InvoiceList: React.FC<InvoiceListProps> = ({ onAddNotification }) =
                         ) : (
                           <div className="w-7"></div> // spacer
                         )}
-
-                        {/* More options status changer */}
-                        <div className="relative">
-                          <button
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              setActiveMenuId(activeMenuId === inv._id ? null : inv._id);
-                            }}
-                            className="p-1.5 hover:bg-navy/5 rounded-lg text-text-secondary hover:text-navy transition-all"
-                          >
-                            <MoreVertical className="h-4.5 w-4.5" />
-                          </button>
-                          
-                          {activeMenuId === inv._id && (
-                            <div className="absolute right-0 mt-2 z-10 w-40 bg-white border border-navy/5 rounded-xl shadow-lg p-1.5 flex flex-col gap-1 text-left">
-                              <span className="text-[10px] font-extrabold text-text-secondary uppercase px-2.5 py-1">Set Status</span>
-                              {['Draft', 'Sent', 'Paid', 'Cancelled'].map(st => (
-                                <button
-                                  key={st}
-                                  onClick={(e) => handleStatusChange(inv._id, st, e)}
-                                  className={`w-full px-2.5 py-1.5 text-xs font-semibold rounded-lg text-left transition-colors ${
-                                    inv.status === st 
-                                      ? 'bg-navy/5 text-navy font-bold' 
-                                      : 'text-text-secondary hover:bg-navy/5 hover:text-navy'
-                                  }`}
-                                >
-                                  {st}
-                                </button>
-                              ))}
-                            </div>
-                          )}
-                        </div>
-
                       </div>
                     </td>
                   </tr>
