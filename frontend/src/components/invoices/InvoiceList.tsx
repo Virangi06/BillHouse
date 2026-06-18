@@ -23,7 +23,7 @@ export interface InvoiceData {
   clientName: string;
   date: string;
   dueDate: string;
-  status: 'Draft' | 'Sent' | 'Paid' | 'Overdue' | 'Cancelled';
+  status: 'Draft' | 'Sent' | 'Viewed' | 'Partially Paid' | 'Paid' | 'Overdue' | 'Cancelled';
   totalAmount: number;
   amountPaid: number;
   amountDue: number;
@@ -42,12 +42,27 @@ export const InvoiceList: React.FC<InvoiceListProps> = ({ onAddNotification }) =
   // Filters and search
   const [statusFilter, setStatusFilter] = useState<string>('All');
   const [searchQuery, setSearchQuery] = useState<string>('');
+  const [clientFilter, setClientFilter] = useState<string>('');
+  const [startDate, setStartDate] = useState<string>('');
+  const [endDate, setEndDate] = useState<string>('');
+  const [clients, setClients] = useState<{ _id: string; name: string }[]>([]);
+
   const [sortField, setSortField] = useState<'date' | 'totalAmount' | 'dueDate'>('date');
   const [sortOrder, setSortOrder] = useState<'asc' | 'desc'>('desc');
 
   // Dropdown actions menu state
   const [activeDropdownId, setActiveDropdownId] = useState<string | null>(null);
   
+  // Fetch clients for dropdown options
+  const fetchClients = async () => {
+    try {
+      const res = await API.get<{ _id: string; name: string }[]>('/clients');
+      setClients(res.data);
+    } catch (err) {
+      console.error('Failed to load clients for filtering', err);
+    }
+  };
+
   // Fetch invoices from backend
   const fetchInvoices = async () => {
     try {
@@ -57,7 +72,10 @@ export const InvoiceList: React.FC<InvoiceListProps> = ({ onAddNotification }) =
       const response = await API.get<InvoiceData[]>('/invoices', {
         params: {
           status: statusFilter,
-          search: searchQuery || undefined
+          search: searchQuery || undefined,
+          client: clientFilter || undefined,
+          startDate: startDate || undefined,
+          endDate: endDate || undefined
         }
       });
       
@@ -71,8 +89,12 @@ export const InvoiceList: React.FC<InvoiceListProps> = ({ onAddNotification }) =
   };
 
   useEffect(() => {
+    fetchClients();
+  }, []);
+
+  useEffect(() => {
     fetchInvoices();
-  }, [statusFilter, searchQuery]);
+  }, [statusFilter, searchQuery, clientFilter, startDate, endDate]);
 
   // Close dropdown on screen resize
   useEffect(() => {
@@ -152,6 +174,20 @@ export const InvoiceList: React.FC<InvoiceListProps> = ({ onAddNotification }) =
           <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-bold bg-amber-500/10 text-amber-700 border border-amber-500/20">
             <Clock className="h-3.5 w-3.5" />
             Sent
+          </span>
+        );
+      case 'Viewed':
+        return (
+          <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-bold bg-blue-500/10 text-blue-700 border border-blue-500/20">
+            <Clock className="h-3.5 w-3.5" />
+            Viewed
+          </span>
+        );
+      case 'Partially Paid':
+        return (
+          <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-bold bg-indigo-500/10 text-indigo-700 border border-indigo-500/20">
+            <Clock className="h-3.5 w-3.5" />
+            Partially Paid
           </span>
         );
       case 'Overdue':
@@ -261,36 +297,94 @@ export const InvoiceList: React.FC<InvoiceListProps> = ({ onAddNotification }) =
       </div>
 
       {/* Control panel: search, sort, filters */}
-      <div className="flex flex-col lg:flex-row gap-4 justify-between items-stretch lg:items-center">
-        {/* Search bar */}
-        <div className="relative max-w-md w-full">
-          <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 h-4 w-4 text-text-secondary" />
-          <input
-            id="invoice-search"
-            type="text"
-            placeholder="Search invoice number or client name..."
-            value={searchQuery}
-            onChange={(e) => setSearchQuery(e.target.value)}
-            className="w-full pl-10 pr-4 py-2.5 text-xs rounded-xl border border-navy/10 bg-white text-navy focus:outline-none focus:border-green focus:ring-1 focus:ring-green transition-all font-semibold"
-          />
+      <div className="flex flex-col gap-4 bg-white border border-navy/5 p-5 rounded-2xl shadow-sm">
+        <div className="flex flex-col lg:flex-row gap-4 justify-between items-stretch lg:items-center">
+          {/* Search bar */}
+          <div className="relative max-w-md w-full">
+            <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 h-4 w-4 text-text-secondary" />
+            <input
+              id="invoice-search"
+              type="text"
+              placeholder="Search invoice number or client name..."
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              className="w-full pl-10 pr-4 py-2.5 text-xs rounded-xl border border-navy/10 bg-white text-navy focus:outline-none focus:border-green focus:ring-1 focus:ring-green transition-all font-semibold"
+            />
+          </div>
+
+          {/* Status filtering tags */}
+          <div className="flex flex-wrap gap-1.5 justify-start lg:justify-end">
+            {['All', 'Draft', 'Sent', 'Viewed', 'Partially Paid', 'Paid', 'Overdue', 'Cancelled'].map((status) => (
+              <button
+                key={status}
+                id={`filter-status-${status.toLowerCase().replace(' ', '-')}`}
+                onClick={() => setStatusFilter(status)}
+                className={`px-3 py-2 rounded-xl text-xs font-bold transition-all border ${
+                  statusFilter === status
+                    ? 'bg-navy border-navy text-white shadow-sm'
+                    : 'bg-white border-navy/10 text-navy/70 hover:bg-navy/5'
+                }`}
+              >
+                {status}
+              </button>
+            ))}
+          </div>
         </div>
 
-        {/* Status filtering tags */}
-        <div className="flex flex-wrap gap-1.5 justify-start lg:justify-end">
-          {['All', 'Draft', 'Sent', 'Paid', 'Overdue', 'Cancelled'].map((status) => (
-            <button
-              key={status}
-              id={`filter-status-${status.toLowerCase()}`}
-              onClick={() => setStatusFilter(status)}
-              className={`px-3 py-2 rounded-xl text-xs font-bold transition-all ${
-                statusFilter === status
-                  ? 'bg-navy text-white shadow-sm'
-                  : 'bg-white border border-navy/10 text-navy/70 hover:bg-navy/5'
-              }`}
+        {/* Secondary filters row (Client & Date Range) */}
+        <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 pt-3 border-t border-navy/5">
+          {/* Client Filter */}
+          <div className="flex flex-col gap-1.5">
+            <label className="text-[10px] font-extrabold uppercase tracking-wider text-text-secondary select-none font-bold">Filter by Client</label>
+            <select
+              value={clientFilter}
+              onChange={(e) => setClientFilter(e.target.value)}
+              className="glass-input px-3 py-2 rounded-xl text-navy text-xs font-semibold shadow-sm focus:outline-none w-full cursor-pointer bg-white"
             >
-              {status}
-            </button>
-          ))}
+              <option value="">All Clients</option>
+              {clients.map((c) => (
+                <option key={c._id} value={c._id}>{c.name}</option>
+              ))}
+            </select>
+          </div>
+
+          {/* Start Date */}
+          <div className="flex flex-col gap-1.5">
+            <label className="text-[10px] font-extrabold uppercase tracking-wider text-text-secondary select-none font-bold">Start Date</label>
+            <input
+              type="date"
+              value={startDate}
+              onChange={(e) => setStartDate(e.target.value)}
+              className="glass-input px-3 py-2 rounded-xl text-navy text-xs font-semibold shadow-sm focus:outline-none w-full bg-white"
+            />
+          </div>
+
+          {/* End Date */}
+          <div className="flex flex-col gap-1.5">
+            <label className="text-[10px] font-extrabold uppercase tracking-wider text-text-secondary select-none font-bold">End Date</label>
+            <div className="relative flex items-center">
+              <input
+                type="date"
+                value={endDate}
+                onChange={(e) => setEndDate(e.target.value)}
+                className="glass-input px-3 py-2 rounded-xl text-navy text-xs font-semibold shadow-sm focus:outline-none w-full bg-white"
+              />
+              {(clientFilter || startDate || endDate) && (
+                <button
+                  type="button"
+                  onClick={() => {
+                    setClientFilter('');
+                    setStartDate('');
+                    setEndDate('');
+                  }}
+                  className="absolute right-3 text-xs font-bold text-red-500 hover:text-red-700"
+                  title="Clear advanced filters"
+                >
+                  Clear
+                </button>
+              )}
+            </div>
+          </div>
         </div>
       </div>
 

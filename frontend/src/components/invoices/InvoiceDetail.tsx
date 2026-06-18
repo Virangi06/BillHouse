@@ -24,6 +24,7 @@ interface InvoiceItem {
   description: string;
   quantity: number;
   rate: number;
+  unit: 'hours' | 'days' | 'months' | 'items' | 'projects';
   gstRate: number;
   amount: number;
   _id?: string;
@@ -36,10 +37,14 @@ interface InvoiceDetailData {
   clientName: string;
   date: string;
   dueDate: string;
-  status: 'Draft' | 'Sent' | 'Paid' | 'Overdue' | 'Cancelled';
+  status: 'Draft' | 'Sent' | 'Viewed' | 'Partially Paid' | 'Paid' | 'Overdue' | 'Cancelled';
   subtotal: number;
   gstAmount: number;
   discountAmount: number;
+  tdsRate: number;
+  tdsAmount: number;
+  template: 'Modern' | 'Classic' | 'Minimal';
+  colorTheme: string;
   totalAmount: number;
   amountPaid: number;
   amountDue: number;
@@ -79,11 +84,24 @@ export const InvoiceDetail: React.FC = () => {
       setLoading(true);
       setErrorMsg(null);
       const res = await API.get<InvoiceDetailData>(`/invoices/${invoiceId}`);
-      setInvoice(res.data);
+      
+      let invoiceData = res.data;
+      if (invoiceData.status === 'Draft' || invoiceData.status === 'Sent') {
+        try {
+          const viewRes = await API.patch<{ message: string; invoice: InvoiceDetailData }>(`/invoices/${invoiceId}/view`);
+          if (viewRes.data?.invoice) {
+            invoiceData = viewRes.data.invoice;
+          }
+        } catch (viewErr) {
+          console.warn('Failed to auto-mark invoice as viewed:', viewErr);
+        }
+      }
+      
+      setInvoice(invoiceData);
 
       // Fetch client billing info
       try {
-        const clientRes = await API.get<ClientDetail>(`/clients/${res.data.client}`);
+        const clientRes = await API.get<ClientDetail>(`/clients/${invoiceData.client}`);
         setClient(clientRes.data);
       } catch (clientErr) {
         console.warn('Failed to load full client details for invoice sheet, falling back to invoice fields', clientErr);
@@ -100,18 +118,22 @@ export const InvoiceDetail: React.FC = () => {
     fetchInvoiceDetails();
   }, [invoiceId]);
 
-  const handleStatusChange = async (newStatus: 'Draft' | 'Sent' | 'Paid' | 'Cancelled') => {
+  const handleStatusChange = async (newStatus: 'Draft' | 'Sent' | 'Viewed' | 'Partially Paid' | 'Paid' | 'Cancelled') => {
     if (!invoice) return;
     try {
       setActionLoading(true);
       setErrorMsg(null);
-      await API.patch(`/invoices/${invoice._id}/status`, { status: newStatus });
-      setInvoice(prev => prev ? {
-        ...prev,
-        status: newStatus,
-        amountPaid: newStatus === 'Paid' ? prev.totalAmount : 0,
-        amountDue: newStatus === 'Paid' ? 0 : prev.totalAmount
-      } : null);
+      const res = await API.patch<{ message: string; invoice: InvoiceDetailData }>(`/invoices/${invoice._id}/status`, { status: newStatus });
+      if (res.data?.invoice) {
+        setInvoice(res.data.invoice);
+      } else {
+        setInvoice(prev => prev ? {
+          ...prev,
+          status: newStatus,
+          amountPaid: newStatus === 'Paid' ? prev.totalAmount : (newStatus === 'Partially Paid' ? Math.round(prev.totalAmount / 2) : 0),
+          amountDue: newStatus === 'Paid' ? 0 : (newStatus === 'Partially Paid' ? prev.totalAmount - Math.round(prev.totalAmount / 2) : prev.totalAmount)
+        } : null);
+      }
     } catch (err: any) {
       const msg = err.response?.data?.error
         || (err.message === 'Network Error' ? 'Network error – check that the backend server is running and CORS allows PATCH requests.' : null)
@@ -209,6 +231,20 @@ export const InvoiceDetail: React.FC = () => {
             Sent
           </span>
         );
+      case 'Viewed':
+        return (
+          <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-bold bg-blue-500/10 text-blue-700 border border-blue-500/20">
+            <Clock className="h-3.5 w-3.5" />
+            Viewed
+          </span>
+        );
+      case 'Partially Paid':
+        return (
+          <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-bold bg-indigo-500/10 text-indigo-700 border border-indigo-500/20">
+            <Clock className="h-3.5 w-3.5" />
+            Partially Paid
+          </span>
+        );
       case 'Overdue':
         return (
           <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-bold bg-rose-500/10 text-rose-700 border border-rose-500/20 animate-pulse">
@@ -237,6 +273,8 @@ export const InvoiceDetail: React.FC = () => {
     switch (status) {
       case 'Paid': return 'border-l-[6px] md:border-l-[8px] border-green';
       case 'Sent': return 'border-l-[6px] md:border-l-[8px] border-amber-500';
+      case 'Viewed': return 'border-l-[6px] md:border-l-[8px] border-blue-500';
+      case 'Partially Paid': return 'border-l-[6px] md:border-l-[8px] border-indigo-500';
       case 'Overdue': return 'border-l-[6px] md:border-l-[8px] border-rose-500';
       case 'Cancelled': return 'border-l-[6px] md:border-l-[8px] border-gray-400';
       default: return 'border-l-[6px] md:border-l-[8px] border-navy/30';
@@ -247,7 +285,7 @@ export const InvoiceDetail: React.FC = () => {
     if (!invoice) return null;
     const { status } = invoice;
     
-    const isSent = status === 'Sent' || status === 'Paid' || status === 'Overdue' || status === 'Cancelled';
+    const isSent = ['Sent', 'Viewed', 'Partially Paid', 'Paid', 'Overdue', 'Cancelled'].includes(status);
     const isPaid = status === 'Paid';
     
     return (
@@ -268,7 +306,7 @@ export const InvoiceDetail: React.FC = () => {
             </div>
           </div>
 
-          {/* Step 2: Sent */}
+          {/* Step 2: Sent / Viewed */}
           <div className="flex gap-3">
             <div className="flex flex-col items-center">
               <div className={`h-6 w-6 rounded-full flex items-center justify-center text-[10px] font-bold shrink-0 border-2 ${
@@ -281,9 +319,17 @@ export const InvoiceDetail: React.FC = () => {
               <div className={`w-0.5 h-8 ${isPaid ? 'bg-green' : 'bg-navy/10'}`}></div>
             </div>
             <div className="flex flex-col">
-              <span className={`text-xs font-extrabold ${isSent ? 'text-navy' : 'text-text-secondary'}`}>Dispatched to Client</span>
+              <span className={`text-xs font-extrabold ${isSent ? 'text-navy' : 'text-text-secondary'}`}>
+                {status === 'Viewed' ? 'Viewed by Client' : status === 'Partially Paid' ? 'Partially Settled' : 'Dispatched to Client'}
+              </span>
               <span className="text-[10px] text-text-secondary font-semibold">
-                {isSent ? 'Sent to recipient email' : 'Pending dispatch'}
+                {status === 'Viewed' 
+                  ? 'Client has opened invoice' 
+                  : status === 'Partially Paid' 
+                    ? `Partially paid: ${formatCurrency(invoice.amountPaid)} received` 
+                    : isSent 
+                      ? 'Sent to recipient email' 
+                      : 'Pending dispatch'}
               </span>
             </div>
           </div>
@@ -398,53 +444,121 @@ export const InvoiceDetail: React.FC = () => {
         {/* Left Side: Printable Invoice (2/3 width on desktop) */}
         <div className="lg:col-span-8 w-full flex justify-center">
           <GlassCard className="printable-invoice-card p-6 sm:p-10 md:p-12 bg-white text-navy shadow-md print:shadow-none print:border-none print:p-0 print:m-0 flex flex-col gap-6 md:gap-8 w-full max-w-4xl overflow-hidden">
-            {/* Invoice Header: stacks on mobile */}
-            <div className="flex flex-col sm:flex-row justify-between items-start gap-6 border-b-[3px] border-[#3b4b5c]/80 pb-5">
-              <div className="flex items-center gap-3">
-                {businessProfile?.logoBase64 ? (
-                  <img src={getLogoUrl(businessProfile.logoBase64)} alt={businessProfile.name} className="h-12 w-auto object-contain" />
-                ) : (
-                  <div className="h-12 w-12 bg-[#3b4b5c] text-white rounded-xl flex items-center justify-center shrink-0">
-                    <Building className="h-6 w-6" />
-                  </div>
-                )}
-                <div className="text-xs text-[#5f6b76] font-semibold leading-normal">
-                  <h3 className="font-extrabold text-navy text-[13px]">{businessProfile?.name || businessName}</h3>
-                  <p>
-                    {businessProfile?.address ? (
-                      <>
-                        {businessProfile.address}
-                        {businessProfile.city && `, ${businessProfile.city}`}
-                        {businessProfile.state && `, ${businessProfile.state}`}
-                        {businessProfile.pincode && ` - ${businessProfile.pincode}`}
-                      </>
+            {/* Invoice Header */}
+            {invoice.template === 'Classic' ? (
+              <div className="flex flex-col gap-6">
+                <div 
+                  className="flex justify-between items-center p-4 rounded-xl text-white shadow-sm"
+                  style={{ backgroundColor: invoice.colorTheme }}
+                >
+                  <h1 className="text-lg font-black tracking-widest uppercase m-0">Tax Invoice</h1>
+                  <span className="text-sm font-extrabold">No: {invoice.number}</span>
+                </div>
+                <div 
+                  className="flex flex-col sm:flex-row justify-between items-start gap-6 pb-5"
+                  style={{ borderBottom: `1px solid ${invoice.colorTheme}40` }}
+                >
+                  <div className="flex items-center gap-3">
+                    {businessProfile?.logoBase64 ? (
+                      <img src={getLogoUrl(businessProfile.logoBase64)} alt={businessProfile.name} className="h-12 w-auto object-contain" />
                     ) : (
-                      "Street Address, City, Country, Zip Code"
+                      <div className="h-12 w-12 text-white rounded-xl flex items-center justify-center shrink-0" style={{ backgroundColor: invoice.colorTheme }}>
+                        <Building className="h-6 w-6" />
+                      </div>
                     )}
-                  </p>
+                    <div className="text-xs text-[#5f6b76] font-semibold leading-normal">
+                      <h3 className="font-extrabold text-navy text-[13px]">{businessProfile?.name || businessName}</h3>
+                      <p>
+                        {businessProfile?.address ? (
+                          <>{businessProfile.address}{businessProfile.city && `, ${businessProfile.city}`}{businessProfile.state && `, ${businessProfile.state}`}{businessProfile.pincode && ` - ${businessProfile.pincode}`}</>
+                        ) : (
+                          "Street Address, City, Country, Zip Code"
+                        )}
+                      </p>
+                    </div>
+                  </div>
+                  <div className="text-left sm:text-right flex flex-col gap-1 text-xs">
+                    <span className="text-[#5f6b76] font-semibold">Issue Date: <span className="font-bold text-navy">{formatDate(invoice.date)}</span></span>
+                    <span className="text-[#5f6b76] font-semibold">Due Date: <span className="font-bold text-navy">{formatDate(invoice.dueDate)}</span></span>
+                  </div>
                 </div>
               </div>
-
-              <div className="text-left sm:text-right flex flex-col gap-1 text-xs w-full sm:w-auto">
-                <span className="text-[#5f6b76] font-semibold">Invoice# <span className="font-bold text-navy">{invoice.number}</span></span>
-                <span className="text-[#5f6b76] font-semibold">Issue date</span>
-                <span className="font-bold text-navy">{formatDate(invoice.date)}</span>
+            ) : invoice.template === 'Minimal' ? (
+              <div className="flex flex-col gap-4 border-b border-slate-200 pb-4">
+                <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
+                  <div>
+                    <h1 className="text-xl font-bold tracking-tight text-navy uppercase m-0">Invoice</h1>
+                    <span className="text-xs text-text-secondary font-semibold">#{invoice.number}</span>
+                  </div>
+                  {businessProfile?.logoBase64 ? (
+                    <img src={getLogoUrl(businessProfile.logoBase64)} alt={businessProfile.name} className="h-9 w-auto object-contain" />
+                  ) : (
+                    <span className="text-xs font-bold text-navy uppercase tracking-wider">{businessProfile?.name || businessName}</span>
+                  )}
+                </div>
+                <div className="grid grid-cols-2 gap-4 text-[11px] text-[#5f6b76] font-medium pt-2">
+                  <div>
+                    <p className="font-bold text-navy">{businessProfile?.name || businessName}</p>
+                    <p>{businessProfile?.address}</p>
+                  </div>
+                  <div className="text-right">
+                    <p>Issue Date: {formatDate(invoice.date)}</p>
+                    <p>Due Date: {formatDate(invoice.dueDate)}</p>
+                  </div>
+                </div>
               </div>
-            </div>
+            ) : (
+              <div 
+                className="flex flex-col sm:flex-row justify-between items-start gap-6 pb-5"
+                style={{ borderBottom: `3px solid ${invoice.colorTheme}` }}
+              >
+                <div className="flex items-center gap-3">
+                  {businessProfile?.logoBase64 ? (
+                    <img src={getLogoUrl(businessProfile.logoBase64)} alt={businessProfile.name} className="h-12 w-auto object-contain" />
+                  ) : (
+                    <div className="h-12 w-12 text-white rounded-xl flex items-center justify-center shrink-0" style={{ backgroundColor: invoice.colorTheme }}>
+                      <Building className="h-6 w-6" />
+                    </div>
+                  )}
+                  <div className="text-xs text-[#5f6b76] font-semibold leading-normal">
+                    <h3 className="font-extrabold text-navy text-[13px]">{businessProfile?.name || businessName}</h3>
+                    <p>
+                      {businessProfile?.address ? (
+                        <>{businessProfile.address}{businessProfile.city && `, ${businessProfile.city}`}{businessProfile.state && `, ${businessProfile.state}`}{businessProfile.pincode && ` - ${businessProfile.pincode}`}</>
+                      ) : (
+                        "Street Address, City, Country, Zip Code"
+                      )}
+                    </p>
+                  </div>
+                </div>
+                <div className="text-left sm:text-right flex flex-col gap-1 text-xs w-full sm:w-auto">
+                  <span className="text-[#5f6b76] font-semibold">Invoice# <span className="font-bold text-navy">{invoice.number}</span></span>
+                  <span className="text-[#5f6b76] font-semibold">Issue date</span>
+                  <span className="font-bold text-navy">{formatDate(invoice.date)}</span>
+                </div>
+              </div>
+            )}
 
-            {/* Business Large Display Header */}
-            <div className="flex flex-col gap-1 mt-2">
-              <h2 className="text-2xl font-bold text-navy tracking-tight">{businessProfile?.name || businessName}</h2>
-              <p className="text-xs text-[#5f6b76] font-medium leading-relaxed whitespace-pre-wrap">
-                {invoice.notes || "Add a message here for your customer."}
-              </p>
-            </div>
+            {/* Business Large Display Header (Hide for Minimal) */}
+            {invoice.template !== 'Minimal' && (
+              <div className="flex flex-col gap-1 mt-2">
+                <h2 className="text-xl font-bold text-navy tracking-tight">{businessProfile?.name || businessName}</h2>
+                <p className="text-xs text-[#5f6b76] font-medium leading-relaxed whitespace-pre-wrap">
+                  {invoice.notes || "Add a message here for your customer."}
+                </p>
+              </div>
+            )}
 
             {/* Three-Column Information Grid */}
             <div className="grid grid-cols-1 md:grid-cols-3 gap-6 pt-2 pb-2 text-xs">
               {/* Col 1: BILL TO */}
               <div className="flex flex-col gap-1.5 leading-relaxed">
-                <h4 className="font-black text-[10px] text-[#5f6b76] uppercase tracking-wider border-b border-navy/5 pb-1">BILL TO</h4>
+                <h4 
+                  className="font-black text-[10px] text-[#5f6b76] uppercase tracking-wider pb-1"
+                  style={{ borderBottom: `1px solid ${invoice.template === 'Minimal' ? '#e2e8f0' : `${invoice.colorTheme}20`}` }}
+                >
+                  BILL TO
+                </h4>
                 <div>
                   <p className="font-extrabold text-navy text-[13px]">{invoice.clientName}</p>
                   {client ? (
@@ -461,8 +575,16 @@ export const InvoiceDetail: React.FC = () => {
               </div>
 
               {/* Col 2: DETAILS */}
-              <div className="flex flex-col gap-1.5 leading-relaxed border-t md:border-t-0 md:border-l md:border-navy/5 pt-4 md:pt-0 md:pl-6">
-                <h4 className="font-black text-[10px] text-[#5f6b76] uppercase tracking-wider border-b border-navy/5 pb-1">DETAILS</h4>
+              <div 
+                className="flex flex-col gap-1.5 leading-relaxed border-t md:border-t-0 md:border-l pt-4 md:pt-0 md:pl-6"
+                style={{ borderLeftColor: invoice.template === 'Minimal' ? 'transparent' : `${invoice.colorTheme}15` }}
+              >
+                <h4 
+                  className="font-black text-[10px] text-[#5f6b76] uppercase tracking-wider pb-1"
+                  style={{ borderBottom: `1px solid ${invoice.template === 'Minimal' ? '#e2e8f0' : `${invoice.colorTheme}20`}` }}
+                >
+                  DETAILS
+                </h4>
                 <div className="text-[#5f6b76] font-semibold flex flex-col gap-1">
                   {invoice.terms ? (
                     <p className="whitespace-pre-wrap">{invoice.terms}</p>
@@ -475,8 +597,16 @@ export const InvoiceDetail: React.FC = () => {
               </div>
 
               {/* Col 3: PAYMENT */}
-              <div className="flex flex-col gap-1.5 leading-relaxed border-t md:border-t-0 md:border-l md:border-navy/5 pt-4 md:pt-0 md:pl-6">
-                <h4 className="font-black text-[10px] text-[#5f6b76] uppercase tracking-wider border-b border-navy/5 pb-1">PAYMENT</h4>
+              <div 
+                className="flex flex-col gap-1.5 leading-relaxed border-t md:border-t-0 md:border-l pt-4 md:pt-0 md:pl-6"
+                style={{ borderLeftColor: invoice.template === 'Minimal' ? 'transparent' : `${invoice.colorTheme}15` }}
+              >
+                <h4 
+                  className="font-black text-[10px] text-[#5f6b76] uppercase tracking-wider pb-1"
+                  style={{ borderBottom: `1px solid ${invoice.template === 'Minimal' ? '#e2e8f0' : `${invoice.colorTheme}20`}` }}
+                >
+                  PAYMENT
+                </h4>
                 <div className="text-[#5f6b76] font-semibold flex flex-col gap-1">
                   <div className="flex flex-col">
                     <span>Due date</span>
@@ -488,7 +618,10 @@ export const InvoiceDetail: React.FC = () => {
                   </div>
                   {/* Render compact bank details under payment info */}
                   {businessProfile && (businessProfile.bankName || businessProfile.bankAccount) && (
-                    <div className="mt-2 pt-2 border-t border-navy/5 text-[10px] leading-tight flex flex-col gap-0.5">
+                    <div 
+                      className="mt-2 pt-2 border-t text-[10px] leading-tight flex flex-col gap-0.5"
+                      style={{ borderTopColor: `${invoice.colorTheme}15` }}
+                    >
                       <p className="font-bold text-navy">Bank Details:</p>
                       {businessProfile.bankName && <p>{businessProfile.bankName}</p>}
                       {businessProfile.bankAccount && <p>A/C: {businessProfile.bankAccount}</p>}
@@ -503,7 +636,10 @@ export const InvoiceDetail: React.FC = () => {
             <div className="overflow-x-auto w-full -mx-4 px-4 sm:mx-0 sm:px-0">
               <table className="w-full text-left border-collapse min-w-[560px]">
                 <thead>
-                  <tr className="border-b border-[#3b4b5c] text-[10px] font-black uppercase text-[#5f6b76] tracking-wider">
+                  <tr 
+                    style={{ borderBottom: `2px solid ${invoice.template === 'Minimal' ? '#e2e8f0' : invoice.colorTheme}` }}
+                    className="text-[10px] font-black uppercase text-[#5f6b76] tracking-wider"
+                  >
                     <th className="py-2.5 pr-4 w-7/12">Item</th>
                     <th className="py-2.5 px-4 text-right w-1/12">Qty</th>
                     <th className="py-2.5 px-4 text-right w-2/12">Price</th>
@@ -519,8 +655,8 @@ export const InvoiceDetail: React.FC = () => {
                           <span className="text-[10px] text-[#5f6b76] mt-0.5 font-medium">GST Rate: {item.gstRate}%</span>
                         </div>
                       </td>
-                      <td className="py-3.5 px-4 text-right text-navy font-semibold align-top">
-                        {item.quantity}
+                      <td className="py-3.5 px-4 text-right text-navy font-semibold align-top whitespace-nowrap">
+                        {item.quantity} <span className="text-[10px] text-[#5f6b76] font-normal">{item.unit ? (item.unit === 'hours' ? 'hrs' : item.unit === 'projects' ? 'proj' : item.unit === 'items' ? 'pcs' : item.unit === 'days' ? 'days' : 'mos') : 'pcs'}</span>
                       </td>
                       <td className="py-3.5 px-4 text-right text-[#5f6b76] font-semibold align-top">
                         {formatCurrency(item.rate)}
@@ -554,10 +690,30 @@ export const InvoiceDetail: React.FC = () => {
                   </div>
                 )}
 
-                <div className="flex justify-between items-center text-[13px] font-black text-navy border-t border-[#3b4b5c] pt-2 pb-2 border-b border-[#3b4b5c]">
+                <div 
+                  className="flex justify-between items-center text-[13px] font-black text-navy pt-2 pb-2"
+                  style={{ 
+                    borderTop: `1px solid ${invoice.template === 'Minimal' ? '#e2e8f0' : invoice.colorTheme}`, 
+                    borderBottom: `1px solid ${invoice.template === 'Minimal' ? '#e2e8f0' : invoice.colorTheme}` 
+                  }}
+                >
                   <span>Total Due</span>
                   <span className="text-base font-black">{formatCurrency(invoice.totalAmount)}</span>
                 </div>
+
+                {invoice.tdsRate > 0 && (
+                  <div 
+                    className="p-2.5 bg-slate-50 border rounded-xl text-[11px] font-semibold text-text-secondary leading-normal text-right mt-1.5"
+                    style={{ borderColor: invoice.template === 'Minimal' ? '#e2e8f0' : `${invoice.colorTheme}25` }}
+                  >
+                    <p className="font-bold text-navy">
+                      Estimated TDS ({invoice.tdsRate}%): {formatCurrency(invoice.tdsAmount)}
+                    </p>
+                    <p className="text-[9px] text-[#5f6b76] italic mt-0.5">
+                      *Estimated TDS deduction at payment: {formatCurrency(invoice.tdsAmount)} (to be deducted by client)
+                    </p>
+                  </div>
+                )}
               </div>
             </div>
 
@@ -639,7 +795,18 @@ export const InvoiceDetail: React.FC = () => {
                 </Button>
               )}
 
-              {(invoice.status === 'Draft' || invoice.status === 'Sent') && (
+              {['Draft', 'Sent', 'Viewed'].includes(invoice.status) && (
+                <Button
+                  variant="outline"
+                  disabled={actionLoading}
+                  onClick={() => handleStatusChange('Partially Paid')}
+                  className="w-full py-2.5 text-xs font-bold border-indigo-500/25 text-indigo-700 hover:bg-indigo-500/5 rounded-xl"
+                >
+                  Mark as Partially Paid
+                </Button>
+              )}
+
+              {['Draft', 'Sent', 'Viewed', 'Partially Paid'].includes(invoice.status) && (
                 <Button
                   variant="secondary"
                   disabled={actionLoading}

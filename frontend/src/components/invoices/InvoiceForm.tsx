@@ -29,6 +29,7 @@ interface LineItem {
   description: string;
   quantity: number;
   rate: number;
+  unit: 'hours' | 'days' | 'months' | 'items' | 'projects';
   gstRate: number; // e.g. 0, 5, 12, 18, 28
   amount: number; // quantity * rate
 }
@@ -72,13 +73,16 @@ export const InvoiceForm: React.FC<InvoiceFormProps> = ({ onAddNotification }) =
     return d.toISOString().split('T')[0];
   });
   const [items, setItems] = useState<LineItem[]>([
-    { description: '', quantity: 1, rate: 0, gstRate: 18, amount: 0 }
+    { description: '', quantity: 1, rate: 0, unit: 'items', gstRate: 18, amount: 0 }
   ]);
   
   // Wizard and Discount states
   const [currentStep, setCurrentStep] = useState<number>(1);
   const [discountType, setDiscountType] = useState<'flat' | 'percent'>('flat');
   const [discountValue, setDiscountValue] = useState<number>(0);
+  const [tdsRate, setTdsRate] = useState<number>(0);
+  const [template, setTemplate] = useState<'Modern' | 'Classic' | 'Minimal'>('Modern');
+  const [colorTheme, setColorTheme] = useState<string>('#3b4b5c');
   
   const [notes, setNotes] = useState<string>('');
   const [terms, setTerms] = useState<string>('');
@@ -119,6 +123,7 @@ export const InvoiceForm: React.FC<InvoiceFormProps> = ({ onAddNotification }) =
         description: it.description,
         quantity: it.quantity,
         rate: it.rate,
+        unit: it.unit || 'items',
         gstRate: it.gstRate,
         amount: it.amount
       }));
@@ -126,6 +131,9 @@ export const InvoiceForm: React.FC<InvoiceFormProps> = ({ onAddNotification }) =
       
       setDiscountValue(inv.discountAmount || 0);
       setDiscountType('flat');
+      setTdsRate(inv.tdsRate || 0);
+      setTemplate(inv.template || 'Modern');
+      setColorTheme(inv.colorTheme || '#3b4b5c');
       setNotes(inv.notes || '');
       setTerms(inv.terms || '');
     } catch (err: any) {
@@ -179,6 +187,8 @@ export const InvoiceForm: React.FC<InvoiceFormProps> = ({ onAddNotification }) =
       item.amount = item.quantity * item.rate;
     } else if (field === 'gstRate') {
       item.gstRate = parseFloat(value) || 0;
+    } else if (field === 'unit') {
+      item.unit = value;
     } else if (field === 'description') {
       item.description = value;
     }
@@ -188,7 +198,7 @@ export const InvoiceForm: React.FC<InvoiceFormProps> = ({ onAddNotification }) =
   };
 
   const addLineItem = () => {
-    setItems([...items, { description: '', quantity: 1, rate: 0, gstRate: 18, amount: 0 }]);
+    setItems([...items, { description: '', quantity: 1, rate: 0, unit: 'items', gstRate: 18, amount: 0 }]);
   };
 
   const removeLineItem = (index: number) => {
@@ -305,6 +315,9 @@ export const InvoiceForm: React.FC<InvoiceFormProps> = ({ onAddNotification }) =
         date,
         dueDate,
         discountAmount,
+        tdsRate,
+        template,
+        colorTheme,
         notes,
         terms,
         items,
@@ -550,6 +563,58 @@ export const InvoiceForm: React.FC<InvoiceFormProps> = ({ onAddNotification }) =
               </div>
             </div>
 
+            <div className="border-t border-navy/5 pt-5 flex flex-col gap-4">
+              <h4 className="text-[10px] font-extrabold uppercase tracking-wider text-text-secondary select-none">Design & Customization</h4>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                {/* Template Select */}
+                <div className="flex flex-col gap-1.5">
+                  <label className="text-xs font-bold text-navy select-none">Invoice Layout Template</label>
+                  <select
+                    value={template}
+                    onChange={(e) => setTemplate(e.target.value as any)}
+                    className="glass-input px-4 py-3 rounded-xl text-navy text-xs font-semibold shadow-sm focus:outline-none w-full cursor-pointer bg-white"
+                  >
+                    <option value="Modern">Modern (Centered, Clean Grid)</option>
+                    <option value="Classic">Classic (Bold Corporate Branding)</option>
+                    <option value="Minimal">Minimal (Clean Monochrome Lines)</option>
+                  </select>
+                </div>
+
+                {/* Color Theme Swatch */}
+                <div className="flex flex-col gap-1.5">
+                  <label className="text-xs font-bold text-navy select-none">Branding Color Theme</label>
+                  <div className="flex items-center gap-3 mt-1">
+                    {[
+                      { name: 'Slate Blue', hex: '#3b4b5c' },
+                      { name: 'Forest Green', hex: '#0c4737' },
+                      { name: 'Dark Navy', hex: '#061b2d' },
+                      { name: 'Steel Gray', hex: '#5f6b76' },
+                      { name: 'Teal Accent', hex: '#2f8f7a' }
+                    ].map((color) => (
+                      <button
+                        key={color.hex}
+                        type="button"
+                        onClick={() => setColorTheme(color.hex)}
+                        style={{ backgroundColor: color.hex }}
+                        className={`h-8 w-8 rounded-full border-2 transition-all relative group cursor-pointer ${
+                          colorTheme === color.hex 
+                            ? 'ring-2 ring-green ring-offset-2 scale-110' 
+                            : 'border-transparent hover:scale-105'
+                        }`}
+                        title={color.name}
+                      >
+                        {colorTheme === color.hex && (
+                          <span className="absolute inset-0 flex items-center justify-center text-white text-[10px] font-bold">
+                            ✓
+                          </span>
+                        )}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              </div>
+            </div>
+
             {/* Validation Message - Localized at the bottom of the box */}
             {errorMsg && (
               <div className="p-3.5 bg-danger/10 border border-danger/35 text-danger text-xs font-bold rounded-xl animate-float-fast flex items-center gap-2">
@@ -605,12 +670,13 @@ export const InvoiceForm: React.FC<InvoiceFormProps> = ({ onAddNotification }) =
               <table className="w-full text-left border-collapse text-xs table-fixed">
                 <thead>
                   <tr className="border-b border-navy/10 bg-navy/5 text-text-secondary uppercase text-[10px] tracking-wider font-extrabold">
-                    <th className="py-2.5 px-3 min-w-[200px] w-6/12">Description</th>
-                    <th className="py-2.5 px-3 text-right min-w-[80px] w-1/12">Qty</th>
-                    <th className="py-2.5 px-3 text-right min-w-[110px] w-2/12">Rate (₹)</th>
-                    <th className="py-2.5 px-3 text-right min-w-[95px] w-1.5/12">GST %</th>
-                    <th className="py-2.5 px-3 text-right min-w-[100px] w-1.5/12">Amount</th>
-                    <th className="py-2.5 px-3 text-center min-w-[50px] w-1/12"></th>
+                    <th className="py-2.5 px-3 min-w-[200px] w-5/12">Description</th>
+                    <th className="py-2.5 px-3 text-right min-w-[90px] w-1.5/12">Unit</th>
+                    <th className="py-2.5 px-3 text-right min-w-[75px] w-1/12">Qty</th>
+                    <th className="py-2.5 px-3 text-right min-w-[105px] w-1.5/12">Rate (₹)</th>
+                    <th className="py-2.5 px-3 text-right min-w-[85px] w-1.5/12">GST %</th>
+                    <th className="py-2.5 px-3 text-right min-w-[95px] w-1.5/12">Amount</th>
+                    <th className="py-2.5 px-3 text-center min-w-[40px] w-0.5/12"></th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-navy/5">
@@ -626,7 +692,20 @@ export const InvoiceForm: React.FC<InvoiceFormProps> = ({ onAddNotification }) =
                           className="w-full bg-white border border-navy/10 rounded-xl px-3 py-2.5 text-xs text-navy focus:outline-none focus:border-green font-semibold"
                         />
                       </td>
-                      <td className="py-2.5 px-3 min-w-[80px]">
+                      <td className="py-2.5 px-3 min-w-[90px]">
+                        <select
+                          value={item.unit}
+                          onChange={(e) => handleItemChange(idx, 'unit', e.target.value)}
+                          className="w-full bg-white border border-navy/10 rounded-xl px-2 py-2.5 text-xs text-navy focus:outline-none focus:border-green font-semibold cursor-pointer"
+                        >
+                          <option value="items">items</option>
+                          <option value="hours">hours</option>
+                          <option value="days">days</option>
+                          <option value="months">months</option>
+                          <option value="projects">projects</option>
+                        </select>
+                      </td>
+                      <td className="py-2.5 px-3 min-w-[75px]">
                         <input
                           type="number"
                           required
@@ -778,12 +857,39 @@ export const InvoiceForm: React.FC<InvoiceFormProps> = ({ onAddNotification }) =
                   </div>
                 </div>
 
+                <div className="flex flex-col gap-1.5 w-full">
+                  <label className="text-xs font-bold text-navy select-none">TDS Rate (%)</label>
+                  <select
+                    value={tdsRate}
+                    onChange={(e) => setTdsRate(parseFloat(e.target.value) || 0)}
+                    className="glass-input px-4 py-3 rounded-xl text-navy text-xs font-semibold shadow-sm focus:outline-none w-full cursor-pointer bg-white"
+                  >
+                    <option value={0}>0% (No TDS)</option>
+                    <option value={1}>1% (TDS - Individuals/HUF)</option>
+                    <option value={2}>2% (TDS - Companies/Partnerships/Services)</option>
+                    <option value={5}>5% (TDS - Commission/Brokerage)</option>
+                    <option value={10}>10% (TDS - Professional/Technical Services)</option>
+                  </select>
+                </div>
+
                 <div className="flex justify-between items-center pt-2 border-t border-navy/10 mt-1">
                   <span className="text-xs font-extrabold text-navy">Grand Total:</span>
                   <span className="text-lg font-black text-green">
                     {formatCurrency(totalAmount)}
                   </span>
                 </div>
+
+                {tdsRate > 0 && (
+                  <div className="p-3 bg-navy/5 border border-navy/10 rounded-xl mt-2 flex flex-col gap-1 animate-fade-in">
+                    <div className="flex justify-between items-center text-xs font-semibold text-text-secondary">
+                      <span>Estimated TDS ({tdsRate}%):</span>
+                      <span className="font-bold text-navy">-{formatCurrency(Math.round((subtotal - discountAmount) * (tdsRate / 100)))}</span>
+                    </div>
+                    <span className="text-[10px] text-text-secondary italic">
+                      *Estimated TDS deduction at payment: {formatCurrency(Math.round((subtotal - discountAmount) * (tdsRate / 100)))}
+                    </span>
+                  </div>
+                )}
               </GlassCard>
 
               {/* Notes & Terms panel */}

@@ -30,12 +30,22 @@ router.get('/', async (req: AuthRequest, res: Response) => {
     }
 
     const { tenantId } = req.user;
-    const { status, search } = req.query;
+    const { status, search, client, startDate, endDate } = req.query;
 
     const query: any = { tenantId };
 
     if (status && status !== 'All') {
       query.status = status;
+    }
+
+    if (client) {
+      query.client = client;
+    }
+
+    if (startDate || endDate) {
+      query.date = {};
+      if (startDate) query.date.$gte = new Date(startDate as string);
+      if (endDate) query.date.$lte = new Date(endDate as string);
     }
 
     if (search) {
@@ -88,6 +98,9 @@ router.post('/', async (req: AuthRequest, res: Response) => {
       date,
       dueDate,
       discountAmount,
+      tdsRate,
+      template,
+      colorTheme,
       notes,
       terms,
       items,
@@ -136,6 +149,7 @@ router.post('/', async (req: AuthRequest, res: Response) => {
       const quantity = Math.max(1, parseFloat(item.quantity) || 1);
       const rate = Math.max(0, parseFloat(item.rate) || 0);
       const gstRate = Math.max(0, parseFloat(item.gstRate) || 0);
+      const unit = item.unit || 'items';
       
       const amount = quantity * rate;
       const itemGst = amount * (gstRate / 100);
@@ -147,12 +161,15 @@ router.post('/', async (req: AuthRequest, res: Response) => {
         description: item.description || 'Line Item',
         quantity,
         rate,
+        unit,
         gstRate,
         amount
       };
     });
 
     const discount = Math.max(0, parseFloat(discountAmount) || 0);
+    const tdsR = Math.max(0, parseFloat(tdsRate) || 0);
+    const tdsAmount = Math.round((subtotal - discount) * (tdsR / 100));
     const totalAmount = subtotal + gstAmount - discount;
 
     const initialStatus = status || 'Draft';
@@ -170,6 +187,10 @@ router.post('/', async (req: AuthRequest, res: Response) => {
       subtotal,
       gstAmount,
       discountAmount: discount,
+      tdsRate: tdsR,
+      tdsAmount,
+      template: template || 'Modern',
+      colorTheme: colorTheme || '#3b4b5c',
       totalAmount,
       amountPaid,
       amountDue,
@@ -208,6 +229,9 @@ router.put('/:id', async (req: AuthRequest, res: Response) => {
       date,
       dueDate,
       discountAmount,
+      tdsRate,
+      template,
+      colorTheme,
       notes,
       terms,
       items,
@@ -248,6 +272,7 @@ router.put('/:id', async (req: AuthRequest, res: Response) => {
         const quantity = Math.max(1, parseFloat(item.quantity) || 1);
         const rate = Math.max(0, parseFloat(item.rate) || 0);
         const gstRate = Math.max(0, parseFloat(item.gstRate) || 0);
+        const unit = item.unit || 'items';
         
         const amount = quantity * rate;
         const itemGst = amount * (gstRate / 100);
@@ -259,6 +284,7 @@ router.put('/:id', async (req: AuthRequest, res: Response) => {
           description: item.description || 'Line Item',
           quantity,
           rate,
+          unit,
           gstRate,
           amount
         };
@@ -273,7 +299,15 @@ router.put('/:id', async (req: AuthRequest, res: Response) => {
       invoice.discountAmount = Math.max(0, parseFloat(discountAmount) || 0);
     }
 
+    if (tdsRate !== undefined) {
+      invoice.tdsRate = Math.max(0, parseFloat(tdsRate) || 0);
+    }
+
+    invoice.tdsAmount = Math.round((invoice.subtotal - invoice.discountAmount) * (invoice.tdsRate / 100));
     invoice.totalAmount = invoice.subtotal + invoice.gstAmount - invoice.discountAmount;
+
+    if (template) invoice.template = template;
+    if (colorTheme) invoice.colorTheme = colorTheme;
 
     // Apply status and payment balances
     if (status) {
@@ -282,6 +316,12 @@ router.put('/:id', async (req: AuthRequest, res: Response) => {
         invoice.amountPaid = invoice.totalAmount;
         invoice.amountDue = 0;
         if (!invoice.paidAt) invoice.paidAt = new Date();
+      } else if (status === 'Partially Paid') {
+        if (invoice.amountPaid === 0 || invoice.amountPaid === invoice.totalAmount) {
+          invoice.amountPaid = Math.round(invoice.totalAmount / 2);
+        }
+        invoice.amountDue = invoice.totalAmount - invoice.amountPaid;
+        invoice.paidAt = undefined;
       } else {
         invoice.amountPaid = 0;
         invoice.amountDue = invoice.totalAmount;
@@ -296,6 +336,11 @@ router.put('/:id', async (req: AuthRequest, res: Response) => {
       if (invoice.status === 'Paid') {
         invoice.amountPaid = invoice.totalAmount;
         invoice.amountDue = 0;
+      } else if (invoice.status === 'Partially Paid') {
+        if (invoice.amountPaid === 0 || invoice.amountPaid === invoice.totalAmount) {
+          invoice.amountPaid = Math.round(invoice.totalAmount / 2);
+        }
+        invoice.amountDue = invoice.totalAmount - invoice.amountPaid;
       } else {
         invoice.amountPaid = 0;
         invoice.amountDue = invoice.totalAmount;
@@ -325,7 +370,7 @@ router.patch('/:id/status', async (req: AuthRequest, res: Response) => {
     const { status } = req.body;
     const { tenantId } = req.user;
 
-    const validStatuses = ['Draft', 'Sent', 'Paid', 'Overdue', 'Cancelled'];
+    const validStatuses = ['Draft', 'Sent', 'Viewed', 'Partially Paid', 'Paid', 'Overdue', 'Cancelled'];
     if (!status || !validStatuses.includes(status)) {
       return res.status(400).json({ error: 'Invalid invoice status supplied' });
     }
@@ -342,6 +387,12 @@ router.patch('/:id/status', async (req: AuthRequest, res: Response) => {
       invoice.amountPaid = invoice.totalAmount;
       invoice.amountDue = 0;
       invoice.paidAt = new Date();
+    } else if (status === 'Partially Paid') {
+      if (invoice.amountPaid === 0 || invoice.amountPaid === invoice.totalAmount) {
+        invoice.amountPaid = Math.round(invoice.totalAmount / 2);
+      }
+      invoice.amountDue = invoice.totalAmount - invoice.amountPaid;
+      invoice.paidAt = undefined;
     } else {
       invoice.amountPaid = 0;
       invoice.amountDue = invoice.totalAmount;
@@ -361,6 +412,35 @@ router.patch('/:id/status', async (req: AuthRequest, res: Response) => {
   } catch (error) {
     console.error('❌ Status patch error:', error);
     return res.status(500).json({ error: 'Server error updating invoice status' });
+  }
+});
+
+// 5a. PATCH RECORD VIEW (Mark status as Viewed)
+router.patch('/:id/view', async (req: AuthRequest, res: Response) => {
+  try {
+    if (!req.user) {
+      return res.status(401).json({ error: 'Unauthorized' });
+    }
+    const { id } = req.params;
+    const { tenantId } = req.user;
+
+    const access = await verifyInvoiceAccess(id, tenantId);
+    if ('error' in access) {
+      return res.status(access.status || 500).json({ error: access.error });
+    }
+
+    const { invoice } = access;
+    // Only automatically bump to Viewed if Draft or Sent
+    if (invoice.status === 'Draft' || invoice.status === 'Sent') {
+      invoice.status = 'Viewed';
+      await invoice.save();
+      return res.status(200).json({ message: 'Invoice marked as viewed', invoice });
+    }
+    
+    return res.status(200).json({ message: 'Invoice status not changed', invoice });
+  } catch (error) {
+    console.error('❌ View patch error:', error);
+    return res.status(500).json({ error: 'Server error marking invoice as viewed' });
   }
 });
 
