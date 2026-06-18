@@ -7,6 +7,7 @@ export interface IUser extends Document {
   email: string;
   passwordHash: string;
   tenantId: string;
+  role: 'Admin' | 'Accountant' | 'Viewer';
   isVerified: boolean;
   verificationToken?: string;
   verificationTokenExpires?: Date;
@@ -30,6 +31,7 @@ const UserSchema: Schema = new Schema(
     },
     passwordHash: { type: String, required: true },
     tenantId: { type: String, required: true, index: true },
+    role: { type: String, enum: ['Admin', 'Accountant', 'Viewer'], default: 'Admin' },
     isVerified: { type: Boolean, default: false },
     verificationToken: { type: String },
     verificationTokenExpires: { type: Date },

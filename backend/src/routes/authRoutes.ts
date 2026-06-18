@@ -160,7 +160,8 @@ router.post('/login', async (req: any, res: any) => {
         name: user.name,
         businessName: user.businessName || '',
         email: user.email,
-        tenantId: user.tenantId
+        tenantId: user.tenantId,
+        role: user.role
       }
     });
   } catch (error) {
