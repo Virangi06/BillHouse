@@ -44,6 +44,9 @@ export const InvoiceList: React.FC<InvoiceListProps> = ({ onAddNotification }) =
   const [searchQuery, setSearchQuery] = useState<string>('');
   const [sortField, setSortField] = useState<'date' | 'totalAmount' | 'dueDate'>('date');
   const [sortOrder, setSortOrder] = useState<'asc' | 'desc'>('desc');
+
+  // Dropdown actions menu state
+  const [activeDropdownId, setActiveDropdownId] = useState<string | null>(null);
   
   // Fetch invoices from backend
   const fetchInvoices = async () => {
@@ -70,6 +73,13 @@ export const InvoiceList: React.FC<InvoiceListProps> = ({ onAddNotification }) =
   useEffect(() => {
     fetchInvoices();
   }, [statusFilter, searchQuery]);
+
+  // Close dropdown on screen resize
+  useEffect(() => {
+    const handleResize = () => setActiveDropdownId(null);
+    window.addEventListener('resize', handleResize);
+    return () => window.removeEventListener('resize', handleResize);
+  }, []);
 
   const handleSort = (field: 'date' | 'totalAmount' | 'dueDate') => {
     if (sortField === field) {
@@ -114,8 +124,6 @@ export const InvoiceList: React.FC<InvoiceListProps> = ({ onAddNotification }) =
       alert(err.response?.data?.error || 'Failed to delete invoice');
     }
   };
-
-
 
   const navigateToCreate = () => {
     setSearchParams({ tab: 'invoices', action: 'create' });
@@ -204,7 +212,7 @@ export const InvoiceList: React.FC<InvoiceListProps> = ({ onAddNotification }) =
           id="btn-create-invoice"
           onClick={navigateToCreate}
           variant="primary" 
-          className="flex items-center gap-2 text-xs font-bold py-2.5 px-4 shadow-md hover:shadow-lg rounded-xl"
+          className="flex items-center gap-2 text-xs font-bold py-2.5 px-4 shadow-md hover:shadow-lg rounded-xl w-full sm:w-auto justify-center"
         >
           <Plus className="h-4.5 w-4.5" />
           Create Invoice
@@ -212,7 +220,7 @@ export const InvoiceList: React.FC<InvoiceListProps> = ({ onAddNotification }) =
       </div>
 
       {/* Stats Summary Row */}
-      <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
         {/* Total Billed */}
         <GlassCard className="p-5 bg-gradient-to-br from-white to-slate-50/80 border border-navy/5 shadow-sm flex flex-col gap-2 hover:-translate-y-1 hover:border-navy/15 hover:shadow-[0_8px_30px_rgba(0,0,0,0.04)] transition-all duration-300">
           <div className="flex items-center justify-between">
@@ -253,7 +261,7 @@ export const InvoiceList: React.FC<InvoiceListProps> = ({ onAddNotification }) =
       </div>
 
       {/* Control panel: search, sort, filters */}
-      <div className="flex flex-col md:flex-row gap-4 justify-between items-stretch md:items-center">
+      <div className="flex flex-col lg:flex-row gap-4 justify-between items-stretch lg:items-center">
         {/* Search bar */}
         <div className="relative max-w-md w-full">
           <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 h-4 w-4 text-text-secondary" />
@@ -268,13 +276,13 @@ export const InvoiceList: React.FC<InvoiceListProps> = ({ onAddNotification }) =
         </div>
 
         {/* Status filtering tags */}
-        <div className="flex flex-wrap gap-2 justify-start md:justify-end">
+        <div className="flex flex-wrap gap-1.5 justify-start lg:justify-end">
           {['All', 'Draft', 'Sent', 'Paid', 'Overdue', 'Cancelled'].map((status) => (
             <button
               key={status}
               id={`filter-status-${status.toLowerCase()}`}
               onClick={() => setStatusFilter(status)}
-              className={`px-4 py-2 rounded-xl text-xs font-bold transition-all ${
+              className={`px-3 py-2 rounded-xl text-xs font-bold transition-all ${
                 statusFilter === status
                   ? 'bg-navy text-white shadow-sm'
                   : 'bg-white border border-navy/10 text-navy/70 hover:bg-navy/5'
@@ -323,8 +331,8 @@ export const InvoiceList: React.FC<InvoiceListProps> = ({ onAddNotification }) =
             )}
           </div>
         ) : (
-          <div className="overflow-x-auto w-full">
-            <table className="w-full text-left border-collapse">
+          <div className="overflow-x-auto w-full -mx-4 px-4 sm:mx-0 sm:px-0">
+            <table className="w-full text-left border-collapse min-w-[750px]">
               <thead>
                 <tr className="border-b border-navy/5 bg-[#F8FAFC]">
                   <th className="py-4 px-6 text-xs font-extrabold uppercase text-text-secondary tracking-wider">Number</th>
@@ -335,7 +343,10 @@ export const InvoiceList: React.FC<InvoiceListProps> = ({ onAddNotification }) =
                   >
                     <div className="flex items-center gap-1">
                       <span>Issue Date</span>
-                      <ArrowUpDown className="h-3.5 w-3.5" />
+                      {sortField === 'date' && (
+                        <span className="text-[8px]">{sortOrder === 'asc' ? '▲' : '▼'}</span>
+                      )}
+                      <ArrowUpDown className="h-3.5 w-3.5 opacity-60" />
                     </div>
                   </th>
                   <th 
@@ -344,7 +355,10 @@ export const InvoiceList: React.FC<InvoiceListProps> = ({ onAddNotification }) =
                   >
                     <div className="flex items-center gap-1">
                       <span>Due Date</span>
-                      <ArrowUpDown className="h-3.5 w-3.5" />
+                      {sortField === 'dueDate' && (
+                        <span className="text-[8px]">{sortOrder === 'asc' ? '▲' : '▼'}</span>
+                      )}
+                      <ArrowUpDown className="h-3.5 w-3.5 opacity-60" />
                     </div>
                   </th>
                   <th 
@@ -353,7 +367,10 @@ export const InvoiceList: React.FC<InvoiceListProps> = ({ onAddNotification }) =
                   >
                     <div className="flex items-center gap-1 justify-end">
                       <span>Amount</span>
-                      <ArrowUpDown className="h-3.5 w-3.5" />
+                      {sortField === 'totalAmount' && (
+                        <span className="text-[8px]">{sortOrder === 'asc' ? '▲' : '▼'}</span>
+                      )}
+                      <ArrowUpDown className="h-3.5 w-3.5 opacity-60" />
                     </div>
                   </th>
                   <th className="py-4 px-6 text-xs font-extrabold uppercase text-text-secondary tracking-wider">Status</th>
@@ -395,36 +412,63 @@ export const InvoiceList: React.FC<InvoiceListProps> = ({ onAddNotification }) =
                       {getStatusBadge(inv.status)}
                     </td>
 
-                    <td className="py-4.5 px-6 text-right" onClick={(e) => e.stopPropagation()}>
-                      <div className="flex items-center justify-end gap-2">
+                    <td className="py-4.5 px-6 text-right relative" onClick={(e) => e.stopPropagation()}>
+                      <div className="flex items-center justify-end">
                         <button
-                          onClick={() => navigateToDetail(inv._id)}
-                          title="View Details"
-                          className="p-1.5 hover:bg-navy/5 rounded-lg text-text-secondary hover:text-navy transition-all"
+                          onClick={() => setActiveDropdownId(activeDropdownId === inv._id ? null : inv._id)}
+                          className="inline-flex items-center gap-1 px-3 py-1.5 bg-navy/5 border border-navy/10 hover:bg-navy/10 rounded-xl text-xs font-bold text-navy transition-all"
                         >
-                          <Eye className="h-4.5 w-4.5" />
+                          <span>Actions</span>
+                          <span className="text-[10px] opacity-60">▼</span>
                         </button>
-                        
-                        {inv.status === 'Draft' && (
-                          <button
-                            onClick={(e) => navigateToEdit(inv._id, e)}
-                            title="Edit Invoice"
-                            className="p-1.5 hover:bg-navy/5 rounded-lg text-text-secondary hover:text-navy transition-all"
-                          >
-                            <Edit2 className="h-4.5 w-4.5" />
-                          </button>
-                        )}
 
-                        {inv.status !== 'Paid' ? (
-                          <button
-                            onClick={(e) => handleDelete(inv._id, e)}
-                            title="Delete Invoice"
-                            className="p-1.5 hover:bg-red-500/10 rounded-lg text-text-secondary hover:text-red-600 transition-all"
-                          >
-                            <Trash2 className="h-4.5 w-4.5" />
-                          </button>
-                        ) : (
-                          <div className="w-7"></div> // spacer
+                        {activeDropdownId === inv._id && (
+                          <>
+                            {/* Click-outside backdrop */}
+                            <div 
+                              className="fixed inset-0 z-20 cursor-default"
+                              onClick={() => setActiveDropdownId(null)}
+                            />
+                            {/* Dropdown Menu */}
+                            <div className="absolute right-6 top-12 w-44 bg-white border border-navy/10 rounded-xl shadow-xl py-1.5 z-30 animate-scale-up text-left flex flex-col gap-0.5">
+                              <button
+                                onClick={() => {
+                                  setActiveDropdownId(null);
+                                  navigateToDetail(inv._id);
+                                }}
+                                className="flex items-center gap-2 px-3.5 py-2 text-xs font-bold text-navy hover:bg-navy/5 transition-colors w-full"
+                              >
+                                <Eye className="h-4 w-4 opacity-70" />
+                                View Details
+                              </button>
+                              
+                              {inv.status === 'Draft' && (
+                                <button
+                                  onClick={(e) => {
+                                    setActiveDropdownId(null);
+                                    navigateToEdit(inv._id, e);
+                                  }}
+                                  className="flex items-center gap-2 px-3.5 py-2 text-xs font-bold text-navy hover:bg-navy/5 transition-colors w-full"
+                                >
+                                  <Edit2 className="h-4 w-4 opacity-70" />
+                                  Edit Draft
+                                </button>
+                              )}
+
+                              {inv.status !== 'Paid' && (
+                                <button
+                                  onClick={(e) => {
+                                    setActiveDropdownId(null);
+                                    handleDelete(inv._id, e);
+                                  }}
+                                  className="flex items-center gap-2 px-3.5 py-2 text-xs font-bold text-red-500 hover:bg-red-500/5 transition-colors w-full"
+                                >
+                                  <Trash2 className="h-4 w-4 text-red-500 opacity-70" />
+                                  Delete Invoice
+                                </button>
+                              )}
+                            </div>
+                          </>
                         )}
                       </div>
                     </td>

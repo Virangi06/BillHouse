@@ -258,7 +258,9 @@ export const InvoiceDetail: React.FC = () => {
     );
   }
 
-  const businessName = user?.name ? `${user.name.split(' ')[0]}'s Org` : 'BillHouse Partner';  return (
+  const businessName = user?.name ? `${user.name.split(' ')[0]}'s Org` : 'BillHouse Partner';
+
+  return (
     <div className="flex flex-col gap-6 w-full max-w-full">
       {/* 1. Page Header (actions bar on mobile, standard header on desktop) - Hidden during print */}
       <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center bg-white border border-navy/5 p-4.5 rounded-2xl shadow-sm gap-4 print:hidden">
@@ -279,12 +281,12 @@ export const InvoiceDetail: React.FC = () => {
           </div>
         </div>
 
-        {/* Quick mobile print & edit actions */}
+        {/* Quick mobile/tablet print & edit actions */}
         <div className="flex sm:hidden gap-2 w-full">
           <Button
             variant="outline"
             onClick={handlePrint}
-            className="flex-1 flex items-center justify-center gap-1.5 text-xs font-bold py-2 border-navy/15 text-navy"
+            className="flex-1 flex items-center justify-center gap-1.5 text-xs font-bold py-2.5 border-navy/15 text-navy"
           >
             <Printer className="h-4 w-4" /> Print
           </Button>
@@ -292,7 +294,7 @@ export const InvoiceDetail: React.FC = () => {
             <Button
               variant="outline"
               onClick={() => setSearchParams({ tab: 'invoices', action: 'edit', id: invoice._id })}
-              className="flex-1 flex items-center justify-center gap-1.5 text-xs font-bold py-2 border-green/30 text-green"
+              className="flex-1 flex items-center justify-center gap-1.5 text-xs font-bold py-2.5 border-green/30 text-green"
             >
               <Edit2 className="h-4 w-4" /> Edit
             </Button>
@@ -312,14 +314,14 @@ export const InvoiceDetail: React.FC = () => {
 
       {/* Main Content Grid */}
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 w-full items-start">
-        {/* Left Side: Printable Invoice (2/3 width) */}
+        {/* Left Side: Printable Invoice (2/3 width on desktop) */}
         <div className="lg:col-span-8 w-full flex justify-center">
-          <GlassCard className="p-8 sm:p-12 border-navy/5 bg-white text-navy shadow-md print:shadow-none print:border-none print:p-0 print:m-0 flex flex-col gap-10 w-full max-w-4xl">
-            {/* Invoice Header */}
-            <div className="flex flex-col sm:flex-row justify-between items-start gap-6 border-b border-navy/10 pb-8">
+          <GlassCard className="p-4 sm:p-8 md:p-12 border-navy/5 bg-white text-navy shadow-md print:shadow-none print:border-none print:p-0 print:m-0 flex flex-col gap-8 md:gap-10 w-full max-w-4xl overflow-hidden">
+            {/* Invoice Header: stacks on mobile */}
+            <div className="flex flex-col sm:flex-row justify-between items-start gap-6 border-b border-navy/10 pb-6 md:pb-8">
               <div className="flex flex-col gap-2">
                 {businessProfile?.logoBase64 ? (
-                  <img src={getLogoUrl(businessProfile.logoBase64)} alt={businessProfile.name} className="h-12 w-auto object-contain mb-1" />
+                  <img src={getLogoUrl(businessProfile.logoBase64)} alt={businessProfile.name} className="h-12 w-auto object-contain mb-1 align-left" />
                 ) : (
                   <div className="flex items-center gap-2">
                     <span className="text-xl">⚡</span>
@@ -347,8 +349,8 @@ export const InvoiceDetail: React.FC = () => {
                 </div>
               </div>
 
-              <div className="flex flex-col sm:items-end text-left sm:text-right gap-1">
-                <h1 className="text-2xl font-black text-navy uppercase tracking-wider">TAX INVOICE</h1>
+              <div className="flex flex-col sm:items-end text-left sm:text-right gap-1 w-full sm:w-auto">
+                <h1 className="text-xl md:text-2xl font-black text-navy uppercase tracking-wider">TAX INVOICE</h1>
                 <span className="text-sm font-extrabold text-green">{invoice.number}</span>
                 <div className="grid grid-cols-2 gap-x-4 gap-y-1 mt-4 text-xs font-semibold">
                   <span className="text-text-secondary">Issue Date:</span>
@@ -361,8 +363,8 @@ export const InvoiceDetail: React.FC = () => {
               </div>
             </div>
 
-            {/* Client Billing Info */}
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-6 bg-navy/5 border border-navy/10 rounded-2xl p-6">
+            {/* Client Billing Info: stacks on mobile */}
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-6 bg-navy/5 border border-navy/10 rounded-2xl p-5 md:p-6">
               <div className="flex flex-col gap-2">
                 <h3 className="text-xs font-extrabold uppercase tracking-wider text-text-secondary flex items-center gap-1.5">
                   <Building className="h-4 w-4 text-green" />
@@ -395,22 +397,22 @@ export const InvoiceDetail: React.FC = () => {
               </div>
             </div>
 
-            {/* Line Items Table */}
-            <div className="flex flex-col">
-              <table className="w-full text-left border-collapse">
+            {/* Line Items Table: wrapped in responsive horizontal scroll to prevent page stretch */}
+            <div className="overflow-x-auto w-full -mx-4 px-4 sm:mx-0 sm:px-0">
+              <table className="w-full text-left border-collapse min-w-[560px]">
                 <thead>
                   <tr className="border-b-2 border-navy/10 text-xs font-extrabold uppercase text-text-secondary tracking-wider">
-                    <th className="py-3 pr-4">Description</th>
-                    <th className="py-3 px-4 text-right">Qty</th>
-                    <th className="py-3 px-4 text-right">Rate</th>
-                    <th className="py-3 px-4 text-right">GST %</th>
-                    <th className="py-3 pl-4 text-right">Total</th>
+                    <th className="py-3 pr-4 w-5/12">Description</th>
+                    <th className="py-3 px-4 text-right w-1/12">Qty</th>
+                    <th className="py-3 px-4 text-right w-2/12">Rate</th>
+                    <th className="py-3 px-4 text-right w-2/12">GST %</th>
+                    <th className="py-3 pl-4 text-right w-2/12">Total</th>
                   </tr>
                 </thead>
                 <tbody>
                   {invoice.items.map((item, idx) => (
                     <tr key={item._id || idx} className="border-b border-navy/5 text-sm font-semibold">
-                      <td className="py-4 pr-4 text-navy font-bold leading-normal">
+                      <td className="py-4 pr-4 text-navy font-bold leading-normal break-words">
                         {item.description}
                       </td>
                       <td className="py-4 px-4 text-right text-text-secondary font-medium">
@@ -431,8 +433,8 @@ export const InvoiceDetail: React.FC = () => {
               </table>
             </div>
 
-            {/* Calculations Sheet & Summary */}
-            <div className="flex flex-col md:flex-row justify-between items-start gap-8 pt-4">
+            {/* Calculations Sheet & Summary: stacks on mobile */}
+            <div className="flex flex-col md:flex-row justify-between items-start gap-8 pt-2">
               {/* Notes & Bank Details info */}
               <div className="flex flex-col gap-6 w-full md:max-w-md text-xs font-semibold leading-relaxed">
                 {invoice.notes && (
@@ -450,7 +452,7 @@ export const InvoiceDetail: React.FC = () => {
                 )}
 
                 {businessProfile && (businessProfile.bankName || businessProfile.bankAccount || businessProfile.bankIfsc || businessProfile.bankUpi) && (
-                  <div className="flex flex-col gap-1.5 bg-navy/5 border border-[#0C4737]/15 rounded-2xl p-4">
+                  <div className="flex flex-col gap-1.5 bg-navy/5 border border-[#0C4737]/15 rounded-2xl p-4 w-full">
                     <span className="text-[10px] font-extrabold uppercase tracking-wider text-green-dark">How to Pay / Bank Details</span>
                     <div className="text-[11px] text-navy font-semibold flex flex-col gap-1">
                       {businessProfile.bankName && <p><span className="text-text-secondary">Bank:</span> {businessProfile.bankName}</p>}
@@ -463,7 +465,7 @@ export const InvoiceDetail: React.FC = () => {
               </div>
 
               {/* Math details */}
-              <div className="w-full md:w-80 flex flex-col gap-4 text-xs font-bold">
+              <div className="w-full md:w-80 flex flex-col gap-4 text-xs font-bold shrink-0">
                 <div className="flex justify-between items-center text-text-secondary">
                   <span>Subtotal:</span>
                   <span className="font-semibold text-navy">{formatCurrency(invoice.subtotal)}</span>
@@ -508,8 +510,8 @@ export const InvoiceDetail: React.FC = () => {
           </GlassCard>
         </div>
 
-        {/* Right Side: Sidebar Actions Panel (1/3 width, hidden when printing) */}
-        <div className="lg:col-span-4 w-full flex flex-col gap-6 print:hidden sticky lg:top-24">
+        {/* Right Side: Sidebar Actions Panel (1/3 width, stacks below on mobile/tablet) */}
+        <div className="lg:col-span-4 w-full flex flex-col gap-6 print:hidden">
           {/* Action Trigger Card */}
           <GlassCard className="p-6 border-navy/5 bg-white shadow-sm flex flex-col gap-4">
             <h3 className="text-sm font-extrabold text-navy border-b border-navy/5 pb-2">Invoice Actions</h3>
@@ -607,8 +609,6 @@ export const InvoiceDetail: React.FC = () => {
               )}
             </div>
           </GlassCard>
-
-
         </div>
       </div>
     </div>
