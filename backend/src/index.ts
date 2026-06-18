@@ -9,6 +9,7 @@ import clientRoutes from './routes/clientRoutes';
 import dashboardRoutes from './routes/dashboardRoutes';
 import invoiceRoutes from './routes/invoiceRoutes';
 import businessRoutes from './routes/businessRoutes';
+import paymentRoutes from './routes/paymentRoutes';
 import { authMiddleware } from './middleware/authMiddleware';
 import dns from 'dns';
 import cron from 'node-cron';
@@ -59,6 +60,7 @@ app.use('/api/clients', authMiddleware, clientRoutes);
 app.use('/api/dashboard', authMiddleware, dashboardRoutes);
 app.use('/api/invoices', authMiddleware, invoiceRoutes);
 app.use('/api/business', authMiddleware, businessRoutes);
+app.use('/api/payments', authMiddleware, paymentRoutes);
 
 // Root route/Health check
 app.get('/', (req, res) => {

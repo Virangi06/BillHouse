@@ -3,6 +3,7 @@ import { useSearchParams } from 'react-router-dom';
 import API from '../../utils/api';
 import Button from '../common/Button';
 import GlassCard from '../common/GlassCard';
+import RecordPaymentModal from '../payments/RecordPaymentModal';
 import { 
   Search, 
   Plus, 
@@ -16,7 +17,8 @@ import {
   AlertCircle,
   XCircle,
   Send,
-  Mail
+  Mail,
+  DollarSign
 } from 'lucide-react';
 
 export interface InvoiceData {
@@ -40,7 +42,12 @@ export const InvoiceList: React.FC<InvoiceListProps> = ({ onAddNotification }) =
   const [invoices, setInvoices] = useState<InvoiceData[]>([]);
   const [loading, setLoading] = useState<boolean>(true);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
-  const [successMsg, setSuccessMsg] = useState<string | null>(null);
+  const [messageBox, setMessageBox] = useState<{ title: string; message: string; isOpen: boolean }>({
+    title: '',
+    message: '',
+    isOpen: false
+  });
+  const [paymentInvoice, setPaymentInvoice] = useState<any | null>(null);
   
   // Filters and search
   const [statusFilter, setStatusFilter] = useState<string>('All');
@@ -71,7 +78,6 @@ export const InvoiceList: React.FC<InvoiceListProps> = ({ onAddNotification }) =
     try {
       setLoading(true);
       setErrorMsg(null);
-      setSuccessMsg(null);
       
       const response = await API.get<InvoiceData[]>('/invoices', {
         params: {
@@ -155,9 +161,12 @@ export const InvoiceList: React.FC<InvoiceListProps> = ({ onAddNotification }) =
     try {
       setLoading(true);
       setErrorMsg(null);
-      setSuccessMsg(null);
       const res = await API.post(`/invoices/${id}/send`);
-      setSuccessMsg(res.data.message || 'Invoice sent to client successfully.');
+      setMessageBox({
+        title: 'Invoice Dispatched',
+        message: res.data.message || `Invoice ${number} sent to client successfully.`,
+        isOpen: true
+      });
       fetchInvoices();
       if (onAddNotification) {
         onAddNotification('invoice', 'Invoice Dispatched', `Invoice ${number} sent to client email.`);
@@ -173,9 +182,12 @@ export const InvoiceList: React.FC<InvoiceListProps> = ({ onAddNotification }) =
     try {
       setLoading(true);
       setErrorMsg(null);
-      setSuccessMsg(null);
       const res = await API.post(`/invoices/${id}/reminder`);
-      setSuccessMsg(res.data.message || 'Payment reminder sent successfully.');
+      setMessageBox({
+        title: 'Reminder Dispatched',
+        message: res.data.message || `Payment reminder for Invoice ${number} sent successfully.`,
+        isOpen: true
+      });
       if (onAddNotification) {
         onAddNotification('invoice', 'Reminder Dispatched', `Payment reminder for ${number} sent to client.`);
       }
@@ -433,13 +445,30 @@ export const InvoiceList: React.FC<InvoiceListProps> = ({ onAddNotification }) =
         </div>
       )}
 
-      {successMsg && (
-        <div className="p-4 bg-green/10 border border-green/30 text-green-dark text-xs font-bold rounded-2xl flex items-center justify-between gap-3">
-          <div className="flex items-center gap-2">
-            <CheckCircle2 className="h-4 w-4 shrink-0 text-green" />
-            <span>{successMsg}</span>
+      {messageBox.isOpen && (
+        <div className="fixed inset-0 bg-navy/60 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+          <div className="w-full max-w-md bg-white rounded-3xl border border-navy/5 shadow-2xl p-6 flex flex-col gap-5 text-center animate-scale-up">
+            <div className="p-4 bg-green/10 text-green rounded-full mx-auto w-16 h-16 flex items-center justify-center">
+              <CheckCircle2 className="h-8 w-8 text-green" />
+            </div>
+
+            <div>
+              <h3 className="text-base font-extrabold text-navy">{messageBox.title}</h3>
+              <p className="text-xs text-text-secondary font-semibold mt-2 leading-relaxed whitespace-pre-wrap">
+                {messageBox.message}
+              </p>
+            </div>
+
+            <div className="flex justify-center pt-3">
+              <Button
+                variant="primary"
+                onClick={() => setMessageBox(prev => ({ ...prev, isOpen: false }))}
+                className="py-2.5 px-6 text-xs font-bold bg-green hover:bg-green-dark text-white rounded-xl shadow-sm"
+              >
+                OK
+              </Button>
+            </div>
           </div>
-          <button onClick={() => setSuccessMsg(null)} className="p-1 hover:bg-green/10 rounded-lg shrink-0">✕</button>
         </div>
       )}
 
@@ -611,6 +640,19 @@ export const InvoiceList: React.FC<InvoiceListProps> = ({ onAddNotification }) =
                                 </button>
                               )}
 
+                              {inv.status !== 'Paid' && inv.status !== 'Cancelled' && (
+                                <button
+                                  onClick={() => {
+                                    setActiveDropdownId(null);
+                                    setPaymentInvoice(inv);
+                                  }}
+                                  className="flex items-center gap-2 px-3.5 py-2 text-xs font-bold text-navy hover:bg-navy/5 transition-colors w-full"
+                                >
+                                  <DollarSign className="h-4 w-4 opacity-70" />
+                                  Record Payment
+                                </button>
+                              )}
+
                               {['Sent', 'Viewed', 'Partially Paid', 'Overdue'].includes(inv.status) && (
                                 <button
                                   onClick={() => {
@@ -648,6 +690,23 @@ export const InvoiceList: React.FC<InvoiceListProps> = ({ onAddNotification }) =
           </div>
         )}
       </GlassCard>
+
+      <RecordPaymentModal
+        isOpen={paymentInvoice !== null}
+        onClose={() => setPaymentInvoice(null)}
+        invoice={paymentInvoice}
+        onSuccess={(updatedInvoice, amountRecorded) => {
+          fetchInvoices();
+          setMessageBox({
+            title: 'Payment Recorded',
+            message: `A payment of ₹${amountRecorded.toLocaleString('en-IN')} was recorded successfully for ${updatedInvoice.number}.`,
+            isOpen: true
+          });
+          if (onAddNotification) {
+            onAddNotification('payment', 'Payment Recorded', `Recorded ₹${amountRecorded} for ${updatedInvoice.number}.`);
+          }
+        }}
+      />
     </div>
   );
 };

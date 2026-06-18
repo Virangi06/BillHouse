@@ -5,6 +5,7 @@ import Button from '../common/Button';
 import GlassCard from '../common/GlassCard';
 import { useAuth } from '../../context/AuthContext';
 import { useBusinessProfile, getLogoUrl } from '../../context/BusinessContext';
+import RecordPaymentModal from '../payments/RecordPaymentModal';
 import {
   ChevronLeft,
   Edit2,
@@ -18,7 +19,8 @@ import {
   FileText,
   Building,
   User,
-  Send
+  Send,
+  DollarSign
 } from 'lucide-react';
 
 interface InvoiceItem {
@@ -79,8 +81,14 @@ export const InvoiceDetail: React.FC<{
   const [client, setClient] = useState<ClientDetail | null>(null);
   const [loading, setLoading] = useState<boolean>(true);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
-  const [successMsg, setSuccessMsg] = useState<string | null>(null);
+  const [messageBox, setMessageBox] = useState<{ title: string; message: string; isOpen: boolean }>({
+    title: '',
+    message: '',
+    isOpen: false
+  });
   const [actionLoading, setActionLoading] = useState<boolean>(false);
+  const [payments, setPayments] = useState<any[]>([]);
+  const [isPaymentModalOpen, setIsPaymentModalOpen] = useState<boolean>(false);
 
   const handleDownloadPDF = () => {
     const element = document.querySelector('.printable-invoice-card');
@@ -108,9 +116,12 @@ export const InvoiceDetail: React.FC<{
     try {
       setActionLoading(true);
       setErrorMsg(null);
-      setSuccessMsg(null);
       const res = await API.post(`/invoices/${invoice._id}/send`);
-      setSuccessMsg(res.data.message || 'Invoice sent to client successfully.');
+      setMessageBox({
+        title: 'Invoice Dispatched',
+        message: res.data.message || `Invoice ${invoice.number} sent to ${client?.email || 'client'} successfully.`,
+        isOpen: true
+      });
       if (res.data?.invoice) {
         setInvoice(res.data.invoice);
       }
@@ -129,9 +140,12 @@ export const InvoiceDetail: React.FC<{
     try {
       setActionLoading(true);
       setErrorMsg(null);
-      setSuccessMsg(null);
       const res = await API.post(`/invoices/${invoice._id}/reminder`);
-      setSuccessMsg(res.data.message || 'Payment reminder sent successfully.');
+      setMessageBox({
+        title: 'Reminder Dispatched',
+        message: res.data.message || 'Payment reminder sent successfully.',
+        isOpen: true
+      });
       if (onAddNotification) {
         onAddNotification('invoice', 'Reminder Dispatched', `Payment reminder for ${invoice.number} sent to client.`);
       }
@@ -142,15 +156,120 @@ export const InvoiceDetail: React.FC<{
     }
   };
 
+  const fetchPayments = async (invId: string) => {
+    try {
+      const res = await API.get(`/payments/invoice/${invId}`);
+      setPayments(res.data);
+    } catch (err) {
+      console.warn('Failed to load payment history:', err);
+    }
+  };
+
+  const handleVoidPayment = async (paymentId: string, amount: number) => {
+    if (!window.confirm(`Are you sure you want to void this payment of ₹${amount}? This will restore the outstanding balance.`)) {
+      return;
+    }
+    try {
+      setActionLoading(true);
+      setErrorMsg(null);
+      const res = await API.delete(`/payments/${paymentId}`);
+      setMessageBox({
+        title: 'Payment Voided',
+        message: res.data.message || 'Payment has been successfully voided.',
+        isOpen: true
+      });
+      if (res.data?.invoice) {
+        setInvoice(res.data.invoice);
+      }
+      if (invoiceId) {
+        fetchPayments(invoiceId);
+      }
+      if (onAddNotification && invoice) {
+        onAddNotification('payment', 'Payment Voided', `Payment of ₹${amount} for ${invoice.number} was voided.`);
+      }
+    } catch (err: any) {
+      setErrorMsg(err.response?.data?.error || 'Failed to void payment transaction');
+    } finally {
+      setActionLoading(false);
+    }
+  };
+
+  const handleDownloadReceipt = (payment: any) => {
+    if (!invoice) return;
+    // Create a temporary hidden container
+    const element = document.createElement('div');
+    element.style.padding = '20px';
+    element.style.fontFamily = 'Inter, sans-serif';
+    element.style.color = '#061B2D';
+    element.innerHTML = `
+      <div style="border: 2px solid #2F8F7A; border-radius: 16px; padding: 30px; background-color: #ffffff;">
+        <div style="display: flex; justify-content: space-between; border-bottom: 2px solid #e2e8f0; padding-bottom: 20px;">
+          <div>
+            <h1 style="color: #0C4737; margin: 0; font-size: 24px; font-weight: 800; text-transform: uppercase;">Payment Receipt</h1>
+            <p style="margin: 5px 0 0 0; font-size: 12px; color: #5F6B76;">Receipt for Invoice reference: <b>${invoice.number}</b></p>
+          </div>
+          <div style="text-align: right;">
+            <h3 style="margin: 0; color: #061B2D; font-size: 14px;">${businessProfile?.name || 'BillHouse Partner'}</h3>
+            <p style="margin: 3px 0 0 0; font-size: 10px; color: #5F6B76;">${businessProfile?.address || ''}</p>
+          </div>
+        </div>
+        
+        <div style="margin-top: 30px; display: grid; grid-template-columns: 1fr 1fr; gap: 20px; font-size: 12px;">
+          <div>
+            <p style="color: #5F6B76; margin: 0 0 5px 0; font-weight: bold; font-size: 10px; text-transform: uppercase;">Received From:</p>
+            <p style="margin: 0; font-weight: bold; font-size: 13px;">${invoice.clientName}</p>
+            <p style="margin: 3px 0 0 0; color: #5F6B76;">${client?.email || ''}</p>
+          </div>
+          <div style="text-align: right;">
+            <p style="color: #5F6B76; margin: 0 0 5px 0; font-weight: bold; font-size: 10px; text-transform: uppercase;">Receipt Details:</p>
+            <p style="margin: 0;">Date: <b>${new Date(payment.date).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' })}</b></p>
+            <p style="margin: 3px 0 0 0;">Method: <b>${payment.method}</b></p>
+            ${payment.transactionId ? `<p style="margin: 3px 0 0 0;">Ref ID: <span style="font-family: monospace;">${payment.transactionId}</span></p>` : ''}
+          </div>
+        </div>
+        
+        <div style="margin-top: 40px; border-top: 1px solid #e2e8f0; padding-top: 20px; text-align: center;">
+          <span style="font-size: 12px; color: #5F6B76;">Amount Received</span>
+          <h2 style="font-size: 32px; font-weight: 900; margin: 5px 0 0 0; color: #0C4737;">₹${payment.amount.toLocaleString('en-IN')}</h2>
+        </div>
+        
+        ${payment.notes ? `
+        <div style="margin-top: 20px; padding: 15px; background-color: #F8FAFC; border-radius: 12px; border: 1px dashed #e2e8f0; font-size: 11px; color: #5F6B76; text-align: left;">
+          <b>Notes:</b> ${payment.notes}
+        </div>` : ''}
+
+        <div style="margin-top: 50px; border-top: 1px dashed #e2e8f0; padding-top: 15px; font-size: 9px; color: #5F6B76; text-align: center;">
+          <p>This is a computer-generated payment receipt confirming transaction settlement. Thank you for your business!</p>
+          <p style="margin: 5px 0 0 0; color: #061B2D; font-weight: bold;">Powered by BillHouse Invoicing SaaS.</p>
+        </div>
+      </div>
+    `;
+    
+    const opt = {
+      margin:       [15, 15, 15, 15],
+      filename:     `Receipt-${invoice.number}-${payment._id.slice(-6)}.pdf`,
+      image:        { type: 'jpeg', quality: 0.98 },
+      html2canvas:  { scale: 2, useCORS: true, letterRendering: true },
+      jsPDF:        { unit: 'mm', format: 'a5', orientation: 'landscape' }
+    };
+    
+    const html2pdf = (window as any).html2pdf;
+    if (html2pdf) {
+      html2pdf().from(element).set(opt).save();
+    } else {
+      console.error('html2pdf.js library is not loaded');
+    }
+  };
+
   const fetchInvoiceDetails = async () => {
     if (!invoiceId) return;
     try {
       setLoading(true);
       setErrorMsg(null);
-      setSuccessMsg(null);
       const res = await API.get<InvoiceDetailData>(`/invoices/${invoiceId}`);
       
       let invoiceData = res.data;
+      fetchPayments(invoiceId);
       if (invoiceData.status === 'Draft' || invoiceData.status === 'Sent') {
         try {
           const viewRes = await API.patch<{ message: string; invoice: InvoiceDetailData }>(`/invoices/${invoiceId}/view`);
@@ -188,7 +307,6 @@ export const InvoiceDetail: React.FC<{
     try {
       setActionLoading(true);
       setErrorMsg(null);
-      setSuccessMsg(null);
       const res = await API.patch<{ message: string; invoice: InvoiceDetailData }>(`/invoices/${invoice._id}/status`, { status: newStatus });
       if (res.data?.invoice) {
         setInvoice(res.data.invoice);
@@ -505,13 +623,30 @@ export const InvoiceDetail: React.FC<{
         </div>
       )}
 
-      {successMsg && (
-        <div className="p-4 bg-green/10 border border-green/30 text-green-dark text-xs font-bold rounded-2xl flex items-center justify-between gap-3 print:hidden">
-          <div className="flex items-center gap-2">
-            <CheckCircle2 className="h-4 w-4 shrink-0 text-green" />
-            <span>{successMsg}</span>
+      {messageBox.isOpen && (
+        <div className="fixed inset-0 bg-navy/60 backdrop-blur-sm z-50 flex items-center justify-center p-4 print:hidden">
+          <div className="w-full max-w-md bg-white rounded-3xl border border-navy/5 shadow-2xl p-6 flex flex-col gap-5 text-center animate-scale-up">
+            <div className="p-4 bg-green/10 text-green rounded-full mx-auto w-16 h-16 flex items-center justify-center">
+              <CheckCircle2 className="h-8 w-8 text-green" />
+            </div>
+
+            <div>
+              <h3 className="text-base font-extrabold text-navy">{messageBox.title}</h3>
+              <p className="text-xs text-text-secondary font-semibold mt-2 leading-relaxed whitespace-pre-wrap">
+                {messageBox.message}
+              </p>
+            </div>
+
+            <div className="flex justify-center pt-3">
+              <Button
+                variant="primary"
+                onClick={() => setMessageBox(prev => ({ ...prev, isOpen: false }))}
+                className="py-2.5 px-6 text-xs font-bold bg-green hover:bg-green-dark text-white rounded-xl shadow-sm"
+              >
+                OK
+              </Button>
+            </div>
           </div>
-          <button onClick={() => setSuccessMsg(null)} className="p-1 hover:bg-green/10 rounded-lg shrink-0">✕</button>
         </div>
       )}
 
@@ -795,6 +930,65 @@ export const InvoiceDetail: React.FC<{
               </div>
             </div>
 
+            {/* Payment History Log (Rendered inside details) */}
+            {payments.length > 0 && (
+              <div className="mt-6 border-t border-slate-200 pt-5">
+                <h4 className="text-xs font-black text-navy uppercase tracking-wider mb-3 flex items-center gap-1">
+                  <span>💰</span> Applied Payments History
+                </h4>
+                <div className="overflow-x-auto w-full">
+                  <table className="w-full text-left text-xs border-collapse">
+                    <thead>
+                      <tr className="border-b border-slate-200 text-[10px] font-black uppercase text-[#5f6b76] tracking-wider">
+                        <th className="py-2 pr-4">Date</th>
+                        <th className="py-2 px-4">Method</th>
+                        <th className="py-2 px-4">Transaction Reference</th>
+                        <th className="py-2 px-4 text-right">Amount</th>
+                        <th className="py-2 pl-4 text-right print:hidden">Receipt</th>
+                        <th className="py-2 pl-4 text-right print:hidden">Void</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-slate-100 font-semibold text-[#5f6b76]">
+                      {payments.map((p) => (
+                        <tr key={p._id} className="hover:bg-slate-50/50">
+                          <td className="py-2.5 pr-4 text-navy">
+                            {new Date(p.date).toLocaleDateString('en-IN', {
+                              day: 'numeric',
+                              month: 'short',
+                              year: 'numeric'
+                            })}
+                          </td>
+                          <td className="py-2.5 px-4">{p.method}</td>
+                          <td className="py-2.5 px-4 font-mono text-[10px]">{p.transactionId || '—'}</td>
+                          <td className="py-2.5 px-4 text-right text-navy font-bold">{formatCurrency(p.amount)}</td>
+                          <td className="py-2.5 pl-4 text-right print:hidden">
+                            <button
+                              type="button"
+                              onClick={() => handleDownloadReceipt(p)}
+                              className="text-[10px] text-green font-extrabold hover:underline"
+                              title="Download payment receipt"
+                            >
+                              Download
+                            </button>
+                          </td>
+                          <td className="py-2.5 pl-4 text-right print:hidden">
+                            <button
+                              type="button"
+                              onClick={() => handleVoidPayment(p._id, p.amount)}
+                              className="text-[10px] text-red-500 hover:text-red-700 font-extrabold hover:underline"
+                              title="Void payment"
+                            >
+                              Void
+                            </button>
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+            )}
+
             {/* Printable Footer */}
             <div className="hidden print:flex justify-between items-end border-t border-navy/10 pt-4 mt-auto text-[9px] text-[#5f6b76] font-semibold w-full">
               <div className="max-w-[70%]">
@@ -874,6 +1068,19 @@ export const InvoiceDetail: React.FC<{
           <GlassCard className="p-6 border-navy/5 bg-white shadow-sm flex flex-col gap-4">
             <h3 className="text-sm font-extrabold text-navy border-b border-navy/5 pb-2">Status Workflow</h3>
             <div className="flex flex-col gap-2.5">
+              {/* Record Payment button */}
+              {invoice.status !== 'Paid' && invoice.status !== 'Cancelled' && (
+                <Button
+                  variant="primary"
+                  disabled={actionLoading}
+                  onClick={() => setIsPaymentModalOpen(true)}
+                  className="w-full py-2.5 text-xs font-black bg-amber-500 hover:bg-amber-600 text-white rounded-xl flex items-center justify-center gap-1.5 shadow-sm"
+                >
+                  <DollarSign className="h-4 w-4" />
+                  Record Payment
+                </Button>
+              )}
+
               {/* Send email button */}
               {invoice.status !== 'Cancelled' && (
                 <Button
@@ -959,6 +1166,30 @@ export const InvoiceDetail: React.FC<{
           </GlassCard>
         </div>
       </div>
+
+      <RecordPaymentModal
+        isOpen={isPaymentModalOpen}
+        onClose={() => setIsPaymentModalOpen(false)}
+        invoice={{
+          _id: invoice._id,
+          number: invoice.number,
+          amountDue: invoice.amountDue,
+          totalAmount: invoice.totalAmount,
+          clientName: invoice.clientName
+        }}
+        onSuccess={(updatedInvoice, amountRecorded) => {
+          setInvoice(updatedInvoice);
+          fetchPayments(invoice._id);
+          setMessageBox({
+            title: 'Payment Recorded',
+            message: `A payment of ₹${amountRecorded.toLocaleString('en-IN')} was recorded successfully for ${invoice.number}.`,
+            isOpen: true
+          });
+          if (onAddNotification) {
+            onAddNotification('payment', 'Payment Recorded', `Recorded ₹${amountRecorded} for ${invoice.number}.`);
+          }
+        }}
+      />
     </div>
   );
 };
