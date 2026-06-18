@@ -89,6 +89,7 @@ export const InvoiceDetail: React.FC<{
   const [actionLoading, setActionLoading] = useState<boolean>(false);
   const [payments, setPayments] = useState<any[]>([]);
   const [isPaymentModalOpen, setIsPaymentModalOpen] = useState<boolean>(false);
+  const [confirmDialog, setConfirmDialog] = useState<{ isOpen: boolean; paymentId: string; amount: number } | null>(null);
 
   const handleDownloadPDF = () => {
     const element = document.querySelector('.printable-invoice-card');
@@ -165,33 +166,12 @@ export const InvoiceDetail: React.FC<{
     }
   };
 
-  const handleVoidPayment = async (paymentId: string, amount: number) => {
-    if (!window.confirm(`Are you sure you want to void this payment of ₹${amount}? This will restore the outstanding balance.`)) {
-      return;
-    }
-    try {
-      setActionLoading(true);
-      setErrorMsg(null);
-      const res = await API.delete(`/payments/${paymentId}`);
-      setMessageBox({
-        title: 'Payment Voided',
-        message: res.data.message || 'Payment has been successfully voided.',
-        isOpen: true
-      });
-      if (res.data?.invoice) {
-        setInvoice(res.data.invoice);
-      }
-      if (invoiceId) {
-        fetchPayments(invoiceId);
-      }
-      if (onAddNotification && invoice) {
-        onAddNotification('payment', 'Payment Voided', `Payment of ₹${amount} for ${invoice.number} was voided.`);
-      }
-    } catch (err: any) {
-      setErrorMsg(err.response?.data?.error || 'Failed to void payment transaction');
-    } finally {
-      setActionLoading(false);
-    }
+  const handleVoidPayment = (paymentId: string, amount: number) => {
+    setConfirmDialog({
+      isOpen: true,
+      paymentId,
+      amount
+    });
   };
 
   const handleDownloadReceipt = (payment: any) => {
@@ -1190,6 +1170,65 @@ export const InvoiceDetail: React.FC<{
           }
         }}
       />
+
+      {confirmDialog && confirmDialog.isOpen && (
+        <div className="fixed inset-0 bg-[#06121E]/60 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+          <div className="w-full max-w-md bg-white rounded-3xl border border-navy/5 shadow-2xl p-6 flex flex-col gap-5 text-center animate-scale-up">
+            <div className="p-4 bg-red-500/10 text-red-500 rounded-full mx-auto w-16 h-16 flex items-center justify-center text-2xl">
+              ⚠️
+            </div>
+            <div>
+              <h3 className="text-base font-extrabold text-navy">Void Payment Transaction</h3>
+              <p className="text-xs text-text-secondary font-semibold mt-2 leading-relaxed">
+                Are you sure you want to void this payment of <strong>₹{confirmDialog.amount}</strong>?
+                This will delete the transaction log and restore the invoice's outstanding balance due.
+              </p>
+            </div>
+            <div className="flex justify-center gap-3 pt-3">
+              <Button
+                variant="outline"
+                onClick={() => setConfirmDialog(null)}
+                className="py-2.5 px-4 text-xs font-bold border-navy/10 text-navy hover:bg-navy/5"
+              >
+                Cancel
+              </Button>
+              <Button
+                variant="primary"
+                onClick={async () => {
+                  const { paymentId, amount } = confirmDialog;
+                  setConfirmDialog(null);
+                  try {
+                    setActionLoading(true);
+                    setErrorMsg(null);
+                    const res = await API.delete(`/payments/${paymentId}`);
+                    setMessageBox({
+                      title: 'Payment Voided',
+                      message: res.data.message || 'Payment has been successfully voided.',
+                      isOpen: true
+                    });
+                    if (res.data?.invoice) {
+                      setInvoice(res.data.invoice);
+                    }
+                    if (invoiceId) {
+                      fetchPayments(invoiceId);
+                    }
+                    if (onAddNotification && invoice) {
+                      onAddNotification('payment', 'Payment Voided', `Payment of ₹${amount} for ${invoice.number} was voided.`);
+                    }
+                  } catch (err: any) {
+                    setErrorMsg(err.response?.data?.error || 'Failed to void payment transaction');
+                  } finally {
+                    setActionLoading(false);
+                  }
+                }}
+                className="py-2.5 px-5 text-xs font-bold bg-red-500 hover:bg-red-600 border-red-500 text-white shadow-md"
+              >
+                Yes, Void Payment
+              </Button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 };

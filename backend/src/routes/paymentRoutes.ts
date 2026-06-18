@@ -6,6 +6,27 @@ import mongoose from 'mongoose';
 
 const router = Router();
 
+// 0. GET ALL PAYMENTS FOR TENANT (GET /)
+router.get('/', async (req: AuthRequest, res: Response) => {
+  try {
+    if (!req.user) {
+      return res.status(401).json({ error: 'Unauthorized' });
+    }
+
+    const { tenantId } = req.user;
+
+    // Find all payment logs and populate associated invoice details
+    const payments = await Payment.find({ tenantId })
+      .populate('invoice', 'number clientName totalAmount amountDue status')
+      .sort({ date: -1 });
+
+    return res.status(200).json(payments);
+  } catch (error) {
+    console.error('❌ Get all payments error:', error);
+    return res.status(500).json({ error: 'Server error fetching payments registry list' });
+  }
+});
+
 // 1. RECORD A PAYMENT (POST /)
 router.post('/', async (req: AuthRequest, res: Response) => {
   try {

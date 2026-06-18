@@ -7,6 +7,7 @@ import API from '../utils/api';
 import InvoiceList from '../components/invoices/InvoiceList';
 import InvoiceForm from '../components/invoices/InvoiceForm';
 import InvoiceDetail from '../components/invoices/InvoiceDetail';
+import PaymentList from '../components/payments/PaymentList';
 import OnboardingWizard from '../components/onboarding/OnboardingWizard';
 import BusinessSettings from '../components/settings/BusinessSettings';
 import BusinessProfilePage from '../components/profile/BusinessProfilePage';
@@ -629,6 +630,19 @@ export const DashboardStub: React.FC = () => {
           >
             <FileText className="h-5 w-5 text-green" />
             Invoices
+          </button>
+
+          {/* Dedicated Payments Tab */}
+          <button
+            onClick={() => handleTabChange('payments')}
+            className={`w-full flex items-center gap-3 px-4 py-3 rounded-2xl text-sm font-semibold transition-all duration-200 ${
+              activeTab === 'payments'
+                ? 'bg-green/10 text-green-dark border-l-4 border-green font-bold shadow-sm'
+                : 'text-navy/70 hover:text-navy hover:bg-navy/5'
+            }`}
+          >
+            <DollarSign className="h-5 w-5 text-green" />
+            Payments
           </button>
 
           {/* Module 2: Client Management */}
@@ -1655,6 +1669,10 @@ export const DashboardStub: React.FC = () => {
               ) : (
                 <InvoiceList onAddNotification={addNotification} />
               )}
+            </div>
+          ) : activeTab === 'payments' ? (
+            <div className="flex flex-col gap-8 w-full max-w-full px-1 animate-fade-in">
+              <PaymentList />
             </div>
           ) : activeTab === 'clients' ? (
             /* ========================================================

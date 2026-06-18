@@ -24,6 +24,10 @@ export const RecordPaymentModal: React.FC<RecordPaymentModalProps> = ({
   invoice,
   onSuccess
 }) => {
+  const [invoicesList, setInvoicesList] = useState<InvoiceSummaryData[]>([]);
+  const [selectedInvoice, setSelectedInvoice] = useState<InvoiceSummaryData | null>(null);
+  const [selectedInvoiceId, setSelectedInvoiceId] = useState<string>('');
+
   const [amount, setAmount] = useState<string>('');
   const [date, setDate] = useState<string>('');
   const [method, setMethod] = useState<'UPI' | 'Bank Transfer' | 'Cash' | 'Card'>('UPI');
@@ -34,20 +38,80 @@ export const RecordPaymentModal: React.FC<RecordPaymentModalProps> = ({
 
   useEffect(() => {
     if (invoice) {
+      setSelectedInvoice(invoice);
+      setSelectedInvoiceId(invoice._id);
       setAmount(invoice.amountDue.toString());
       setDate(new Date().toISOString().split('T')[0]);
       setMethod('UPI');
       setTransactionId('');
       setNotes('');
       setErrorMsg(null);
+    } else if (isOpen) {
+      const fetchActiveInvoices = async () => {
+        try {
+          setLoading(true);
+          const res = await API.get('/invoices');
+          const unpaid = res.data.filter((inv: any) => inv.status !== 'Paid' && inv.status !== 'Cancelled');
+          setInvoicesList(unpaid);
+          if (unpaid.length > 0) {
+            setSelectedInvoice({
+              _id: unpaid[0]._id,
+              number: unpaid[0].number,
+              amountDue: unpaid[0].amountDue,
+              totalAmount: unpaid[0].totalAmount,
+              clientName: unpaid[0].clientName
+            });
+            setSelectedInvoiceId(unpaid[0]._id);
+            setAmount(unpaid[0].amountDue.toString());
+          } else {
+            setSelectedInvoice(null);
+            setSelectedInvoiceId('');
+            setAmount('');
+          }
+          setDate(new Date().toISOString().split('T')[0]);
+          setMethod('UPI');
+          setTransactionId('');
+          setNotes('');
+          setErrorMsg(null);
+        } catch (err: any) {
+          console.error(err);
+          setErrorMsg('Failed to load active invoices for payment recording');
+        } finally {
+          setLoading(false);
+        }
+      };
+      fetchActiveInvoices();
     }
   }, [invoice, isOpen]);
 
-  if (!isOpen || !invoice) return null;
+  if (!isOpen) return null;
+
+  const handleInvoiceChange = (id: string) => {
+    setSelectedInvoiceId(id);
+    const chosen = invoicesList.find(inv => inv._id === id);
+    if (chosen) {
+      setSelectedInvoice({
+        _id: chosen._id,
+        number: chosen.number,
+        amountDue: chosen.amountDue,
+        totalAmount: chosen.totalAmount,
+        clientName: chosen.clientName
+      });
+      setAmount(chosen.amountDue.toString());
+    } else {
+      setSelectedInvoice(null);
+      setAmount('');
+    }
+  };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setErrorMsg(null);
+
+    if (!selectedInvoice) {
+      setErrorMsg('Please select an active invoice statement first');
+      return;
+    }
 
     const parsedAmount = Number(amount);
     if (isNaN(parsedAmount) || parsedAmount <= 0) {
@@ -55,15 +119,15 @@ export const RecordPaymentModal: React.FC<RecordPaymentModalProps> = ({
       return;
     }
 
-    if (parsedAmount > invoice.amountDue) {
-      setErrorMsg(`Payment amount cannot exceed the remaining balance due (₹${invoice.amountDue})`);
+    if (parsedAmount > selectedInvoice.amountDue) {
+      setErrorMsg(`Payment amount cannot exceed the remaining balance due (₹${selectedInvoice.amountDue})`);
       return;
     }
 
     try {
       setLoading(true);
       const res = await API.post('/payments', {
-        invoiceId: invoice._id,
+        invoiceId: selectedInvoice._id,
         amount: parsedAmount,
         date,
         method,
@@ -87,7 +151,11 @@ export const RecordPaymentModal: React.FC<RecordPaymentModalProps> = ({
           <div>
             <h3 className="text-base font-extrabold text-navy">Record Payment</h3>
             <p className="text-[11px] text-text-secondary mt-0.5">
-              Record a payment for invoice <span className="font-bold text-navy">{invoice.number}</span>
+              {invoice ? (
+                <>Record a payment for invoice <span className="font-bold text-navy">{invoice.number}</span></>
+              ) : (
+                'Record a payment statement globally across client invoices'
+              )}
             </p>
           </div>
           <button
@@ -107,17 +175,43 @@ export const RecordPaymentModal: React.FC<RecordPaymentModalProps> = ({
 
         {/* Input Form */}
         <form onSubmit={handleSubmit} className="flex flex-col gap-4 text-xs font-semibold">
+          {/* Invoice Selection Dropdown (Only in global mode) */}
+          {!invoice && (
+            <div className="flex flex-col gap-1.5">
+              <label className="text-text-secondary">Select Active Invoice *</label>
+              {invoicesList.length === 0 ? (
+                <div className="p-3 bg-amber-500/10 border border-amber-500/20 text-amber-700 text-xs font-semibold rounded-xl select-none">
+                  ⚠️ No outstanding invoices found. All are fully settled.
+                </div>
+              ) : (
+                <select
+                  value={selectedInvoiceId}
+                  onChange={(e) => handleInvoiceChange(e.target.value)}
+                  className="w-full px-4 py-2.5 rounded-xl border border-navy/10 bg-[#F8FAFC] text-navy focus:outline-none focus:border-green focus:bg-white transition-all font-semibold cursor-pointer"
+                >
+                  {invoicesList.map((inv) => (
+                    <option key={inv._id} value={inv._id}>
+                      {inv.number} - {inv.clientName} (Due: ₹{inv.amountDue})
+                    </option>
+                  ))}
+                </select>
+              )}
+            </div>
+          )}
+
           {/* Invoice Balance Stats strip */}
-          <div className="grid grid-cols-2 gap-3 bg-[#F8FAFC] p-3 rounded-2xl border border-navy/5">
-            <div className="flex flex-col gap-0.5">
-              <span className="text-[10px] text-text-secondary uppercase tracking-wider">Total Value</span>
-              <span className="text-sm font-extrabold text-navy">₹{invoice.totalAmount}</span>
+          {selectedInvoice && (
+            <div className="grid grid-cols-2 gap-3 bg-[#F8FAFC] p-3 rounded-2xl border border-navy/5">
+              <div className="flex flex-col gap-0.5">
+                <span className="text-[10px] text-text-secondary uppercase tracking-wider">Total Value</span>
+                <span className="text-sm font-extrabold text-navy">₹{selectedInvoice.totalAmount}</span>
+              </div>
+              <div className="flex flex-col gap-0.5">
+                <span className="text-[10px] text-text-secondary uppercase tracking-wider">Balance Due</span>
+                <span className="text-sm font-black text-amber-600">₹{selectedInvoice.amountDue}</span>
+              </div>
             </div>
-            <div className="flex flex-col gap-0.5">
-              <span className="text-[10px] text-text-secondary uppercase tracking-wider">Balance Due</span>
-              <span className="text-sm font-black text-amber-600">₹{invoice.amountDue}</span>
-            </div>
-          </div>
+          )}
 
           {/* Amount field */}
           <div className="flex flex-col gap-1.5">
@@ -127,11 +221,12 @@ export const RecordPaymentModal: React.FC<RecordPaymentModalProps> = ({
               required
               step="any"
               min="0.01"
-              max={invoice.amountDue}
+              max={selectedInvoice ? selectedInvoice.amountDue : undefined}
               placeholder="e.g. 5000"
               value={amount}
               onChange={(e) => setAmount(e.target.value)}
               className="w-full px-4 py-2.5 rounded-xl border border-navy/10 bg-[#F8FAFC] text-navy focus:outline-none focus:border-green focus:bg-white transition-all font-semibold"
+              disabled={!selectedInvoice}
             />
           </div>
 
@@ -145,6 +240,7 @@ export const RecordPaymentModal: React.FC<RecordPaymentModalProps> = ({
                 value={date}
                 onChange={(e) => setDate(e.target.value)}
                 className="w-full px-4 py-2.5 rounded-xl border border-navy/10 bg-[#F8FAFC] text-navy focus:outline-none focus:border-green focus:bg-white transition-all font-semibold"
+                disabled={!selectedInvoice}
               />
             </div>
 
@@ -154,6 +250,7 @@ export const RecordPaymentModal: React.FC<RecordPaymentModalProps> = ({
                 value={method}
                 onChange={(e) => setMethod(e.target.value as any)}
                 className="w-full px-4 py-2.5 rounded-xl border border-navy/10 bg-[#F8FAFC] text-navy focus:outline-none focus:border-green focus:bg-white transition-all font-semibold cursor-pointer"
+                disabled={!selectedInvoice}
               >
                 <option value="UPI">UPI</option>
                 <option value="Bank Transfer">Bank Transfer</option>
@@ -172,6 +269,7 @@ export const RecordPaymentModal: React.FC<RecordPaymentModalProps> = ({
               value={transactionId}
               onChange={(e) => setTransactionId(e.target.value)}
               className="w-full px-4 py-2.5 rounded-xl border border-navy/10 bg-[#F8FAFC] text-navy focus:outline-none focus:border-green focus:bg-white transition-all font-semibold font-mono"
+              disabled={!selectedInvoice}
             />
           </div>
 
@@ -184,6 +282,7 @@ export const RecordPaymentModal: React.FC<RecordPaymentModalProps> = ({
               value={notes}
               onChange={(e) => setNotes(e.target.value)}
               className="w-full px-4 py-2.5 rounded-xl border border-navy/10 bg-[#F8FAFC] text-navy focus:outline-none focus:border-green focus:bg-white transition-all font-semibold resize-none"
+              disabled={!selectedInvoice}
             />
           </div>
 
@@ -203,6 +302,7 @@ export const RecordPaymentModal: React.FC<RecordPaymentModalProps> = ({
               variant="primary"
               isLoading={loading}
               className="py-2.5 px-5 text-xs font-bold bg-green hover:bg-green-dark text-white rounded-xl shadow-md"
+              disabled={!selectedInvoice}
             >
               Record Payment
             </Button>
