@@ -148,3 +148,128 @@ export async function sendResetPasswordEmail(email: string, name: string, token:
   }
   return info;
 }
+
+export async function sendInvoiceEmail(email: string, clientName: string, invoice: any, business: any) {
+  const t = await getTransporter();
+  const currencySymbol = invoice.currency === 'INR' ? '₹' : invoice.currency || '₹';
+  const amountStr = new Intl.NumberFormat('en-IN', { style: 'currency', currency: 'INR', maximumFractionDigits: 0 }).format(invoice.totalAmount);
+  const dueDateStr = new Date(invoice.dueDate).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' });
+  const themeColor = invoice.colorTheme || '#3b4b5c';
+
+  const itemRows = invoice.items.map((item: any) => `
+    <tr>
+      <td style="padding: 10px; border-bottom: 1px solid #f0f0f0;">
+        <strong>${item.description}</strong><br>
+        <span style="font-size: 11px; color: #5f6b76;">GST Rate: ${item.gstRate}%</span>
+      </td>
+      <td style="padding: 10px; border-bottom: 1px solid #f0f0f0; text-align: right;">${item.quantity} ${item.unit || 'items'}</td>
+      <td style="padding: 10px; border-bottom: 1px solid #f0f0f0; text-align: right;">${currencySymbol}${item.rate}</td>
+      <td style="padding: 10px; border-bottom: 1px solid #f0f0f0; text-align: right;"><strong>${currencySymbol}${item.amount}</strong></td>
+    </tr>
+  `).join('');
+
+  const mailOptions = {
+    from: process.env.SENDGRID_FROM_EMAIL || '"BillHouse" <noreply@billhouse.com>',
+    to: email,
+    subject: `Invoice ${invoice.number} from ${business.name}`,
+    text: `Hello ${clientName},\n\nYou have received a new invoice ${invoice.number} from ${business.name} for the amount of ${amountStr}, due on ${dueDateStr}.\n\nThank you,\n${business.name}`,
+    html: `
+      <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px; border: 1px solid #f0f0f0; border-radius: 8px;">
+        <div style="text-align: center; border-bottom: 3px solid ${themeColor}; padding-bottom: 15px;">
+          <h2 style="color: #061B2D; margin: 0;">${business.name}</h2>
+          <p style="font-size: 12px; color: #5f6b76; margin: 5px 0 0 0;">${business.address || ''}, ${business.city || ''}</p>
+        </div>
+        <div style="margin: 20px 0;">
+          <p>Hello <strong>${clientName}</strong>,</p>
+          <p>Please find the invoice details for statement <strong>${invoice.number}</strong> below:</p>
+          <table style="width: 100%; border-collapse: collapse; margin: 20px 0; font-size: 13px;">
+            <thead>
+              <tr style="background-color: #f8fafc; text-align: left; font-weight: bold; border-bottom: 2px solid ${themeColor};">
+                <th style="padding: 10px;">Item</th>
+                <th style="padding: 10px; text-align: right;">Qty</th>
+                <th style="padding: 10px; text-align: right;">Price</th>
+                <th style="padding: 10px; text-align: right;">Amount</th>
+              </tr>
+            </thead>
+            <tbody>
+              ${itemRows}
+            </tbody>
+          </table>
+          
+          <div style="text-align: right; font-size: 14px; margin-top: 20px;">
+            <p style="margin: 5px 0;">Subtotal: <strong>${currencySymbol}${invoice.subtotal}</strong></p>
+            <p style="margin: 5px 0;">Tax: <strong>${currencySymbol}${invoice.gstAmount}</strong></p>
+            ${invoice.discountAmount > 0 ? `<p style="margin: 5px 0; color: #e74c3c;">Discount: <strong>-${currencySymbol}${invoice.discountAmount}</strong></p>` : ''}
+            ${invoice.tdsRate > 0 ? `<p style="margin: 5px 0; color: #7f8c8d;">TDS (${invoice.tdsRate}%): <strong>-${currencySymbol}${invoice.tdsAmount}</strong></p>` : ''}
+            <h3 style="color: ${themeColor}; margin: 10px 0 0 0;">Total Due: ${amountStr}</h3>
+            <p style="font-size: 12px; color: #5f6b76;">Due Date: <strong>${dueDateStr}</strong></p>
+          </div>
+        </div>
+
+        ${business.bankAccount ? `
+        <div style="background-color: #f8fafc; padding: 15px; border-radius: 6px; margin: 20px 0; font-size: 12px;">
+          <p style="font-weight: bold; color: #061B2D; margin: 0 0 10px 0;">Payment Details (Bank Transfer):</p>
+          <p style="margin: 3px 0;">Bank: <strong>${business.bankName || ''}</strong></p>
+          <p style="margin: 3px 0;">Account: <strong>${business.bankAccount}</strong></p>
+          <p style="margin: 3px 0;">IFSC Code: <strong>${business.bankIfsc || ''}</strong></p>
+        </div>
+        ` : ''}
+
+        <hr style="border: 0; border-top: 1px solid #e0e0e0; margin: 20px 0;">
+        <p style="font-size: 11px; color: #5F6B76; text-align: center;">Powered by BillHouse. If you have any questions, please contact the sender directly.</p>
+      </div>
+    `
+  };
+
+  const info = await t.sendMail(mailOptions);
+  return info;
+}
+
+export async function sendPaymentReminderEmail(email: string, clientName: string, invoice: any, business: any) {
+  const t = await getTransporter();
+  const currencySymbol = invoice.currency === 'INR' ? '₹' : invoice.currency || '₹';
+  const outstandingStr = new Intl.NumberFormat('en-IN', { style: 'currency', currency: 'INR', maximumFractionDigits: 0 }).format(invoice.amountDue);
+  const dueDateStr = new Date(invoice.dueDate).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' });
+  const themeColor = invoice.colorTheme || '#3b4b5c';
+
+  const mailOptions = {
+    from: process.env.SENDGRID_FROM_EMAIL || '"BillHouse" <noreply@billhouse.com>',
+    to: email,
+    subject: `Payment Reminder: Invoice ${invoice.number} is overdue`,
+    text: `Hello ${clientName},\n\nThis is a friendly reminder that invoice ${invoice.number} from ${business.name} was due on ${dueDateStr}. The outstanding amount is ${outstandingStr}.\n\nPlease arrange for payment as soon as possible.\n\nThank you,\n${business.name}`,
+    html: `
+      <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px; border: 1px solid #f0f0f0; border-radius: 8px;">
+        <div style="text-align: center; border-bottom: 3px solid #e74c3c; padding-bottom: 15px;">
+          <h2 style="color: #061B2D; margin: 0;">Payment Reminder</h2>
+          <p style="font-size: 13px; color: #e74c3c; margin: 5px 0 0 0; font-weight: bold;">Invoice ${invoice.number} is Overdue</p>
+        </div>
+        <div style="margin: 20px 0;">
+          <p>Hello <strong>${clientName}</strong>,</p>
+          <p>This is a friendly reminder that payment for invoice <strong>${invoice.number}</strong> issued by <strong>${business.name}</strong> was due on <strong>${dueDateStr}</strong>.</p>
+          
+          <div style="background-color: #fdf2f2; border-left: 4px solid #e74c3c; padding: 15px; border-radius: 6px; margin: 20px 0;">
+            <p style="margin: 0; font-size: 13px; color: #5f6b76;">Outstanding Balance:</p>
+            <h3 style="margin: 5px 0 0 0; color: #e74c3c; font-size: 20px; font-weight: 900;">${outstandingStr}</h3>
+          </div>
+
+          <p>Please review the statement details and arrange for bank transfer / settlement at your earliest convenience.</p>
+        </div>
+
+        ${business.bankAccount ? `
+        <div style="background-color: #f8fafc; padding: 15px; border-radius: 6px; margin: 20px 0; font-size: 12px;">
+          <p style="font-weight: bold; color: #061B2D; margin: 0 0 10px 0;">Payment Details (Bank Transfer):</p>
+          <p style="margin: 3px 0;">Bank: <strong>${business.bankName || ''}</strong></p>
+          <p style="margin: 3px 0;">Account: <strong>${business.bankAccount}</strong></p>
+          <p style="margin: 3px 0;">IFSC Code: <strong>${business.bankIfsc || ''}</strong></p>
+        </div>
+        ` : ''}
+
+        <hr style="border: 0; border-top: 1px solid #e0e0e0; margin: 20px 0;">
+        <p style="font-size: 11px; color: #5F6B76; text-align: center;">Powered by BillHouse Invoicing. Thank you for your business!</p>
+      </div>
+    `
+  };
+
+  const info = await t.sendMail(mailOptions);
+  return info;
+}

@@ -4,6 +4,7 @@ import Client from '../models/Client';
 import Business from '../models/Business';
 import { AuthRequest } from '../middleware/authMiddleware';
 import mongoose from 'mongoose';
+import { sendInvoiceEmail, sendPaymentReminderEmail } from '../services/emailService';
 
 const router = Router();
 
@@ -472,6 +473,96 @@ router.delete('/:id', async (req: AuthRequest, res: Response) => {
   } catch (error) {
     console.error('❌ Delete invoice error:', error);
     return res.status(500).json({ error: 'Server error deleting invoice record' });
+  }
+});
+
+// 7. SEND INVOICE BY EMAIL
+router.post('/:id/send', async (req: AuthRequest, res: Response) => {
+  try {
+    if (!req.user) {
+      return res.status(401).json({ error: 'Unauthorized' });
+    }
+
+    const { id } = req.params;
+    const { tenantId } = req.user;
+
+    const access = await verifyInvoiceAccess(id, tenantId);
+    if ('error' in access) {
+      return res.status(access.status || 500).json({ error: access.error });
+    }
+
+    const { invoice } = access;
+
+    // Fetch client email info
+    const clientObj = await Client.findById(invoice.client);
+    if (!clientObj) {
+      return res.status(404).json({ error: 'Recipient client not found in registry' });
+    }
+
+    // Fetch business branding / bank info
+    const businessObj = await Business.findOne({ tenantId });
+    const businessMeta = businessObj || { name: 'BillHouse Partner' };
+
+    // Send the email
+    await sendInvoiceEmail(clientObj.email, clientObj.name, invoice, businessMeta);
+
+    // Transition state from Draft to Sent (if applicable)
+    if (invoice.status === 'Draft') {
+      invoice.status = 'Sent';
+      invoice.sentAt = new Date();
+      await invoice.save();
+    }
+
+    return res.status(200).json({
+      message: `Invoice ${invoice.number} sent to ${clientObj.email} successfully`,
+      invoice
+    });
+  } catch (error) {
+    console.error('❌ Send invoice email error:', error);
+    return res.status(500).json({ error: 'Server error sending invoice email' });
+  }
+});
+
+// 8. SEND PAYMENT REMINDER BY EMAIL
+router.post('/:id/reminder', async (req: AuthRequest, res: Response) => {
+  try {
+    if (!req.user) {
+      return res.status(401).json({ error: 'Unauthorized' });
+    }
+
+    const { id } = req.params;
+    const { tenantId } = req.user;
+
+    const access = await verifyInvoiceAccess(id, tenantId);
+    if ('error' in access) {
+      return res.status(access.status || 500).json({ error: access.error });
+    }
+
+    const { invoice } = access;
+
+    if (invoice.status === 'Paid' || invoice.status === 'Cancelled') {
+      return res.status(400).json({ error: 'Cannot send payment reminders for Paid or Cancelled invoices' });
+    }
+
+    // Fetch client email info
+    const clientObj = await Client.findById(invoice.client);
+    if (!clientObj) {
+      return res.status(404).json({ error: 'Recipient client not found in registry' });
+    }
+
+    // Fetch business details
+    const businessObj = await Business.findOne({ tenantId });
+    const businessMeta = businessObj || { name: 'BillHouse Partner' };
+
+    // Send the reminder email
+    await sendPaymentReminderEmail(clientObj.email, clientObj.name, invoice, businessMeta);
+
+    return res.status(200).json({
+      message: `Payment reminder for invoice ${invoice.number} sent to ${clientObj.email} successfully`
+    });
+  } catch (error) {
+    console.error('❌ Send invoice reminder error:', error);
+    return res.status(500).json({ error: 'Server error sending payment reminder' });
   }
 });
 

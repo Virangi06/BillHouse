@@ -11,6 +11,8 @@ import invoiceRoutes from './routes/invoiceRoutes';
 import businessRoutes from './routes/businessRoutes';
 import { authMiddleware } from './middleware/authMiddleware';
 import dns from 'dns';
+import cron from 'node-cron';
+import Invoice from './models/Invoice';
 
 // Fix for DNS SRV resolution issues on certain ISPs (like Jio/Airtel in India)
 // by setting the DNS servers to Google and Cloudflare DNS.
@@ -80,6 +82,49 @@ const startServer = () => {
   app.listen(PORT, () => {
     console.log(`🚀 BillHouse Backend Server is running on http://localhost:${PORT}`);
     console.log(`👉 Accepting requests from: ${frontendUrl}`);
+    
+    // Start cron scheduler for overdue check
+    cron.schedule('0 0 * * *', async () => {
+      console.log('⏰ Running daily Overdue status checks...');
+      try {
+        const today = new Date();
+        today.setHours(0, 0, 0, 0);
+
+        const result = await Invoice.updateMany(
+          {
+            status: { $in: ['Sent', 'Viewed', 'Partially Paid'] },
+            dueDate: { $lt: today }
+          },
+          {
+            $set: { status: 'Overdue' }
+          }
+        );
+        console.log(`✅ Daily Overdue check completed: marked ${result.modifiedCount} invoices as Overdue.`);
+      } catch (err) {
+        console.error('❌ Error in daily Overdue cron schedule:', err);
+      }
+    });
+
+    // Run once immediately on server startup to sync overdue status
+    (async () => {
+      console.log('⏰ Running startup Overdue status checks...');
+      try {
+        const today = new Date();
+        today.setHours(0, 0, 0, 0);
+        const result = await Invoice.updateMany(
+          {
+            status: { $in: ['Sent', 'Viewed', 'Partially Paid'] },
+            dueDate: { $lt: today }
+          },
+          {
+            $set: { status: 'Overdue' }
+          }
+        );
+        console.log(`✅ Startup Overdue check completed: marked ${result.modifiedCount} invoices as Overdue.`);
+      } catch (err) {
+        console.error('❌ Error in startup Overdue check:', err);
+      }
+    })();
   });
 };
 

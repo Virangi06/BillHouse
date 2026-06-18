@@ -14,7 +14,9 @@ import {
   Clock,
   CheckCircle2,
   AlertCircle,
-  XCircle
+  XCircle,
+  Send,
+  Mail
 } from 'lucide-react';
 
 export interface InvoiceData {
@@ -38,6 +40,7 @@ export const InvoiceList: React.FC<InvoiceListProps> = ({ onAddNotification }) =
   const [invoices, setInvoices] = useState<InvoiceData[]>([]);
   const [loading, setLoading] = useState<boolean>(true);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
+  const [successMsg, setSuccessMsg] = useState<string | null>(null);
   
   // Filters and search
   const [statusFilter, setStatusFilter] = useState<string>('All');
@@ -68,6 +71,7 @@ export const InvoiceList: React.FC<InvoiceListProps> = ({ onAddNotification }) =
     try {
       setLoading(true);
       setErrorMsg(null);
+      setSuccessMsg(null);
       
       const response = await API.get<InvoiceData[]>('/invoices', {
         params: {
@@ -144,6 +148,41 @@ export const InvoiceList: React.FC<InvoiceListProps> = ({ onAddNotification }) =
       }
     } catch (err: any) {
       alert(err.response?.data?.error || 'Failed to delete invoice');
+    }
+  };
+
+  const handleSendEmail = async (id: string, number: string) => {
+    try {
+      setLoading(true);
+      setErrorMsg(null);
+      setSuccessMsg(null);
+      const res = await API.post(`/invoices/${id}/send`);
+      setSuccessMsg(res.data.message || 'Invoice sent to client successfully.');
+      fetchInvoices();
+      if (onAddNotification) {
+        onAddNotification('invoice', 'Invoice Dispatched', `Invoice ${number} sent to client email.`);
+      }
+    } catch (err: any) {
+      setErrorMsg(err.response?.data?.error || 'Failed to send invoice email.');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleSendReminder = async (id: string, number: string) => {
+    try {
+      setLoading(true);
+      setErrorMsg(null);
+      setSuccessMsg(null);
+      const res = await API.post(`/invoices/${id}/reminder`);
+      setSuccessMsg(res.data.message || 'Payment reminder sent successfully.');
+      if (onAddNotification) {
+        onAddNotification('invoice', 'Reminder Dispatched', `Payment reminder for ${number} sent to client.`);
+      }
+    } catch (err: any) {
+      setErrorMsg(err.response?.data?.error || 'Failed to send payment reminder.');
+    } finally {
+      setLoading(false);
     }
   };
 
@@ -394,6 +433,16 @@ export const InvoiceList: React.FC<InvoiceListProps> = ({ onAddNotification }) =
         </div>
       )}
 
+      {successMsg && (
+        <div className="p-4 bg-green/10 border border-green/30 text-green-dark text-xs font-bold rounded-2xl flex items-center justify-between gap-3">
+          <div className="flex items-center gap-2">
+            <CheckCircle2 className="h-4 w-4 shrink-0 text-green" />
+            <span>{successMsg}</span>
+          </div>
+          <button onClick={() => setSuccessMsg(null)} className="p-1 hover:bg-green/10 rounded-lg shrink-0">✕</button>
+        </div>
+      )}
+
       {/* List Table container */}
       <GlassCard className="overflow-hidden border-navy/5 shadow-sm">
         {loading ? (
@@ -546,6 +595,32 @@ export const InvoiceList: React.FC<InvoiceListProps> = ({ onAddNotification }) =
                                 >
                                   <Edit2 className="h-4 w-4 opacity-70" />
                                   Edit Draft
+                                </button>
+                              )}
+
+                              {inv.status !== 'Cancelled' && (
+                                <button
+                                  onClick={() => {
+                                    setActiveDropdownId(null);
+                                    handleSendEmail(inv._id, inv.number);
+                                  }}
+                                  className="flex items-center gap-2 px-3.5 py-2 text-xs font-bold text-navy hover:bg-navy/5 transition-colors w-full"
+                                >
+                                  <Send className="h-4 w-4 opacity-70" />
+                                  Send Email
+                                </button>
+                              )}
+
+                              {['Sent', 'Viewed', 'Partially Paid', 'Overdue'].includes(inv.status) && (
+                                <button
+                                  onClick={() => {
+                                    setActiveDropdownId(null);
+                                    handleSendReminder(inv._id, inv.number);
+                                  }}
+                                  className="flex items-center gap-2 px-3.5 py-2 text-xs font-bold text-navy hover:bg-navy/5 transition-colors w-full"
+                                >
+                                  <Clock className="h-4 w-4 opacity-70" />
+                                  Send Reminder
                                 </button>
                               )}
 

@@ -168,6 +168,7 @@ export const DashboardStub: React.FC = () => {
   const [clientSortBy, setClientSortBy] = useState<'name' | 'date' | 'outstanding'>('name');
   const [clientCountryFilter, setClientCountryFilter] = useState<string>('All');
   const [clientStatusFilter, setClientStatusFilter] = useState<'active' | 'archived'>('active');
+  const [uniqueCountries, setUniqueCountries] = useState<string[]>([]);
 
   // Profile Dropdown and row menus Refs
   const [isProfileDropdownOpen, setIsProfileDropdownOpen] = useState<boolean>(false);
@@ -274,9 +275,22 @@ export const DashboardStub: React.FC = () => {
     }
   };
 
+  const fetchCountriesList = async () => {
+    try {
+      const params: any = {};
+      if (clientStatusFilter === 'archived') params.archived = 'true';
+      const response = await API.get<ClientData[]>('/clients/with-financials', { params });
+      const countries = Array.from(new Set(response.data.map(c => c.country || 'India'))).filter(Boolean);
+      setUniqueCountries(countries);
+    } catch (err) {
+      console.error('Failed to load countries list', err);
+    }
+  };
+
   useEffect(() => {
     fetchClients();
     fetchDashboardStats();
+    fetchCountriesList();
   }, [activeTab, clientSortBy, clientCountryFilter, clientStatusFilter]);
 
   // Handle click outside hooks
@@ -1637,7 +1651,7 @@ export const DashboardStub: React.FC = () => {
               {action === 'create' || action === 'edit' ? (
                 <InvoiceForm onAddNotification={addNotification} />
               ) : action === 'detail' ? (
-                <InvoiceDetail />
+                <InvoiceDetail onAddNotification={addNotification} />
               ) : (
                 <InvoiceList onAddNotification={addNotification} />
               )}
@@ -1764,11 +1778,9 @@ export const DashboardStub: React.FC = () => {
                           className="px-3 py-2.5 text-xs rounded-xl border border-navy/10 bg-white text-navy focus:outline-none focus:border-green transition-all font-semibold cursor-pointer"
                         >
                           <option value="All">All Countries</option>
-                          <option value="India">India</option>
-                          <option value="USA">USA</option>
-                          <option value="UK">UK</option>
-                          <option value="UAE">UAE</option>
-                          <option value="Others">Others</option>
+                          {uniqueCountries.map(country => (
+                            <option key={country} value={country}>{country}</option>
+                          ))}
                         </select>
                       </div>
 

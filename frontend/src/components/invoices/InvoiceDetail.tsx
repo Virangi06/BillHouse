@@ -17,7 +17,8 @@ import {
   XCircle,
   FileText,
   Building,
-  User
+  User,
+  Send
 } from 'lucide-react';
 
 interface InvoiceItem {
@@ -66,7 +67,9 @@ interface ClientDetail {
   address?: string;
 }
 
-export const InvoiceDetail: React.FC = () => {
+export const InvoiceDetail: React.FC<{
+  onAddNotification?: (type: 'payment' | 'invoice' | 'client' | 'system', title: string, message: string) => void;
+}> = ({ onAddNotification }) => {
   const { user } = useAuth();
   const { businessProfile } = useBusinessProfile();
   const [searchParams, setSearchParams] = useSearchParams();
@@ -76,13 +79,75 @@ export const InvoiceDetail: React.FC = () => {
   const [client, setClient] = useState<ClientDetail | null>(null);
   const [loading, setLoading] = useState<boolean>(true);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
+  const [successMsg, setSuccessMsg] = useState<string | null>(null);
   const [actionLoading, setActionLoading] = useState<boolean>(false);
+
+  const handleDownloadPDF = () => {
+    const element = document.querySelector('.printable-invoice-card');
+    if (!element) return;
+    
+    const opt = {
+      margin:       [10, 10, 10, 10],
+      filename:     `${invoice?.number || 'invoice'}.pdf`,
+      image:        { type: 'jpeg', quality: 0.98 },
+      html2canvas:  { scale: 2, useCORS: true, letterRendering: true },
+      jsPDF:        { unit: 'mm', format: 'a4', orientation: 'portrait' }
+    };
+    
+    const html2pdf = (window as any).html2pdf;
+    if (html2pdf) {
+      html2pdf().from(element).set(opt).save();
+    } else {
+      console.error('html2pdf.js library is not loaded');
+      window.print();
+    }
+  };
+
+  const handleSendEmail = async () => {
+    if (!invoice) return;
+    try {
+      setActionLoading(true);
+      setErrorMsg(null);
+      setSuccessMsg(null);
+      const res = await API.post(`/invoices/${invoice._id}/send`);
+      setSuccessMsg(res.data.message || 'Invoice sent to client successfully.');
+      if (res.data?.invoice) {
+        setInvoice(res.data.invoice);
+      }
+      if (onAddNotification) {
+        onAddNotification('invoice', 'Invoice Dispatched', `Invoice ${invoice.number} sent to ${client?.email || 'client'}.`);
+      }
+    } catch (err: any) {
+      setErrorMsg(err.response?.data?.error || 'Failed to send invoice email.');
+    } finally {
+      setActionLoading(false);
+    }
+  };
+
+  const handleSendReminder = async () => {
+    if (!invoice) return;
+    try {
+      setActionLoading(true);
+      setErrorMsg(null);
+      setSuccessMsg(null);
+      const res = await API.post(`/invoices/${invoice._id}/reminder`);
+      setSuccessMsg(res.data.message || 'Payment reminder sent successfully.');
+      if (onAddNotification) {
+        onAddNotification('invoice', 'Reminder Dispatched', `Payment reminder for ${invoice.number} sent to client.`);
+      }
+    } catch (err: any) {
+      setErrorMsg(err.response?.data?.error || 'Failed to send payment reminder.');
+    } finally {
+      setActionLoading(false);
+    }
+  };
 
   const fetchInvoiceDetails = async () => {
     if (!invoiceId) return;
     try {
       setLoading(true);
       setErrorMsg(null);
+      setSuccessMsg(null);
       const res = await API.get<InvoiceDetailData>(`/invoices/${invoiceId}`);
       
       let invoiceData = res.data;
@@ -123,6 +188,7 @@ export const InvoiceDetail: React.FC = () => {
     try {
       setActionLoading(true);
       setErrorMsg(null);
+      setSuccessMsg(null);
       const res = await API.patch<{ message: string; invoice: InvoiceDetailData }>(`/invoices/${invoice._id}/status`, { status: newStatus });
       if (res.data?.invoice) {
         setInvoice(res.data.invoice);
@@ -439,6 +505,16 @@ export const InvoiceDetail: React.FC = () => {
         </div>
       )}
 
+      {successMsg && (
+        <div className="p-4 bg-green/10 border border-green/30 text-green-dark text-xs font-bold rounded-2xl flex items-center justify-between gap-3 print:hidden">
+          <div className="flex items-center gap-2">
+            <CheckCircle2 className="h-4 w-4 shrink-0 text-green" />
+            <span>{successMsg}</span>
+          </div>
+          <button onClick={() => setSuccessMsg(null)} className="p-1 hover:bg-green/10 rounded-lg shrink-0">✕</button>
+        </div>
+      )}
+
       {/* Main Content Grid */}
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 w-full items-start">
         {/* Left Side: Printable Invoice (2/3 width on desktop) */}
@@ -543,9 +619,11 @@ export const InvoiceDetail: React.FC = () => {
             {invoice.template !== 'Minimal' && (
               <div className="flex flex-col gap-1 mt-2">
                 <h2 className="text-xl font-bold text-navy tracking-tight">{businessProfile?.name || businessName}</h2>
-                <p className="text-xs text-[#5f6b76] font-medium leading-relaxed whitespace-pre-wrap">
-                  {invoice.notes || "Add a message here for your customer."}
-                </p>
+                {invoice.notes && (
+                  <p className="text-xs text-[#5f6b76] font-medium leading-relaxed whitespace-pre-wrap">
+                    {invoice.notes}
+                  </p>
+                )}
               </div>
             )}
 
@@ -569,7 +647,9 @@ export const InvoiceDetail: React.FC = () => {
                       {client.taxId && <p className="font-bold text-navy mt-1">GSTIN: {client.taxId}</p>}
                     </div>
                   ) : (
-                    <p className="text-[#5f6b76] mt-1">Loading client billing details...</p>
+                    <div className="text-[#5f6b76] font-semibold mt-1 flex flex-col gap-0.5">
+                      <p>Billing address not provided</p>
+                    </div>
                   )}
                 </div>
               </div>
@@ -586,10 +666,8 @@ export const InvoiceDetail: React.FC = () => {
                   DETAILS
                 </h4>
                 <div className="text-[#5f6b76] font-semibold flex flex-col gap-1">
-                  {invoice.terms ? (
+                  {invoice.terms && (
                     <p className="whitespace-pre-wrap">{invoice.terms}</p>
-                  ) : (
-                    <p className="italic text-[11px]">No custom terms or project details specified for this statement.</p>
                   )}
                   {businessProfile?.gstNumber && <p className="font-bold text-navy mt-1">Sender GSTIN: {businessProfile.gstNumber}</p>}
                   {businessProfile?.panNumber && <p className="font-bold text-navy">Sender PAN: {businessProfile.panNumber}</p>}
@@ -740,14 +818,24 @@ export const InvoiceDetail: React.FC = () => {
               <Button
                 variant="primary"
                 disabled={actionLoading}
-                onClick={handlePrint}
+                onClick={handleDownloadPDF}
                 className="w-full py-3 text-xs font-black shadow-md bg-green hover:bg-green-dark text-white rounded-xl flex items-center justify-center gap-2"
               >
                 <Printer className="h-4.5 w-4.5" />
-                Print / Save PDF
+                Download PDF File
               </Button>
 
               <div className="grid grid-cols-2 gap-2">
+                <Button
+                  variant="outline"
+                  disabled={actionLoading}
+                  onClick={handlePrint}
+                  className="w-full py-2.5 text-xs font-bold border-navy/15 text-navy hover:bg-navy/5 rounded-xl flex items-center justify-center gap-1.5"
+                >
+                  <Printer className="h-4 w-4" />
+                  Print Viewport
+                </Button>
+
                 <Button
                   variant="outline"
                   disabled={actionLoading}
@@ -757,7 +845,9 @@ export const InvoiceDetail: React.FC = () => {
                   <Copy className="h-4 w-4" />
                   Duplicate
                 </Button>
+              </div>
 
+              <div>
                 {invoice.status === 'Draft' ? (
                   <Button
                     variant="outline"
@@ -784,12 +874,38 @@ export const InvoiceDetail: React.FC = () => {
           <GlassCard className="p-6 border-navy/5 bg-white shadow-sm flex flex-col gap-4">
             <h3 className="text-sm font-extrabold text-navy border-b border-navy/5 pb-2">Status Workflow</h3>
             <div className="flex flex-col gap-2.5">
-              {invoice.status === 'Draft' && (
+              {/* Send email button */}
+              {invoice.status !== 'Cancelled' && (
                 <Button
                   variant="primary"
                   disabled={actionLoading}
+                  onClick={handleSendEmail}
+                  className="w-full py-2.5 text-xs font-bold bg-green hover:bg-green-dark text-white rounded-xl flex items-center justify-center gap-1.5 shadow-sm"
+                >
+                  <Send className="h-4 w-4" />
+                  Send to Client
+                </Button>
+              )}
+
+              {/* Overdue reminder email button */}
+              {['Sent', 'Viewed', 'Partially Paid', 'Overdue'].includes(invoice.status) && (
+                <Button
+                  variant="outline"
+                  disabled={actionLoading}
+                  onClick={handleSendReminder}
+                  className="w-full py-2.5 text-xs font-bold border-amber-500 text-amber-700 hover:bg-amber-50 rounded-xl flex items-center justify-center gap-1.5"
+                >
+                  <Clock className="h-4 w-4" />
+                  Send Overdue Reminder
+                </Button>
+              )}
+
+              {invoice.status === 'Draft' && (
+                <Button
+                  variant="outline"
+                  disabled={actionLoading}
                   onClick={() => handleStatusChange('Sent')}
-                  className="w-full py-2.5 text-xs font-bold bg-navy text-white hover:bg-navy/90 rounded-xl"
+                  className="w-full py-2.5 text-xs font-bold border-navy/15 text-navy hover:bg-navy/5 rounded-xl"
                 >
                   Mark as Sent / Dispatched
                 </Button>
