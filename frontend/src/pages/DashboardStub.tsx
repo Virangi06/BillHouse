@@ -565,7 +565,7 @@ export const DashboardStub: React.FC = () => {
       )}
 
       {/* 1. LEFT SIDEBAR - Zero Trust design */}
-      <aside className={`fixed inset-y-0 left-0 w-64 bg-white/95 backdrop-blur-md border-r border-navy/5 text-navy flex flex-col justify-between shrink-0 z-40 transition-transform duration-300 transform lg:relative lg:translate-x-0 ${
+      <aside className={`print:hidden fixed inset-y-0 left-0 w-64 bg-white/95 backdrop-blur-md border-r border-navy/5 text-navy flex flex-col justify-between shrink-0 z-40 transition-transform duration-300 transform lg:relative lg:translate-x-0 ${
         isMobileSidebarOpen ? 'translate-x-0' : '-translate-x-full'
       }`}>
         
@@ -687,10 +687,10 @@ export const DashboardStub: React.FC = () => {
       </aside>
 
       {/* 2. MAIN PANEL WINDOW */}
-      <div className="flex-1 flex flex-col min-w-0 overflow-y-auto">
+      <div className="flex-1 flex flex-col min-w-0 overflow-y-auto print:overflow-visible">
         
         {/* Top Header Navigation panel */}
-        <header className="bg-white border-b border-navy/5 py-3 px-4 md:px-8 flex flex-row items-center justify-between shadow-sm shrink-0 sticky top-0 z-10">
+        <header className="print:hidden bg-white border-b border-navy/5 py-3 px-4 md:px-8 flex flex-row items-center justify-between shadow-sm shrink-0 sticky top-0 z-10">
           
           {/* Welcome Greeting context with responsive hamburger toggler */}
           <div className="flex items-center gap-2.5 min-w-0">
