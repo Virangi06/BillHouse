@@ -2,6 +2,10 @@ import express from 'express';
 import mongoose from 'mongoose';
 import cors from 'cors';
 import dotenv from 'dotenv';
+
+// Load environment variables immediately at the very beginning
+dotenv.config();
+
 import path from 'path';
 import fs from 'fs';
 import authRoutes from './routes/authRoutes';
@@ -24,9 +28,6 @@ try {
 } catch (dnsErr) {
   console.warn('⚠️ Could not set custom DNS servers:', dnsErr);
 }
-
-// Load environment variables
-dotenv.config();
 
 const app = express();
 const PORT = process.env.PORT || 5000;

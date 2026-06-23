@@ -10,6 +10,7 @@ import InvoiceDetail from '../components/invoices/InvoiceDetail';
 import PaymentList from '../components/payments/PaymentList';
 import OnboardingWizard from '../components/onboarding/OnboardingWizard';
 import BusinessSettings from '../components/settings/BusinessSettings';
+import ReminderSettings from '../components/settings/ReminderSettings';
 import ClientDetail from '../components/clients/ClientDetail';
 import logo from '../assets/Logo_transparent.png';
 import { useBusinessProfile } from '../context/BusinessContext';
@@ -429,6 +430,13 @@ export const DashboardStub: React.FC = () => {
     }
   }, [activeTab, isPro, reportStartDate, reportEndDate]);
 
+  useEffect(() => {
+    if ((activeTab === 'reports' || activeTab === 'reminders') && !isPro) {
+      setSearchParams({ tab: 'dashboard' });
+      setIsUpgradeModalOpen(true);
+    }
+  }, [activeTab, isPro, setSearchParams]);
+
   // Handle click outside hooks
   useEffect(() => {
     const handleClickOutside = (event: MouseEvent) => {
@@ -449,8 +457,8 @@ export const DashboardStub: React.FC = () => {
     return () => document.removeEventListener('mousedown', handleClickOutside);
   }, []);
 
-  const handleTabChange = (tab: 'dashboard' | 'clients' | 'invoices' | 'settings' | 'profile' | 'reports' | 'payments') => {
-    if (tab === 'reports' && !isPro) {
+  const handleTabChange = (tab: 'dashboard' | 'clients' | 'invoices' | 'settings' | 'profile' | 'reports' | 'payments' | 'reminders') => {
+    if ((tab === 'reports' || tab === 'reminders') && !isPro) {
       setIsUpgradeModalOpen(true);
       return;
     }
@@ -807,6 +815,23 @@ export const DashboardStub: React.FC = () => {
           >
             <BarChart3 className="h-5 w-5 text-green" />
             Reports
+            {!isPro && (
+              <span className="text-[9px] bg-green/10 text-green px-1.5 py-0.5 rounded-full ml-auto font-bold">Pro</span>
+            )}
+          </button>
+
+          {/* Module 5: Automated Reminders */}
+          <button
+            onClick={() => handleTabChange('reminders')}
+            className={`w-full flex items-center gap-3 px-4 py-3 rounded-2xl text-sm font-semibold transition-all duration-200 ${
+              activeTab === 'reminders'
+                ? 'bg-green/10 text-green-dark border-l-4 border-green font-bold shadow-sm'
+                : 'text-navy/70 hover:text-navy hover:bg-navy/5'
+            }`}
+            title="Automated Reminders"
+          >
+            <Bell className="h-5 w-5 text-green" />
+            Reminders
             {!isPro && (
               <span className="text-[9px] bg-green/10 text-green px-1.5 py-0.5 rounded-full ml-auto font-bold">Pro</span>
             )}
@@ -2368,6 +2393,8 @@ export const DashboardStub: React.FC = () => {
               )}
 
             </div>
+          ) : activeTab === 'reminders' && isPro ? (
+            <ReminderSettings />
           ) : activeTab === 'settings' || activeTab === 'profile' ? (
             <BusinessSettings />
           ) : null}

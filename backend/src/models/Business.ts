@@ -32,6 +32,7 @@ export interface IBusiness extends Document {
   // Notification preferences
   remindersEnabled?: boolean;
   remindersIntervals?: number[];
+  reminderTemplate?: 'professional' | 'friendly' | 'urgent';
   // Bank details (shown on printed invoice)
   bankName?: string;
   bankAccount?: string;
@@ -83,6 +84,7 @@ const BusinessSchema: Schema = new Schema(
     // Notification preferences
     remindersEnabled: { type: Boolean, default: true },
     remindersIntervals: { type: [Number], default: [7, 14, 30] },
+    reminderTemplate: { type: String, enum: ['professional', 'friendly', 'urgent'], default: 'professional' },
     // Bank details
     bankName: { type: String, trim: true },
     bankAccount: { type: String, trim: true },

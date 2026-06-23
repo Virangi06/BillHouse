@@ -7,9 +7,8 @@ import {
   Shield, BadgePercent, Sparkles, RefreshCw, Globe,
   Clock, DollarSign, Phone, Bell, Mail, Hash,
   CreditCard, Landmark, QrCode, Settings2,
-  CheckCircle2, Lock
+  CheckCircle2
 } from 'lucide-react';
-import UpgradeModal from '../common/UpgradeModal';
 
 const BUSINESS_TYPES = [
   { value: 'freelancer', label: 'Freelancer', icon: User },
@@ -45,7 +44,7 @@ const INVOICE_FORMATS = [
   { value: '{prefix}{number}', label: 'INV000001 (Continuous)' },
 ];
 
-type TabKey = 'profile' | 'address' | 'branding' | 'invoice' | 'tax' | 'bank' | 'notifications';
+type TabKey = 'profile' | 'address' | 'branding' | 'invoice' | 'tax' | 'bank';
 
 const TABS: { key: TabKey; label: string; icon: React.ElementType; description: string }[] = [
   { key: 'profile',       label: 'Business Profile',   icon: Building2,     description: 'Name, type & contact' },
@@ -54,7 +53,6 @@ const TABS: { key: TabKey; label: string; icon: React.ElementType; description: 
   { key: 'invoice',       label: 'Invoice Config',     icon: FileText,      description: 'Numbering & currency' },
   { key: 'tax',           label: 'Tax Registry',       icon: BadgePercent,  description: 'GST, PAN & tax IDs' },
   { key: 'bank',          label: 'Bank & Payment',     icon: Banknote,      description: 'Account & UPI details' },
-  { key: 'notifications', label: 'Reminders',          icon: Bell,          description: 'Auto-reminder settings' },
 ];
 
 const BusinessSettings: React.FC = () => {
@@ -68,7 +66,6 @@ const BusinessSettings: React.FC = () => {
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
   const [logoPreview, setLogoPreview] = useState<string>('');
   const [bannerPreview, setBannerPreview] = useState<string>('');
-  const [isUpgradeModalOpen, setIsUpgradeModalOpen] = useState(false);
 
   const [form, setForm] = useState({
     name: '', legalName: '', type: 'freelancer' as 'freelancer' | 'agency' | 'business',
@@ -80,8 +77,6 @@ const BusinessSettings: React.FC = () => {
     currency: 'INR', timeZone: 'Asia/Kolkata',
     invoiceNumberFormat: '{prefix}-{number}',
     bankName: '', bankAccount: '', bankIfsc: '', bankUpi: '',
-    remindersEnabled: true,
-    remindersIntervals: [7, 14, 30] as number[],
   });
 
   useEffect(() => {
@@ -112,8 +107,6 @@ const BusinessSettings: React.FC = () => {
         bankAccount: businessProfile.bankAccount || '',
         bankIfsc: businessProfile.bankIfsc || '',
         bankUpi: businessProfile.bankUpi || '',
-        remindersEnabled: businessProfile.remindersEnabled !== undefined ? businessProfile.remindersEnabled : true,
-        remindersIntervals: businessProfile.remindersIntervals || [7, 14, 30],
       });
       setLogoPreview(businessProfile.logoBase64 || '');
       setBannerPreview(businessProfile.bannerBase64 || '');
@@ -168,7 +161,6 @@ const BusinessSettings: React.FC = () => {
         invoiceNumberFormat: form.invoiceNumberFormat,
         bankName: form.bankName.trim(), bankAccount: form.bankAccount.trim(),
         bankIfsc: form.bankIfsc.trim().toUpperCase(), bankUpi: form.bankUpi.trim(),
-        remindersEnabled: form.remindersEnabled, remindersIntervals: form.remindersIntervals,
       };
       if (businessProfile) { await API.put('/business', payload); }
       else { await API.post('/business', payload); }
@@ -208,7 +200,7 @@ const BusinessSettings: React.FC = () => {
     { label: 'Business',   value: form.name || '—', icon: Building2 },
     { label: 'Currency',   value: form.currency,     icon: DollarSign },
     { label: 'GST',        value: form.gstNumber || 'Not set', icon: BadgePercent },
-    { label: 'Reminders',  value: form.remindersEnabled ? `${form.remindersIntervals.length} active` : 'Disabled', icon: Bell },
+    { label: 'Reminders',  value: businessProfile?.remindersEnabled ? `${businessProfile?.remindersIntervals?.length || 0} active` : 'Disabled', icon: Bell },
   ];
 
   /* ── Tab content renderer ───────────────────────────── */
@@ -571,110 +563,6 @@ const BusinessSettings: React.FC = () => {
         </div>
       );
 
-      /* ── Notifications ── */
-      case 'notifications': return (
-        <div className="flex flex-col gap-5 relative min-h-[300px]">
-          {/* Glassmorphism Lock Overlay */}
-          {!businessProfile?.isPro && (
-            <div className="absolute inset-0 bg-white/70 backdrop-blur-[3px] rounded-2xl z-20 flex flex-col items-center justify-center text-center p-6 border border-navy/5 animate-fade-in">
-              <div className="p-4 bg-amber-500/10 text-amber-600 rounded-full mb-3 flex items-center justify-center">
-                <Lock className="h-7 w-7" />
-              </div>
-              <h3 className="text-base font-extrabold text-navy">Automated Email Reminders is a Pro Feature</h3>
-              <p className="text-xs text-text-secondary font-semibold max-w-sm mt-1.5 leading-relaxed">
-                Save hours tracking down invoices. Automatically scan and email gentle reminders to clients at day 7, 14, and 30 overdue.
-              </p>
-              <button
-                type="button"
-                onClick={() => setIsUpgradeModalOpen(true)}
-                className="mt-6 px-6 py-2.5 bg-green hover:bg-green-dark text-white rounded-xl text-xs font-black shadow-md flex items-center gap-2 active:scale-98 transition-all cursor-pointer"
-              >
-                👑 Upgrade to Pro Plan
-              </button>
-            </div>
-          )}
-
-          <div className="flex items-start gap-3 p-4 bg-gradient-to-br from-blue-50 to-indigo-50/50 border border-blue-200/60 rounded-2xl">
-            <Bell className="h-4 w-4 text-blue-600 shrink-0 mt-0.5" />
-            <div>
-              <p className="text-xs font-extrabold text-blue-800 mb-0.5">Automated Receivables</p>
-              <p className="text-[11px] text-blue-700 font-semibold leading-relaxed">
-                Schedule polite, automatic payment reminders to clients when invoices pass their due date.
-              </p>
-            </div>
-          </div>
-
-          {/* Master toggle */}
-          <div className={`flex items-center justify-between p-4 rounded-2xl border-2 transition-all ${form.remindersEnabled ? 'bg-green/5 border-green/20' : 'bg-slate-50 border-navy/8'}`}>
-            <div className="flex items-center gap-3">
-              <div className={`w-10 h-10 rounded-xl flex items-center justify-center transition-all ${form.remindersEnabled ? 'bg-green/15' : 'bg-navy/8'}`}>
-                <Bell className={`h-4.5 w-4.5 transition-all ${form.remindersEnabled ? 'text-green' : 'text-navy/40'}`} />
-              </div>
-              <div>
-                <p className="text-sm font-extrabold text-navy">Automated Reminders</p>
-                <p className="text-[11px] text-navy/50 font-semibold">
-                  {form.remindersEnabled ? 'Enabled — emails sent on schedule' : 'Disabled — no emails will be sent'}
-                </p>
-              </div>
-            </div>
-            <label className="relative inline-flex items-center cursor-pointer select-none">
-              <input type="checkbox" checked={form.remindersEnabled}
-                onChange={e => set('remindersEnabled', e.target.checked)} className="sr-only peer" />
-              <div className="w-11 h-6 bg-slate-200 peer-focus:outline-none rounded-full peer
-                peer-checked:after:translate-x-full peer-checked:after:border-white
-                after:content-[''] after:absolute after:top-[2px] after:left-[2px]
-                after:bg-white after:border-slate-300 after:border after:rounded-full
-                after:h-5 after:w-5 after:transition-all peer-checked:bg-green" />
-            </label>
-          </div>
-
-          {/* Interval toggles */}
-          {form.remindersEnabled && (
-            <div className="flex flex-col gap-4 p-5 bg-[#FAFCFB] border border-navy/5 rounded-2xl">
-              <div>
-                <label className={labelClass}>Reminder Milestones (days after due date)</label>
-                <p className="text-[11px] text-navy/50 font-semibold">
-                  Clients receive reminder emails on these days. Toggle each milestone on or off.
-                </p>
-              </div>
-              <div className="grid grid-cols-3 gap-3">
-                {[7, 14, 30].map(day => {
-                  const isActive = form.remindersIntervals.includes(day);
-                  return (
-                    <button key={day} type="button"
-                      onClick={() => {
-                        let next = [...form.remindersIntervals];
-                        if (isActive) next = next.filter(d => d !== day);
-                        else next = [...next, day].sort((a, b) => a - b);
-                        set('remindersIntervals', next);
-                      }}
-                      className={`flex flex-col items-center gap-2 py-4 px-3 rounded-2xl border-2 font-bold transition-all
-                        ${isActive
-                          ? 'border-green bg-green/8 text-green shadow-sm shadow-green/10'
-                          : 'border-navy/8 bg-white text-navy/40 hover:border-navy/20'}`}>
-                      <div className={`w-9 h-9 rounded-xl flex items-center justify-center transition-all ${isActive ? 'bg-green/15' : 'bg-navy/5'}`}>
-                        <Clock className={`h-4 w-4 ${isActive ? 'text-green' : 'text-navy/30'}`} />
-                      </div>
-                      <div className="text-center">
-                        <p className="text-sm font-extrabold">{day}</p>
-                        <p className="text-[10px] font-bold opacity-70">Days</p>
-                      </div>
-                      {isActive && <span className="text-[9px] font-extrabold text-green uppercase tracking-widest">Active</span>}
-                    </button>
-                  );
-                })}
-              </div>
-              {form.remindersIntervals.length === 0 && (
-                <div className="flex items-center gap-2 p-3 bg-amber-50 border border-amber-200 rounded-xl">
-                  <AlertCircle className="h-3.5 w-3.5 text-amber-600 shrink-0" />
-                  <p className="text-[11px] text-amber-700 font-semibold">Select at least one reminder milestone.</p>
-                </div>
-              )}
-            </div>
-          )}
-        </div>
-      );
-
       default: return null;
     }
   };
@@ -801,10 +689,6 @@ const BusinessSettings: React.FC = () => {
           </div>
         </div>
       </div>
-      <UpgradeModal
-        isOpen={isUpgradeModalOpen}
-        onClose={() => setIsUpgradeModalOpen(false)}
-      />
     </div>
   );
 };

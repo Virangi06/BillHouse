@@ -230,14 +230,85 @@ export async function sendPaymentReminderEmail(email: string, clientName: string
   const currencySymbol = invoice.currency === 'INR' ? '₹' : invoice.currency || '₹';
   const outstandingStr = new Intl.NumberFormat('en-IN', { style: 'currency', currency: 'INR', maximumFractionDigits: 0 }).format(invoice.amountDue);
   const dueDateStr = new Date(invoice.dueDate).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' });
-  const themeColor = invoice.colorTheme || '#3b4b5c';
 
-  const mailOptions = {
-    from: process.env.SENDGRID_FROM_EMAIL || '"BillHouse" <noreply@billhouse.com>',
-    to: email,
-    subject: `Payment Reminder: Invoice ${invoice.number} is overdue`,
-    text: `Hello ${clientName},\n\nThis is a friendly reminder that invoice ${invoice.number} from ${business.name} was due on ${dueDateStr}. The outstanding amount is ${outstandingStr}.\n\nPlease arrange for payment as soon as possible.\n\nThank you,\n${business.name}`,
-    html: `
+  const template = business.reminderTemplate || 'professional';
+  let subject = `Payment Reminder: Invoice ${invoice.number} is overdue`;
+  let text = '';
+  let html = '';
+
+  if (template === 'friendly') {
+    subject = `Friendly Check-in: Invoice ${invoice.number} from ${business.name}`;
+    text = `Hi ${clientName},\n\nHope you're having a great week! Just a friendly check-in regarding invoice ${invoice.number} from ${business.name}, which was due on ${dueDateStr}.\n\nThe outstanding balance is ${outstandingStr}. If you have a moment, please arrange for payment.\n\nWe really appreciate your partnership!\n\nBest regards,\n${business.name}`;
+    html = `
+      <div style="font-family: 'Segoe UI', Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 25px; border: 1px solid #e2e8f0; border-radius: 12px; background-color: #ffffff; color: #1e293b;">
+        <div style="text-align: center; border-bottom: 3px solid #10b981; padding-bottom: 20px; margin-bottom: 20px;">
+          <h2 style="color: #0f172a; margin: 0; font-size: 22px;">Friendly Check-in 😊</h2>
+          <p style="font-size: 13px; color: #10b981; margin: 5px 0 0 0; font-weight: bold;">Invoice ${invoice.number} Update</p>
+        </div>
+        <div style="margin: 20px 0; font-size: 14px; line-height: 1.6;">
+          <p>Hi <strong>${clientName}</strong>,</p>
+          <p>Hope you are having a wonderful week! Just sending a quick, friendly check-in regarding invoice <strong>${invoice.number}</strong> for services with <strong>${business.name}</strong>. It was due on <strong>${dueDateStr}</strong>.</p>
+          
+          <div style="background-color: #ecfdf5; border-left: 4px solid #10b981; padding: 15px; border-radius: 8px; margin: 20px 0;">
+            <p style="margin: 0; font-size: 12px; color: #047857;">Outstanding Amount:</p>
+            <h3 style="margin: 5px 0 0 0; color: #047857; font-size: 22px; font-weight: 800;">${outstandingStr}</h3>
+          </div>
+
+          <p>If you've already sent payment, please disregard this note. Otherwise, we would appreciate it if you could arrange settlement at your earliest convenience.</p>
+          <p>We value our partnership and look forward to working together again soon!</p>
+        </div>
+
+        ${business.bankAccount ? `
+        <div style="background-color: #f8fafc; padding: 15px; border: 1px dashed #cbd5e1; border-radius: 8px; margin: 20px 0; font-size: 12px;">
+          <p style="font-weight: bold; color: #0f172a; margin: 0 0 8px 0;">Payment Details:</p>
+          <p style="margin: 3px 0;">Bank Name: <strong>${business.bankName || ''}</strong></p>
+          <p style="margin: 3px 0;">Account: <strong>${business.bankAccount}</strong></p>
+          <p style="margin: 3px 0;">IFSC Code: <strong>${business.bankIfsc || ''}</strong></p>
+        </div>
+        ` : ''}
+
+        <hr style="border: 0; border-top: 1px solid #f1f5f9; margin: 20px 0;">
+        <p style="font-size: 11px; color: #64748b; text-align: center; margin: 0;">Sent automatically by BillHouse Invoicing. Thank you!</p>
+      </div>
+    `;
+  } else if (template === 'urgent') {
+    subject = `URGENT NOTICE: Invoice ${invoice.number} is severely past due`;
+    text = `URGENT PAYMENT DEMAND\n\nDear Accounts Team / ${clientName},\n\nThis is a formal notice that invoice ${invoice.number} from ${business.name} is now severely past due. It was due on ${dueDateStr}.\n\nThe total outstanding balance of ${outstandingStr} must be settled immediately.\n\nPlease reply with payment confirmation as soon as possible.\n\nSincerely,\n${business.name}`;
+    html = `
+      <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 25px; border: 2px solid #ef4444; border-radius: 12px; background-color: #fef2f2; color: #7f1d1d;">
+        <div style="text-align: center; border-bottom: 4px solid #ef4444; padding-bottom: 20px; margin-bottom: 20px;">
+          <h2 style="color: #7f1d1d; margin: 0; font-size: 22px; text-transform: uppercase; tracking-wider: 1px;">Urgent Payment Demand</h2>
+          <p style="font-size: 14px; color: #ef4444; margin: 8px 0 0 0; font-weight: 900;">INVOICE ${invoice.number} IS CRITICALLY OVERDUE</p>
+        </div>
+        <div style="margin: 20px 0; font-size: 14px; line-height: 1.6;">
+          <p>Dear Accounts Team / <strong>${clientName}</strong>,</p>
+          <p>This is a formal notice that invoice <strong>${invoice.number}</strong> issued by <strong>${business.name}</strong> remains unpaid and is now severely past due. The original due date was <strong>${dueDateStr}</strong>.</p>
+          
+          <div style="background-color: #fee2e2; border: 1px solid #fca5a5; border-left: 5px solid #ef4444; padding: 15px; border-radius: 8px; margin: 20px 0;">
+            <p style="margin: 0; font-size: 12px; color: #7f1d1d; text-transform: uppercase; font-weight: bold; tracking-wider: 0.5px;">Critically Overdue Balance:</p>
+            <h3 style="margin: 5px 0 0 0; color: #b91c1c; font-size: 24px; font-weight: 900;">${outstandingStr}</h3>
+          </div>
+
+          <p>Please process payment immediately to settle this outstanding amount. Kindly reply directly to this email with payment verification details or a wire confirmation number once completed.</p>
+        </div>
+
+        ${business.bankAccount ? `
+        <div style="background-color: #ffffff; padding: 15px; border: 1px solid #fca5a5; border-radius: 8px; margin: 20px 0; font-size: 12px; color: #111827;">
+          <p style="font-weight: bold; color: #b91c1c; margin: 0 0 8px 0; text-transform: uppercase;">Remittance Bank Transfer Instructions:</p>
+          <p style="margin: 3px 0;">Bank Name: <strong>${business.bankName || ''}</strong></p>
+          <p style="margin: 3px 0;">Account Number: <strong>${business.bankAccount}</strong></p>
+          <p style="margin: 3px 0;">IFSC Code: <strong>${business.bankIfsc || ''}</strong></p>
+        </div>
+        ` : ''}
+
+        <hr style="border: 0; border-top: 1px solid #fca5a5; margin: 20px 0;">
+        <p style="font-size: 11px; color: #991b1b; text-align: center; margin: 0; font-weight: bold;">This is an automated system reminder dispatched on behalf of ${business.name}.</p>
+      </div>
+    `;
+  } else {
+    // Professional
+    text = `Hello ${clientName},\n\nThis is a friendly reminder that invoice ${invoice.number} from ${business.name} was due on ${dueDateStr}. The outstanding amount is ${outstandingStr}.\n\nPlease arrange for payment as soon as possible.\n\nThank you,\n${business.name}`;
+    html = `
       <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px; border: 1px solid #f0f0f0; border-radius: 8px;">
         <div style="text-align: center; border-bottom: 3px solid #e74c3c; padding-bottom: 15px;">
           <h2 style="color: #061B2D; margin: 0;">Payment Reminder</h2>
@@ -267,7 +338,15 @@ export async function sendPaymentReminderEmail(email: string, clientName: string
         <hr style="border: 0; border-top: 1px solid #e0e0e0; margin: 20px 0;">
         <p style="font-size: 11px; color: #5F6B76; text-align: center;">Powered by BillHouse Invoicing. Thank you for your business!</p>
       </div>
-    `
+    `;
+  }
+
+  const mailOptions = {
+    from: process.env.SENDGRID_FROM_EMAIL || '"BillHouse" <noreply@billhouse.com>',
+    to: email,
+    subject,
+    text,
+    html
   };
 
   const info = await t.sendMail(mailOptions);

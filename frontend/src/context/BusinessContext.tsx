@@ -40,6 +40,7 @@ export interface BusinessProfile {
   // Notification config
   remindersEnabled?: boolean;
   remindersIntervals?: number[];
+  reminderTemplate?: 'professional' | 'friendly' | 'urgent';
   // Pro subscription details
   isPro?: boolean;
   subscriptionPlan?: 'monthly' | 'annual' | 'none';
