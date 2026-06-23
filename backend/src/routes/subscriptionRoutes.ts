@@ -10,7 +10,8 @@ const router = Router();
 // Initialize Razorpay instance (using mock checks if keys are placeholders or missing)
 const keyId = process.env.RAZORPAY_KEY_ID;
 const keySecret = process.env.RAZORPAY_KEY_SECRET;
-const isMockMode = !keyId || !keySecret || keyId.startsWith('your_') || keySecret.startsWith('your_');
+const isLiveKey = keyId?.startsWith('rzp_live_');
+const isMockMode = !keyId || !keySecret || keyId.startsWith('your_') || keySecret.startsWith('your_') || isLiveKey;
 
 let razorpay: Razorpay | null = null;
 if (!isMockMode) {
@@ -19,13 +20,17 @@ if (!isMockMode) {
       key_id: keyId!,
       key_secret: keySecret!
     });
-    console.log('💳 Subscription System: Loaded Razorpay Payment Gateway');
+    console.log('💳 Subscription System: Loaded Razorpay Test Mode Gateway (Student Safe)');
   } catch (err) {
     console.error('❌ Failed to initialize Razorpay SDK. Falling back to Mock Mode.', err);
     razorpay = null;
   }
 } else {
-  console.log('💳 Subscription System: Razorpay keys are missing/mock. Running in MOCK CHECKOUT MODE.');
+  if (isLiveKey) {
+    console.log('⚠️ Student Mode Enforcement: Live Razorpay key detected but restricted to Test Mode. Falling back to MOCK CHECKOUT MODE.');
+  } else {
+    console.log('💳 Subscription System: Razorpay keys are missing/mock. Running in MOCK CHECKOUT MODE.');
+  }
 }
 
 // 1. CREATE RAZORPAY ORDER FOR UPGRADE
