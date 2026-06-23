@@ -7,8 +7,9 @@ import {
   Shield, BadgePercent, Sparkles, RefreshCw, Globe,
   Clock, DollarSign, Phone, Bell, Mail, Hash,
   CreditCard, Landmark, QrCode, Settings2,
-  CheckCircle2
+  CheckCircle2, Lock
 } from 'lucide-react';
+import UpgradeModal from '../common/UpgradeModal';
 
 const BUSINESS_TYPES = [
   { value: 'freelancer', label: 'Freelancer', icon: User },
@@ -67,6 +68,7 @@ const BusinessSettings: React.FC = () => {
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
   const [logoPreview, setLogoPreview] = useState<string>('');
   const [bannerPreview, setBannerPreview] = useState<string>('');
+  const [isUpgradeModalOpen, setIsUpgradeModalOpen] = useState(false);
 
   const [form, setForm] = useState({
     name: '', legalName: '', type: 'freelancer' as 'freelancer' | 'agency' | 'business',
@@ -571,7 +573,27 @@ const BusinessSettings: React.FC = () => {
 
       /* ── Notifications ── */
       case 'notifications': return (
-        <div className="flex flex-col gap-5">
+        <div className="flex flex-col gap-5 relative min-h-[300px]">
+          {/* Glassmorphism Lock Overlay */}
+          {!businessProfile?.isPro && (
+            <div className="absolute inset-0 bg-white/70 backdrop-blur-[3px] rounded-2xl z-20 flex flex-col items-center justify-center text-center p-6 border border-navy/5 animate-fade-in">
+              <div className="p-4 bg-amber-500/10 text-amber-600 rounded-full mb-3 flex items-center justify-center">
+                <Lock className="h-7 w-7" />
+              </div>
+              <h3 className="text-base font-extrabold text-navy">Automated Email Reminders is a Pro Feature</h3>
+              <p className="text-xs text-text-secondary font-semibold max-w-sm mt-1.5 leading-relaxed">
+                Save hours tracking down invoices. Automatically scan and email gentle reminders to clients at day 7, 14, and 30 overdue.
+              </p>
+              <button
+                type="button"
+                onClick={() => setIsUpgradeModalOpen(true)}
+                className="mt-6 px-6 py-2.5 bg-green hover:bg-green-dark text-white rounded-xl text-xs font-black shadow-md flex items-center gap-2 active:scale-98 transition-all cursor-pointer"
+              >
+                👑 Upgrade to Pro Plan
+              </button>
+            </div>
+          )}
+
           <div className="flex items-start gap-3 p-4 bg-gradient-to-br from-blue-50 to-indigo-50/50 border border-blue-200/60 rounded-2xl">
             <Bell className="h-4 w-4 text-blue-600 shrink-0 mt-0.5" />
             <div>
@@ -779,6 +801,10 @@ const BusinessSettings: React.FC = () => {
           </div>
         </div>
       </div>
+      <UpgradeModal
+        isOpen={isUpgradeModalOpen}
+        onClose={() => setIsUpgradeModalOpen(false)}
+      />
     </div>
   );
 };

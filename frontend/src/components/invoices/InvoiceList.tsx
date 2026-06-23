@@ -17,7 +17,6 @@ import {
   AlertCircle,
   XCircle,
   Send,
-  Mail,
   DollarSign
 } from 'lucide-react';
 

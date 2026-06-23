@@ -9,8 +9,6 @@ import {
   MapPin,
   FileText,
   AlertTriangle,
-  CheckCircle,
-  Clock,
   Plus,
   ChevronDown,
   User

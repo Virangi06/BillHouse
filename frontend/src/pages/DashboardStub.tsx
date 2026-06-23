@@ -10,16 +10,17 @@ import InvoiceDetail from '../components/invoices/InvoiceDetail';
 import PaymentList from '../components/payments/PaymentList';
 import OnboardingWizard from '../components/onboarding/OnboardingWizard';
 import BusinessSettings from '../components/settings/BusinessSettings';
-import BusinessProfilePage from '../components/profile/BusinessProfilePage';
 import ClientDetail from '../components/clients/ClientDetail';
 import logo from '../assets/Logo_transparent.png';
 import { useBusinessProfile } from '../context/BusinessContext';
+import { FileSpreadsheet, Printer as PrintIcon, Download } from 'lucide-react';
+import UpgradeModal from '../components/common/UpgradeModal';
+import * as XLSX from 'xlsx';
 import {
   LayoutDashboard,
   Users,
   FileText,
   Settings,
-  Building2,
   LogOut,
   Search,
   Bell,
@@ -32,9 +33,7 @@ import {
   CheckCircle,
   AlertTriangle,
   Plus,
-  MoreHorizontal,
   Edit2,
-  Trash2,
   Archive,
   RotateCcw,
   X,
@@ -52,7 +51,11 @@ import {
   Tooltip as RechartsTooltip,
   PieChart,
   Pie,
-  Cell
+  Cell,
+  BarChart,
+  Bar,
+  Legend,
+  CartesianGrid
 } from 'recharts';
 
 // Client Data Model
@@ -67,6 +70,7 @@ interface ClientData {
   taxId?: string;
   gstNumber?: string;
   notes?: string;
+  isArchived?: boolean;
   // Financial aggregates (populated from with-financials endpoint)
   totalBilled?: number;
   totalPaid?: number;
@@ -119,7 +123,8 @@ interface DashboardStats {
 
 export const DashboardStub: React.FC = () => {
   const { user, logout } = useAuth();
-  const { hasCompletedOnboarding, isLoadingBusiness } = useBusinessProfile();
+  const { businessProfile, hasCompletedOnboarding, isLoadingBusiness } = useBusinessProfile();
+  const isPro = businessProfile?.isPro || false;
   const [searchParams, setSearchParams] = useSearchParams();
   const activeTab = searchParams.get('tab') || 'dashboard';
   const action = searchParams.get('action');
@@ -170,14 +175,16 @@ export const DashboardStub: React.FC = () => {
   const [clientCountryFilter, setClientCountryFilter] = useState<string>('All');
   const [clientStatusFilter, setClientStatusFilter] = useState<'active' | 'archived'>('active');
   const [uniqueCountries, setUniqueCountries] = useState<string[]>([]);
+  const [isUpgradeModalOpen, setIsUpgradeModalOpen] = useState<boolean>(false);
+  const [reportsData, setReportsData] = useState<any | null>(null);
+  const [reportsLoading, setReportsLoading] = useState<boolean>(false);
+  const [reportStartDate, setReportStartDate] = useState<string>('');
+  const [reportEndDate, setReportEndDate] = useState<string>('');
 
   // Profile Dropdown and row menus Refs
   const [isProfileDropdownOpen, setIsProfileDropdownOpen] = useState<boolean>(false);
   const profileDropdownRef = useRef<HTMLDivElement | null>(null);
   
-  const [activeMenuId, setActiveMenuId] = useState<string | null>(null);
-  const actionMenuRef = useRef<HTMLDivElement | null>(null);
-
   // Global unified search state & refs
   const [globalSearchQuery, setGlobalSearchQuery] = useState<string>('');
   const [isSearchFocused, setIsSearchFocused] = useState<boolean>(false);
@@ -288,11 +295,139 @@ export const DashboardStub: React.FC = () => {
     }
   };
 
+  // Fetch Reports and analytics
+  const fetchReportsData = async () => {
+    setReportsLoading(true);
+    try {
+      const params: any = {};
+      if (reportStartDate) params.startDate = reportStartDate;
+      if (reportEndDate) params.endDate = reportEndDate;
+      const response = await API.get('/dashboard/reports', { params });
+      setReportsData(response.data);
+    } catch (err: any) {
+      console.error(err);
+      setErrorMsg(err.response?.data?.error || 'Failed to fetch reports and analytics');
+    } finally {
+      setReportsLoading(false);
+    }
+  };
+
+  // Export reports data to Microsoft Excel format (.xlsx)
+  const exportToExcel = () => {
+    if (!reportsData) return;
+    try {
+      // 1. Financials Summary Sheet
+      const financialsData = [
+        { Metric: 'Total Invoiced', Value: reportsData.financials.totalInvoiced },
+        { Metric: 'Cash Collected', Value: reportsData.financials.totalCollected },
+        { Metric: 'Outstanding Balance', Value: reportsData.financials.totalOutstanding },
+        { Metric: 'GST Tax Collected', Value: reportsData.financials.totalGstCollected },
+        { Metric: 'TDS Deducted', Value: reportsData.financials.totalTdsDeducted },
+        { Metric: 'Total Invoice Count', Value: reportsData.financials.invoiceCount }
+      ];
+      const wsSummary = XLSX.utils.json_to_sheet(financialsData);
+
+      // 2. Billing & Tax Trends Sheet
+      const trendsData = reportsData.billingTrend.map((bt: any, index: number) => {
+        const tt = reportsData.taxTrend[index] || { gst: 0, tds: 0 };
+        return {
+          Month: bt.month,
+          'Billed Amount (₹)': bt.billed,
+          'Collected Amount (₹)': bt.collected,
+          'GST Collected (₹)': tt.gst,
+          'TDS Deducted (₹)': tt.tds
+        };
+      });
+      const wsTrends = XLSX.utils.json_to_sheet(trendsData);
+
+      // 3. Overdue Aging Invoices Sheet
+      const overdueData = (reportsData.overdueAging || []).map((inv: any) => ({
+        'Invoice Number': inv.number,
+        'Client Name': inv.clientName,
+        'Due Date': new Date(inv.dueDate).toLocaleDateString(),
+        'Overdue Days': inv.overdueDays,
+        'Amount Due (₹)': inv.amountDue
+      }));
+      const wsOverdue = XLSX.utils.json_to_sheet(overdueData);
+
+      // Create Workbook and append sheets
+      const wb = XLSX.utils.book_new();
+      XLSX.utils.book_append_sheet(wb, wsSummary, 'Financial Overview');
+      XLSX.utils.book_append_sheet(wb, wsTrends, 'Monthly Trends');
+      XLSX.utils.book_append_sheet(wb, wsOverdue, 'Overdue Aging Register');
+
+      // Save file
+      XLSX.writeFile(wb, `BillHouse_Financial_Report_${new Date().toISOString().slice(0,10)}.xlsx`);
+      setSuccessMsg('Financial report successfully exported to Excel format!');
+      addNotification('system', 'Excel Export Complete', 'Financial reports workbook generated.');
+    } catch (err: any) {
+      console.error(err);
+      setErrorMsg('Failed to export Excel report.');
+    }
+  };
+
+  // Export reports data to standard CSV
+  const exportToCSV = () => {
+    if (!reportsData) return;
+    try {
+      let csvContent = 'data:text/csv;charset=utf-8,';
+      
+      // Title
+      csvContent += 'BillHouse Invoicing Financial Report\n';
+      csvContent += `Generated: ${new Date().toLocaleString()}\n\n`;
+
+      // Financials Summary
+      csvContent += 'FINANCIALS OVERVIEW\n';
+      csvContent += 'Metric,Value (₹)\n';
+      csvContent += `Total Invoiced,${reportsData.financials.totalInvoiced}\n`;
+      csvContent += `Cash Collected,${reportsData.financials.totalCollected}\n`;
+      csvContent += `Outstanding Balance,${reportsData.financials.totalOutstanding}\n`;
+      csvContent += `GST Tax Collected,${reportsData.financials.totalGstCollected}\n`;
+      csvContent += `TDS Deducted,${reportsData.financials.totalTdsDeducted}\n`;
+      csvContent += `Invoice Count,${reportsData.financials.invoiceCount}\n\n`;
+
+      // Trends
+      csvContent += 'MONTHLY TRENDS\n';
+      csvContent += 'Month,Billed (₹),Collected (₹),GST Collected (₹),TDS Deducted (₹)\n';
+      reportsData.billingTrend.forEach((bt: any, i: number) => {
+        const tt = reportsData.taxTrend[i] || { gst: 0, tds: 0 };
+        csvContent += `${bt.month},${bt.billed},${bt.collected},${tt.gst},${tt.tds}\n`;
+      });
+      csvContent += '\n';
+
+      // Overdue aging
+      csvContent += 'OVERDUE AGING INVOICES\n';
+      csvContent += 'Invoice Number,Client Name,Due Date,Overdue Days,Amount Due (₹)\n';
+      (reportsData.overdueAging || []).forEach((inv: any) => {
+        csvContent += `${inv.number},"${inv.clientName}",${new Date(inv.dueDate).toLocaleDateString()},${inv.overdueDays},${inv.amountDue}\n`;
+      });
+
+      const encodedUri = encodeURI(csvContent);
+      const link = document.createElement('a');
+      link.setAttribute('href', encodedUri);
+      link.setAttribute('download', `BillHouse_Financial_Report_${new Date().toISOString().slice(0,10)}.csv`);
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      setSuccessMsg('Financial report successfully exported to CSV!');
+      addNotification('system', 'CSV Export Complete', 'Financial reports CSV generated.');
+    } catch (err: any) {
+      console.error(err);
+      setErrorMsg('Failed to export CSV report.');
+    }
+  };
+
   useEffect(() => {
     fetchClients();
     fetchDashboardStats();
     fetchCountriesList();
   }, [activeTab, clientSortBy, clientCountryFilter, clientStatusFilter]);
+
+  useEffect(() => {
+    if (activeTab === 'reports' && isPro) {
+      fetchReportsData();
+    }
+  }, [activeTab, isPro, reportStartDate, reportEndDate]);
 
   // Handle click outside hooks
   useEffect(() => {
@@ -300,10 +435,6 @@ export const DashboardStub: React.FC = () => {
       // Profile Dropdown click outside
       if (profileDropdownRef.current && !profileDropdownRef.current.contains(event.target as Node)) {
         setIsProfileDropdownOpen(false);
-      }
-      // Row Menu click outside
-      if (actionMenuRef.current && !actionMenuRef.current.contains(event.target as Node)) {
-        setActiveMenuId(null);
       }
       // Global Search dropdown click outside
       if (searchRef.current && !searchRef.current.contains(event.target as Node)) {
@@ -318,9 +449,12 @@ export const DashboardStub: React.FC = () => {
     return () => document.removeEventListener('mousedown', handleClickOutside);
   }, []);
 
-  const handleTabChange = (tab: 'dashboard' | 'clients' | 'invoices' | 'settings' | 'profile') => {
+  const handleTabChange = (tab: 'dashboard' | 'clients' | 'invoices' | 'settings' | 'profile' | 'reports' | 'payments') => {
+    if (tab === 'reports' && !isPro) {
+      setIsUpgradeModalOpen(true);
+      return;
+    }
     setSearchParams({ tab });
-    setActiveMenuId(null);
     setSuccessMsg(null);
     setErrorMsg(null);
     setIsMobileSidebarOpen(false);
@@ -359,7 +493,6 @@ export const DashboardStub: React.FC = () => {
     });
     setErrorMsg(null);
     setIsClientModalOpen(true);
-    setActiveMenuId(null);
   };
 
   const handleClientSubmit = async (e: React.FormEvent) => {
@@ -404,7 +537,6 @@ export const DashboardStub: React.FC = () => {
       setClients(prev => prev.filter(c => c._id !== isDeletingClient._id));
       addNotification('client', 'Client Archived', `${isDeletingClient.name} was archived to preserve invoice history.`);
       setIsDeletingClient(null);
-      setActiveMenuId(null);
       fetchDashboardStats(); // Refresh stats counters
     } catch (err: any) {
       console.error(err);
@@ -665,13 +797,19 @@ export const DashboardStub: React.FC = () => {
 
           {/* Module 6: Reports & Analytics */}
           <button
-            onClick={() => setIsReportsModalOpen(true)}
-            className="w-full flex items-center gap-3 px-4 py-3 rounded-2xl text-sm font-semibold text-navy/70 hover:text-navy hover:bg-navy/5 transition-all duration-200"
+            onClick={() => handleTabChange('reports')}
+            className={`w-full flex items-center gap-3 px-4 py-3 rounded-2xl text-sm font-semibold transition-all duration-200 ${
+              activeTab === 'reports'
+                ? 'bg-green/10 text-green-dark border-l-4 border-green font-bold shadow-sm'
+                : 'text-navy/70 hover:text-navy hover:bg-navy/5'
+            }`}
             title="Reports & Analytics"
           >
             <BarChart3 className="h-5 w-5 text-green" />
             Reports
-            <span className="text-[9px] bg-green/10 text-green px-1.5 py-0.5 rounded-full ml-auto font-bold">Pro</span>
+            {!isPro && (
+              <span className="text-[9px] bg-green/10 text-green px-1.5 py-0.5 rounded-full ml-auto font-bold">Pro</span>
+            )}
           </button>
 
           {/* Business Settings */}
@@ -690,18 +828,34 @@ export const DashboardStub: React.FC = () => {
 
         {/* Pro Upgrades Info */}
         <div className="p-4">
-          <div className="p-4 bg-gradient-to-br from-[#F8FAFC] to-green/5 border border-green/15 rounded-2xl flex flex-col gap-3">
-            <div className="flex items-center gap-2 text-green-dark">
-              <span className="text-yellow-500 text-sm">👑</span>
-              <span className="text-xs font-bold uppercase tracking-wider text-navy">Upgrade to Pro</span>
+          {isPro ? (
+            <div className="p-4 bg-gradient-to-br from-[#0c4737] to-[#061b2d] border border-green/30 rounded-2xl flex flex-col gap-2 shadow-lg relative overflow-hidden text-left">
+              <div className="absolute -top-6 -right-6 w-20 h-20 bg-green-mint/15 rounded-full blur-xl pointer-events-none" />
+              <div className="flex items-center gap-2 text-white">
+                <span className="text-yellow-500 text-sm">👑</span>
+                <span className="text-xs font-black uppercase tracking-wider">Pro Subscriber</span>
+              </div>
+              <p className="text-[11px] text-white/80 leading-relaxed font-semibold">
+                You have active access to advanced analytics and automated tools!
+              </p>
             </div>
-            <p className="text-[11px] text-text-secondary leading-relaxed">
-              Unlock advanced features like recurring invoices, custom branding & reminders.
-            </p>
-            <button className="w-full py-2 bg-navy hover:bg-green-dark text-white transition-all rounded-xl text-xs font-bold shadow-sm active:scale-98">
-              Upgrade Now
-            </button>
-          </div>
+          ) : (
+            <div className="p-4 bg-gradient-to-br from-[#F8FAFC] to-green/5 border border-green/15 rounded-2xl flex flex-col gap-3 text-left">
+              <div className="flex items-center gap-2 text-green-dark">
+                <span className="text-yellow-500 text-sm">👑</span>
+                <span className="text-xs font-bold uppercase tracking-wider text-navy">Upgrade to Pro</span>
+              </div>
+              <p className="text-[11px] text-text-secondary leading-relaxed">
+                Unlock advanced features like recurring invoices, custom branding & reminders.
+              </p>
+              <button 
+                onClick={() => setIsUpgradeModalOpen(true)}
+                className="w-full py-2 bg-navy hover:bg-green-dark text-white transition-all rounded-xl text-xs font-bold shadow-sm active:scale-98 cursor-pointer"
+              >
+                Upgrade Now
+              </button>
+            </div>
+          )}
         </div>
 
         {/* Footer info collapse */}
@@ -1954,6 +2108,268 @@ export const DashboardStub: React.FC = () => {
             </div>
           ) : activeTab === 'settings' || activeTab === 'profile' ? (
             <BusinessSettings />
+          ) : activeTab === 'reports' && isPro ? (
+            /* ========================================================
+               REPORTS & ANALYTICS VIEW
+               ======================================================== */
+            <div className="flex flex-col gap-8 max-w-7xl mx-auto animate-fade-in print:p-0">
+              
+              {/* Reports Page Header Strip */}
+              <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center bg-white border border-navy/5 p-6 rounded-2xl shadow-sm gap-4 print:hidden text-left">
+                <div>
+                  <h2 className="text-xl font-extrabold text-navy tracking-tight flex items-center gap-2">
+                    <BarChart3 className="h-6 w-6 text-green" />
+                    Reports & Analytics
+                  </h2>
+                  <p className="text-xs text-text-secondary font-semibold mt-0.5">
+                    Premium business insights, tax tracking, and financial statements.
+                  </p>
+                </div>
+                
+                {/* Export controls */}
+                <div className="flex items-center gap-3 w-full sm:w-auto">
+                  <button 
+                    onClick={exportToExcel}
+                    className="flex-1 sm:flex-none flex items-center justify-center gap-2 px-4 py-2.5 bg-green hover:bg-green-dark text-white text-xs font-bold rounded-xl transition-all shadow-sm active:scale-98 cursor-pointer"
+                  >
+                    <FileSpreadsheet className="h-4.5 w-4.5" />
+                    Export Excel
+                  </button>
+                  <button 
+                    onClick={exportToCSV}
+                    className="flex-1 sm:flex-none flex items-center justify-center gap-2 px-4 py-2.5 bg-navy hover:bg-[#1a2d3c] text-white text-xs font-bold rounded-xl transition-all shadow-sm active:scale-98 cursor-pointer"
+                  >
+                    <Download className="h-4.5 w-4.5" />
+                    Export CSV
+                  </button>
+                  <button 
+                    onClick={() => window.print()}
+                    className="flex-1 sm:flex-none flex items-center justify-center gap-2 px-4 py-2.5 bg-slate-100 hover:bg-slate-200 text-navy text-xs font-bold rounded-xl transition-all shadow-sm active:scale-98 cursor-pointer border border-navy/5"
+                  >
+                    <PrintIcon className="h-4.5 w-4.5" />
+                    Print / PDF
+                  </button>
+                </div>
+              </div>
+
+              {/* Date filtering options strip */}
+              <div className="flex flex-col sm:flex-row gap-4 items-center justify-between bg-white border border-navy/5 p-4 rounded-2xl shadow-sm print:hidden">
+                <div className="flex items-center gap-2 text-xs font-semibold text-text-secondary">
+                  <span className="w-2.5 h-2.5 rounded-full bg-green inline-block"></span>
+                  <span>Premium Active Period Filters</span>
+                </div>
+                
+                <div className="flex flex-wrap sm:flex-nowrap items-center gap-3">
+                  <div className="flex items-center gap-2">
+                    <span className="text-xs font-semibold text-text-secondary">From:</span>
+                    <input 
+                      type="date"
+                      value={reportStartDate}
+                      onChange={e => setReportStartDate(e.target.value)}
+                      className="px-3 py-2 text-xs rounded-xl border border-navy/10 bg-white text-navy font-semibold focus:outline-none focus:border-green cursor-pointer"
+                    />
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <span className="text-xs font-semibold text-text-secondary">To:</span>
+                    <input 
+                      type="date"
+                      value={reportEndDate}
+                      onChange={e => setReportEndDate(e.target.value)}
+                      className="px-3 py-2 text-xs rounded-xl border border-navy/10 bg-white text-navy font-semibold focus:outline-none focus:border-green cursor-pointer"
+                    />
+                  </div>
+                  {(reportStartDate || reportEndDate) && (
+                    <button 
+                      onClick={() => { setReportStartDate(''); setReportEndDate(''); }}
+                      className="text-xs text-red-500 font-bold hover:underline"
+                    >
+                      Clear
+                    </button>
+                  )}
+                </div>
+              </div>
+
+              {reportsLoading ? (
+                <div className="flex flex-col gap-8 py-12 items-center justify-center bg-white border border-navy/5 rounded-3xl min-h-[400px]">
+                  <div className="w-10 h-10 border-4 border-green/20 border-t-green rounded-full animate-spin"></div>
+                  <span className="text-xs font-bold text-text-secondary animate-pulse">Analyzing accounts ledger...</span>
+                </div>
+              ) : !reportsData ? (
+                <div className="glass-card p-12 text-center flex flex-col items-center justify-center gap-3 bg-white border border-navy/5 rounded-3xl min-h-[400px]">
+                  <BarChart3 className="h-10 w-10 text-text-secondary/40 animate-pulse" />
+                  <p className="text-xs font-bold text-text-secondary">Failed to retrieve reporting details.</p>
+                </div>
+              ) : (
+                <>
+                  {/* Financial Aggregates KPI cards */}
+                  <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6 text-left">
+                    {/* KPI 1: Total Invoiced */}
+                    <div className="glass-card p-6 rounded-3xl flex justify-between items-center bg-white border border-navy/5 hover:shadow-md transition-all">
+                      <div className="flex flex-col gap-1.5 font-semibold min-w-0">
+                        <span className="text-[10px] font-extrabold uppercase tracking-wider text-text-secondary">Total Billed</span>
+                        <span className="text-2xl font-black text-navy mt-1 truncate">
+                          {formatINR(reportsData.financials.totalInvoiced)}
+                        </span>
+                        <span className="text-[10px] text-text-secondary font-medium">Accumulated invoice amount</span>
+                      </div>
+                      <div className="p-3 bg-navy/5 text-navy rounded-2xl shrink-0">
+                        <FileText className="h-5 w-5 text-navy" />
+                      </div>
+                    </div>
+
+                    {/* KPI 2: Cash Collected */}
+                    <div className="glass-card p-6 rounded-3xl flex justify-between items-center bg-white border border-navy/5 hover:shadow-md transition-all">
+                      <div className="flex flex-col gap-1.5 font-semibold min-w-0">
+                        <span className="text-[10px] font-extrabold uppercase tracking-wider text-text-secondary">Cash Collected</span>
+                        <span className="text-2xl font-black text-green-dark mt-1 truncate">
+                          {formatINR(reportsData.financials.totalCollected)}
+                        </span>
+                        <span className="text-[10px] text-text-secondary font-medium">Received settlements</span>
+                      </div>
+                      <div className="p-3 bg-green/10 text-green rounded-2xl shrink-0">
+                        <DollarSign className="h-5 w-5 text-green" />
+                      </div>
+                    </div>
+
+                    {/* KPI 3: GST Tax liability */}
+                    <div className="glass-card p-6 rounded-3xl flex justify-between items-center bg-white border border-navy/5 hover:shadow-md transition-all">
+                      <div className="flex flex-col gap-1.5 font-semibold min-w-0">
+                        <span className="text-[10px] font-extrabold uppercase tracking-wider text-text-secondary">GST Collected</span>
+                        <span className="text-2xl font-black text-blue-600 mt-1 truncate">
+                          {formatINR(reportsData.financials.totalGstCollected)}
+                        </span>
+                        <span className="text-[10px] text-text-secondary font-medium">Accumulated GST tax</span>
+                      </div>
+                      <div className="p-3 bg-blue-500/10 text-blue-600 rounded-2xl shrink-0">
+                        <TrendingUp className="h-5 w-5 text-blue-600" />
+                      </div>
+                    </div>
+
+                    {/* KPI 4: TDS Deducted */}
+                    <div className="glass-card p-6 rounded-3xl flex justify-between items-center bg-white border border-navy/5 hover:shadow-md transition-all">
+                      <div className="flex flex-col gap-1.5 font-semibold min-w-0">
+                        <span className="text-[10px] font-extrabold uppercase tracking-wider text-text-secondary">TDS Deducted</span>
+                        <span className="text-2xl font-black text-amber-600 mt-1 truncate">
+                          {formatINR(reportsData.financials.totalTdsDeducted)}
+                        </span>
+                        <span className="text-[10px] text-text-secondary font-medium">Withheld taxes (TDS)</span>
+                      </div>
+                      <div className="p-3 bg-amber-500/10 text-amber-600 rounded-2xl shrink-0">
+                        <Clock className="h-5 w-5 text-amber-600" />
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Charts Grid */}
+                  <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 print:block print:space-y-8">
+                    
+                    {/* Chart 1: Monthly billing trend (Billed vs Collected) */}
+                    <div className="glass-card p-6 rounded-3xl bg-white border border-navy/5 hover:shadow-md transition-all">
+                      <h3 className="text-sm font-extrabold text-navy text-left mb-6">Monthly Billing Performance (INR)</h3>
+                      <div className="h-80 w-full select-none">
+                        <ResponsiveContainer width="100%" height="100%">
+                          <BarChart data={reportsData.billingTrend} margin={{ top: 10, right: 10, left: -10, bottom: 0 }}>
+                            <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#E2E8F0" />
+                            <XAxis dataKey="month" stroke="#5F6B76" fontSize={10} tickLine={false} axisLine={false} />
+                            <YAxis stroke="#5F6B76" fontSize={10} tickLine={false} axisLine={false} />
+                            <RechartsTooltip formatter={(value) => [`₹${value}`, 'Amount']} />
+                            <Legend wrapperStyle={{ fontSize: '11px', fontWeight: 'bold' }} />
+                            <Bar dataKey="billed" name="Billed Amount" fill="#0C4737" radius={[4, 4, 0, 0]} />
+                            <Bar dataKey="collected" name="Collected Amount" fill="#2F8F7A" radius={[4, 4, 0, 0]} />
+                          </BarChart>
+                        </ResponsiveContainer>
+                      </div>
+                    </div>
+
+                    {/* Chart 2: Tax Liability comparison (GST vs TDS) */}
+                    <div className="glass-card p-6 rounded-3xl bg-white border border-navy/5 hover:shadow-md transition-all">
+                      <h3 className="text-sm font-extrabold text-navy text-left mb-6">Tax Liability Breakdown (GST & TDS)</h3>
+                      <div className="h-80 w-full select-none">
+                        <ResponsiveContainer width="100%" height="100%">
+                          <AreaChart data={reportsData.taxTrend} margin={{ top: 10, right: 10, left: -10, bottom: 0 }}>
+                            <defs>
+                              <linearGradient id="colorGst" x1="0" y1="0" x2="0" y2="1">
+                                <stop offset="5%" stopColor="#3B82F6" stopOpacity={0.2}/>
+                                <stop offset="95%" stopColor="#3B82F6" stopOpacity={0}/>
+                              </linearGradient>
+                              <linearGradient id="colorTds" x1="0" y1="0" x2="0" y2="1">
+                                <stop offset="5%" stopColor="#D97706" stopOpacity={0.2}/>
+                                <stop offset="95%" stopColor="#D97706" stopOpacity={0}/>
+                              </linearGradient>
+                            </defs>
+                            <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#E2E8F0" />
+                            <XAxis dataKey="month" stroke="#5F6B76" fontSize={10} tickLine={false} axisLine={false} />
+                            <YAxis stroke="#5F6B76" fontSize={10} tickLine={false} axisLine={false} />
+                            <RechartsTooltip formatter={(value) => [`₹${value}`, 'Amount']} />
+                            <Legend wrapperStyle={{ fontSize: '11px', fontWeight: 'bold' }} />
+                            <Area type="monotone" dataKey="gst" name="GST Liability" stroke="#3B82F6" strokeWidth={2} fillOpacity={1} fill="url(#colorGst)" />
+                            <Area type="monotone" dataKey="tds" name="TDS Deductions" stroke="#D97706" strokeWidth={2} fillOpacity={1} fill="url(#colorTds)" />
+                          </AreaChart>
+                        </ResponsiveContainer>
+                      </div>
+                    </div>
+
+                  </div>
+
+                  {/* Overdue Aging List Panel */}
+                  <div className="glass-card p-6 rounded-3xl bg-white border border-navy/5 hover:shadow-md transition-all">
+                    <div className="flex justify-between items-center mb-6">
+                      <div className="text-left">
+                        <h3 className="text-sm font-extrabold text-navy">Overdue Invoices Aging Register</h3>
+                        <p className="text-[10px] text-text-secondary mt-0.5">Oldest overdue invoices needing recovery tracking</p>
+                      </div>
+                      <span className="px-2.5 py-1 bg-red-500/10 text-red-500 rounded-full text-[10px] font-extrabold uppercase">
+                        {reportsData.overdueAging?.length || 0} Critical Overdue
+                      </span>
+                    </div>
+
+                    <div className="overflow-x-auto">
+                      <table className="w-full text-left text-xs border-collapse">
+                        <thead>
+                          <tr className="border-b border-navy/5 text-text-secondary uppercase text-[10px] tracking-wider font-extrabold bg-[#F8FAFC]">
+                            <th className="py-3 px-4">Invoice #</th>
+                            <th className="py-3 px-4">Client Name</th>
+                            <th className="py-3 px-4">Due Date</th>
+                            <th className="py-3 px-4 text-center">Overdue Days</th>
+                            <th className="py-3 px-4 text-right">Outstanding Amount</th>
+                          </tr>
+                        </thead>
+                        <tbody className="divide-y divide-navy/5 text-navy font-semibold">
+                          {!reportsData.overdueAging || reportsData.overdueAging.length === 0 ? (
+                            <tr>
+                              <td colSpan={5} className="py-8 text-center text-text-secondary font-bold">
+                                No overdue aging records. Excellent collection efficiency!
+                              </td>
+                            </tr>
+                          ) : (
+                            reportsData.overdueAging.map((inv: any) => (
+                              <tr key={inv._id} className="hover:bg-red-500/[0.02]">
+                                <td className="py-3 px-4 font-mono font-bold text-red-500">{inv.number}</td>
+                                <td className="py-3 px-4 font-extrabold">{inv.clientName}</td>
+                                <td className="py-3 px-4 text-text-secondary">
+                                  {new Date(inv.dueDate).toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric' })}
+                                </td>
+                                <td className="py-3 px-4 text-center">
+                                  <span className="px-2.5 py-0.5 bg-red-500/10 text-red-500 border border-red-500/20 rounded-full font-extrabold text-[10px]">
+                                    {inv.overdueDays} Days
+                                  </span>
+                                </td>
+                                <td className="py-3 px-4 text-right font-extrabold text-red-500">
+                                  {formatINR(inv.amountDue)}
+                                </td>
+                              </tr>
+                            ))
+                          )}
+                        </tbody>
+                      </table>
+                    </div>
+                  </div>
+                </>
+              )}
+
+            </div>
+          ) : activeTab === 'settings' || activeTab === 'profile' ? (
+            <BusinessSettings />
           ) : null}
 
         </main>
@@ -2193,28 +2609,41 @@ export const DashboardStub: React.FC = () => {
                   <span className="text-green font-bold">✓</span> GST/Tax ready report exports
                 </li>
                 <li className="flex items-center gap-2">
-                  <span className="text-green font-bold">✓</span> Dynamic Profit & Loss statements
+                  <span className="text-green font-bold">✓</span> Profit & Loss statement breakdowns
                 </li>
                 <li className="flex items-center gap-2">
-                  <span className="text-green font-bold">✓</span> Multi-currency invoicing charts
+                  <span className="text-green font-bold">✓</span> Dynamic monthly billing charts
                 </li>
                 <li className="flex items-center gap-2">
-                  <span className="text-green font-bold">✓</span> Automatic CSV & PDF invoice backups
+                  <span className="text-green font-bold">✓</span> Export to CSV & Microsoft Excel format
                 </li>
               </ul>
             </div>
             <div className="flex flex-col gap-2.5 pt-3">
               <Button
                 variant="primary"
-                onClick={() => setIsReportsModalOpen(false)}
+                onClick={() => {
+                  setIsReportsModalOpen(false);
+                  setIsUpgradeModalOpen(true);
+                }}
                 className="w-full py-3 text-xs font-bold shadow-md"
               >
-                Close Preview
+                Upgrade to Unlock
               </Button>
             </div>
           </div>
         </div>
       )}
+
+      {/* 4. Pro Upgrade Checkout Modal */}
+      <UpgradeModal 
+        isOpen={isUpgradeModalOpen} 
+        onClose={() => setIsUpgradeModalOpen(false)} 
+        onSuccess={() => {
+          setSuccessMsg("Congratulations! You have successfully upgraded to the Pro plan.");
+          addNotification('system', 'Subscription Upgraded', 'Your business is now on the Professional Plan!');
+        }}
+      />
 
     </div>
   );

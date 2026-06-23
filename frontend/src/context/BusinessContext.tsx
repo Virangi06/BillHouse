@@ -40,6 +40,10 @@ export interface BusinessProfile {
   // Notification config
   remindersEnabled?: boolean;
   remindersIntervals?: number[];
+  // Pro subscription details
+  isPro?: boolean;
+  subscriptionPlan?: 'monthly' | 'annual' | 'none';
+  subscriptionExpiresAt?: string;
 }
 
 interface BusinessContextType {

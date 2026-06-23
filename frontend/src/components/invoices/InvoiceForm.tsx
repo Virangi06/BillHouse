@@ -10,9 +10,6 @@ import {
   Plus, 
   Trash2, 
   UserPlus, 
-  Save,
-  Send,
-  Search,
   AlertCircle
 } from 'lucide-react';
 
@@ -44,8 +41,6 @@ export const InvoiceForm: React.FC<InvoiceFormProps> = ({ onAddNotification }) =
   const action = searchParams.get('action'); // 'create' or 'edit'
 
   const [clients, setClients] = useState<Client[]>([]);
-  const [clientSearch, setClientSearch] = useState<string>('');
-  const [loadingClients, setLoadingClients] = useState<boolean>(false);
   const [savingInvoice, setSavingInvoice] = useState<boolean>(false);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
 
@@ -97,14 +92,11 @@ export const InvoiceForm: React.FC<InvoiceFormProps> = ({ onAddNotification }) =
   // Fetch all clients
   const fetchClients = async () => {
     try {
-      setLoadingClients(true);
       const res = await API.get<Client[]>('/clients');
       setClients(res.data);
     } catch (err: any) {
       console.error(err);
       setErrorMsg('Failed to load client directory');
-    } finally {
-      setLoadingClients(false);
     }
   };
 
@@ -213,12 +205,6 @@ export const InvoiceForm: React.FC<InvoiceFormProps> = ({ onAddNotification }) =
     ? Math.round(subtotal * (discountValue / 100))
     : discountValue;
   const totalAmount = Math.max(0, subtotal + gstTotal - discountAmount);
-
-  // Filter clients
-  const filteredClients = clients.filter(c => 
-    c.name.toLowerCase().includes(clientSearch.toLowerCase()) ||
-    c.email.toLowerCase().includes(clientSearch.toLowerCase())
-  );
 
   const selectedClient = clients.find(c => c._id === selectedClientId);
 

@@ -270,6 +270,163 @@ export class DashboardService {
       .slice(0, 5)
       .map(({ type, message, meta, time, color }) => ({ type, message, meta, time, color }));
   }
+
+  // Method to fetch reports and analytics metrics for Pro users
+  static async getReportsAnalytics(tenantId: string, startDate?: string, endDate?: string) {
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+
+    const query: any = { tenantId, status: { $ne: 'Cancelled' } };
+    if (startDate || endDate) {
+      query.date = {};
+      if (startDate) query.date.$gte = new Date(startDate);
+      if (endDate) query.date.$lte = new Date(endDate);
+    }
+
+    // Fetch all active invoices (excluding Cancelled)
+    const invoices = await Invoice.find(query);
+
+    // 1. Core aggregates
+    let totalInvoiced = 0;
+    let totalCollected = 0;
+    let totalOutstanding = 0;
+    let totalGstCollected = 0;
+    let totalTdsDeducted = 0;
+
+    invoices.forEach(inv => {
+      totalInvoiced += inv.totalAmount || 0;
+      totalCollected += inv.amountPaid || 0;
+      totalOutstanding += inv.amountDue || 0;
+      totalGstCollected += inv.gstAmount || 0;
+      totalTdsDeducted += inv.tdsAmount || 0;
+    });
+
+    // Rounding sums
+    totalInvoiced = Math.round(totalInvoiced * 100) / 100;
+    totalCollected = Math.round(totalCollected * 100) / 100;
+    totalOutstanding = Math.round(totalOutstanding * 100) / 100;
+    totalGstCollected = Math.round(totalGstCollected * 100) / 100;
+    totalTdsDeducted = Math.round(totalTdsDeducted * 100) / 100;
+
+    // 2. Compute billing performance & tax breakdown
+    // Generate month ranges between startDate and endDate or default to past 6 months
+    let startD = new Date(today.getFullYear(), today.getMonth() - 5, 1);
+    if (startDate) {
+      startD = new Date(startDate);
+      startD.setDate(1);
+    }
+    
+    let endD = new Date(today);
+    if (endDate) {
+      endD = new Date(endDate);
+    }
+
+    const diffMonths = (endD.getFullYear() - startD.getFullYear()) * 12 + (endD.getMonth() - startD.getMonth()) + 1;
+    const count = Math.min(Math.max(1, diffMonths), 24);
+
+    const monthlyBilling: any[] = [];
+    const monthlyTax: any[] = [];
+    for (let i = 0; i < count; i++) {
+      const d = new Date(startD.getFullYear(), startD.getMonth() + i, 1);
+      const monthLabel = d.toLocaleDateString('en-IN', { month: 'short', year: '2-digit' });
+      
+      monthlyBilling.push({
+        month: monthLabel,
+        billed: 0,
+        collected: 0,
+        year: d.getFullYear(),
+        monthNum: d.getMonth()
+      });
+
+      monthlyTax.push({
+        month: monthLabel,
+        gst: 0,
+        tds: 0,
+        year: d.getFullYear(),
+        monthNum: d.getMonth()
+      });
+    }
+
+    invoices.forEach(inv => {
+      const invDate = new Date(inv.date);
+      const idx = monthlyBilling.findIndex(m => m.year === invDate.getFullYear() && m.monthNum === invDate.getMonth());
+      if (idx !== -1) {
+        monthlyBilling[idx].billed += inv.totalAmount || 0;
+        monthlyBilling[idx].collected += inv.amountPaid || 0;
+        monthlyTax[idx].gst += inv.gstAmount || 0;
+        monthlyTax[idx].tds += inv.tdsAmount || 0;
+      }
+    });
+
+    // Clean monthNum/year tags before returning
+    const billingTrend = monthlyBilling.map(({ month, billed, collected }) => ({
+      month,
+      billed: Math.round(billed),
+      collected: Math.round(collected)
+    }));
+
+    const taxTrend = monthlyTax.map(({ month, gst, tds }) => ({
+      month,
+      gst: Math.round(gst),
+      tds: Math.round(tds)
+    }));
+
+    // 3. Outstanding overdue aging list
+    const overdueQuery: any = { tenantId, status: 'Overdue' };
+    if (startDate || endDate) {
+      overdueQuery.dueDate = {};
+      if (startDate) overdueQuery.dueDate.$gte = new Date(startDate);
+      if (endDate) overdueQuery.dueDate.$lte = new Date(endDate);
+    }
+    const overdueInvoices = await Invoice.find(overdueQuery)
+      .sort({ dueDate: 1 }) // oldest first
+      .select('number clientName totalAmount amountDue dueDate');
+
+    const overdueAging = overdueInvoices.map(inv => {
+      const dueDate = new Date(inv.dueDate);
+      const diffTime = today.getTime() - dueDate.getTime();
+      const overdueDays = Math.max(0, Math.round(diffTime / (1000 * 60 * 60 * 24)));
+      return {
+        _id: inv._id,
+        number: inv.number,
+        clientName: inv.clientName,
+        totalAmount: inv.totalAmount,
+        amountDue: inv.amountDue,
+        dueDate: inv.dueDate,
+        overdueDays
+      };
+    });
+
+    // 4. Status distribution for analytics
+    const statusCounts = { Paid: 0, Sent: 0, Viewed: 0, Overdue: 0, Draft: 0 };
+    invoices.forEach(inv => {
+      if (inv.status in statusCounts) {
+        statusCounts[inv.status as keyof typeof statusCounts]++;
+      }
+    });
+    const statusDistribution = [
+      { name: 'Paid', value: statusCounts.Paid, color: '#2F8F7A' },
+      { name: 'Sent', value: statusCounts.Sent, color: '#0C4737' },
+      { name: 'Viewed', value: statusCounts.Viewed, color: '#BEE8D8' },
+      { name: 'Overdue', value: statusCounts.Overdue, color: '#E76F51' },
+      { name: 'Draft', value: statusCounts.Draft, color: '#5F6B76' }
+    ];
+
+    return {
+      financials: {
+        totalInvoiced,
+        totalCollected,
+        totalOutstanding,
+        totalGstCollected,
+        totalTdsDeducted,
+        invoiceCount: invoices.length
+      },
+      billingTrend,
+      taxTrend,
+      overdueAging,
+      statusDistribution
+    };
+  }
 }
 
 function formatTimeAgo(dateInput: any) {

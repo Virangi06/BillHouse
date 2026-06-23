@@ -37,6 +37,10 @@ export interface IBusiness extends Document {
   bankAccount?: string;
   bankIfsc?: string;
   bankUpi?: string;
+  // Pro Subscription Tier
+  isPro?: boolean;
+  subscriptionPlan?: 'monthly' | 'annual' | 'none';
+  subscriptionExpiresAt?: Date;
   // Timestamps
   createdAt: Date;
   updatedAt: Date;
@@ -83,7 +87,11 @@ const BusinessSchema: Schema = new Schema(
     bankName: { type: String, trim: true },
     bankAccount: { type: String, trim: true },
     bankIfsc: { type: String, trim: true, uppercase: true },
-    bankUpi: { type: String, trim: true }
+    bankUpi: { type: String, trim: true },
+    // Pro Subscription Tier
+    isPro: { type: Boolean, default: false },
+    subscriptionPlan: { type: String, enum: ['monthly', 'annual', 'none'], default: 'none' },
+    subscriptionExpiresAt: { type: Date }
   },
   {
     timestamps: true

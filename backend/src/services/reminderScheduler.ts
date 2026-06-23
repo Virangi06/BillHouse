@@ -31,8 +31,8 @@ export async function runDailyReminders(): Promise<void> {
         continue;
       }
 
-      // Check if reminders are enabled (default to true)
-      const remindersEnabled = business.remindersEnabled !== false;
+      // Check if reminders are enabled and business is a Pro subscriber
+      const remindersEnabled = business.remindersEnabled !== false && business.isPro === true;
       if (!remindersEnabled) {
         continue;
       }

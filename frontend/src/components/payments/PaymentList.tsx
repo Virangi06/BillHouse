@@ -8,13 +8,9 @@ import {
   Search, 
   Plus, 
   Trash2, 
-  Printer, 
   Clock, 
   CheckCircle2, 
-  AlertCircle, 
-  DollarSign, 
-  Calendar,
-  Filter
+  DollarSign
 } from 'lucide-react';
 
 interface PaymentData {
@@ -40,7 +36,6 @@ export const PaymentList: React.FC = () => {
   const { businessProfile } = useBusinessProfile();
   const [payments, setPayments] = useState<PaymentData[]>([]);
   const [invoices, setInvoices] = useState<any[]>([]);
-  const [clients, setClients] = useState<any[]>([]);
   const [loading, setLoading] = useState<boolean>(true);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
   
@@ -66,15 +61,13 @@ export const PaymentList: React.FC = () => {
       setLoading(true);
       setErrorMsg(null);
       
-      const [paymentsRes, invoicesRes, clientsRes] = await Promise.all([
+      const [paymentsRes, invoicesRes] = await Promise.all([
         API.get('/payments'),
-        API.get('/invoices'),
-        API.get('/clients')
+        API.get('/invoices')
       ]);
 
       setPayments(paymentsRes.data);
       setInvoices(invoicesRes.data);
-      setClients(clientsRes.data);
     } catch (err: any) {
       console.error('Failed to load payments history data:', err);
       setErrorMsg(err.response?.data?.error || 'Failed to retrieve payments history list');

@@ -18,7 +18,6 @@ import {
   XCircle,
   FileText,
   Building,
-  User,
   Send,
   DollarSign
 } from 'lucide-react';
@@ -58,6 +57,7 @@ interface InvoiceDetailData {
   createdAt?: string;
   sentAt?: string;
   paidAt?: string;
+  remindersSent?: Array<{ sentAt: string; type: string }>;
 }
 
 interface ClientDetail {
@@ -465,18 +465,6 @@ export const InvoiceDetail: React.FC<{
         })}
       </div>
     );
-  };
-
-  const getStatusBarColor = (status: string) => {
-    switch (status) {
-      case 'Paid': return 'border-l-[6px] md:border-l-[8px] border-green';
-      case 'Sent': return 'border-l-[6px] md:border-l-[8px] border-amber-500';
-      case 'Viewed': return 'border-l-[6px] md:border-l-[8px] border-blue-500';
-      case 'Partially Paid': return 'border-l-[6px] md:border-l-[8px] border-indigo-500';
-      case 'Overdue': return 'border-l-[6px] md:border-l-[8px] border-rose-500';
-      case 'Cancelled': return 'border-l-[6px] md:border-l-[8px] border-gray-400';
-      default: return 'border-l-[6px] md:border-l-[8px] border-navy/30';
-    }
   };
 
   const renderStatusTimeline = () => {
