@@ -42,6 +42,7 @@ export const InvoiceList: React.FC<InvoiceListProps> = ({ onAddNotification }) =
   const [, setSearchParams] = useSearchParams();
   const [invoices, setInvoices] = useState<InvoiceData[]>([]);
   const [loading, setLoading] = useState<boolean>(true);
+  const [actionLoading, setActionLoading] = useState<boolean>(false);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
   const [messageBox, setMessageBox] = useState<{ title: string; message: string; isOpen: boolean }>({
     title: '',
@@ -61,8 +62,9 @@ export const InvoiceList: React.FC<InvoiceListProps> = ({ onAddNotification }) =
   const [sortField, setSortField] = useState<'date' | 'totalAmount' | 'dueDate'>('date');
   const [sortOrder, setSortOrder] = useState<'asc' | 'desc'>('desc');
 
-  // Dropdown actions menu state
+  // Dropdown actions menu — track which row is open + its screen coords
   const [activeDropdownId, setActiveDropdownId] = useState<string | null>(null);
+  const [dropdownPos, setDropdownPos] = useState<{ top: number; right: number } | null>(null);
   
   // Fetch clients for dropdown options
   const fetchClients = async () => {
@@ -107,11 +109,15 @@ export const InvoiceList: React.FC<InvoiceListProps> = ({ onAddNotification }) =
     fetchInvoices();
   }, [statusFilter, searchQuery, clientFilter, startDate, endDate]);
 
-  // Close dropdown on screen resize
+  // Close dropdown on screen resize or scroll
   useEffect(() => {
-    const handleResize = () => setActiveDropdownId(null);
-    window.addEventListener('resize', handleResize);
-    return () => window.removeEventListener('resize', handleResize);
+    const closeDropdown = () => { setActiveDropdownId(null); setDropdownPos(null); };
+    window.addEventListener('resize', closeDropdown);
+    window.addEventListener('scroll', closeDropdown, true);
+    return () => {
+      window.removeEventListener('resize', closeDropdown);
+      window.removeEventListener('scroll', closeDropdown, true);
+    };
   }, []);
 
   const handleSort = (field: 'date' | 'totalAmount' | 'dueDate') => {
@@ -140,14 +146,14 @@ export const InvoiceList: React.FC<InvoiceListProps> = ({ onAddNotification }) =
     return 0;
   });
 
-  const handleDelete = async (id: string, e: React.MouseEvent) => {
-    e.stopPropagation();
+  const handleDelete = async (id: string) => {
     if (!window.confirm('Are you sure you want to delete this invoice? This action cannot be undone.')) {
       return;
     }
 
     const targetInvoice = invoices.find(inv => inv._id === id);
     try {
+      setActionLoading(true);
       await API.delete(`/invoices/${id}`);
       setInvoices(prev => prev.filter(inv => inv._id !== id));
       if (onAddNotification && targetInvoice) {
@@ -155,12 +161,14 @@ export const InvoiceList: React.FC<InvoiceListProps> = ({ onAddNotification }) =
       }
     } catch (err: any) {
       alert(err.response?.data?.error || 'Failed to delete invoice');
+    } finally {
+      setActionLoading(false);
     }
   };
 
   const handleSendEmail = async (id: string, number: string) => {
     try {
-      setLoading(true);
+      setActionLoading(true);
       setErrorMsg(null);
       const res = await API.post(`/invoices/${id}/send`);
       setMessageBox({
@@ -175,13 +183,13 @@ export const InvoiceList: React.FC<InvoiceListProps> = ({ onAddNotification }) =
     } catch (err: any) {
       setErrorMsg(err.response?.data?.error || 'Failed to send invoice email.');
     } finally {
-      setLoading(false);
+      setActionLoading(false);
     }
   };
 
   const handleSendReminder = async (id: string, number: string) => {
     try {
-      setLoading(true);
+      setActionLoading(true);
       setErrorMsg(null);
       const res = await API.post(`/invoices/${id}/reminder`);
       setMessageBox({
@@ -189,13 +197,14 @@ export const InvoiceList: React.FC<InvoiceListProps> = ({ onAddNotification }) =
         message: res.data.message || `Payment reminder for Invoice ${number} sent successfully.`,
         isOpen: true
       });
+      fetchInvoices();
       if (onAddNotification) {
         onAddNotification('invoice', 'Reminder Dispatched', `Payment reminder for ${number} sent to client.`);
       }
     } catch (err: any) {
       setErrorMsg(err.response?.data?.error || 'Failed to send payment reminder.');
     } finally {
-      setLoading(false);
+      setActionLoading(false);
     }
   };
 
@@ -619,103 +628,29 @@ export const InvoiceList: React.FC<InvoiceListProps> = ({ onAddNotification }) =
                       </div>
                     </td>
 
-                    <td className="py-4.5 px-6 text-right relative" onClick={(e) => e.stopPropagation()}>
+                    <td className="py-4.5 px-6 text-right" onClick={(e) => e.stopPropagation()}>
                       <div className="flex items-center justify-end">
                         <button
-                          onClick={() => setActiveDropdownId(activeDropdownId === inv._id ? null : inv._id)}
-                          className="inline-flex items-center gap-1 px-3 py-1.5 bg-navy/5 border border-navy/10 hover:bg-navy/10 rounded-xl text-xs font-bold text-navy transition-all"
+                          disabled={actionLoading}
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            if (activeDropdownId === inv._id) {
+                              setActiveDropdownId(null);
+                              setDropdownPos(null);
+                            } else {
+                              const rect = (e.currentTarget as HTMLElement).getBoundingClientRect();
+                              setDropdownPos({
+                                top: rect.bottom + window.scrollY + 6,
+                                right: window.innerWidth - rect.right
+                              });
+                              setActiveDropdownId(inv._id);
+                            }
+                          }}
+                          className="inline-flex items-center gap-1 px-3 py-1.5 bg-navy/5 border border-navy/10 hover:bg-navy/10 rounded-xl text-xs font-bold text-navy transition-all disabled:opacity-50"
                         >
-                          <span>Actions</span>
+                          <span>{actionLoading && activeDropdownId === inv._id ? '...' : 'Actions'}</span>
                           <span className="text-[10px] opacity-60">▼</span>
                         </button>
-
-                        {activeDropdownId === inv._id && (
-                          <>
-                            {/* Click-outside backdrop */}
-                            <div 
-                              className="fixed inset-0 z-20 cursor-default"
-                              onClick={() => setActiveDropdownId(null)}
-                            />
-                            {/* Dropdown Menu */}
-                            <div className="absolute right-6 top-12 w-44 bg-white border border-navy/10 rounded-xl shadow-xl py-1.5 z-30 animate-scale-up text-left flex flex-col gap-0.5">
-                              <button
-                                onClick={() => {
-                                  setActiveDropdownId(null);
-                                  navigateToDetail(inv._id);
-                                }}
-                                className="flex items-center gap-2 px-3.5 py-2 text-xs font-bold text-navy hover:bg-navy/5 transition-colors w-full"
-                              >
-                                <Eye className="h-4 w-4 opacity-70" />
-                                View Details
-                              </button>
-                              
-                              {inv.status === 'Draft' && (
-                                <button
-                                  onClick={(e) => {
-                                    setActiveDropdownId(null);
-                                    navigateToEdit(inv._id, e);
-                                  }}
-                                  className="flex items-center gap-2 px-3.5 py-2 text-xs font-bold text-navy hover:bg-navy/5 transition-colors w-full"
-                                >
-                                  <Edit2 className="h-4 w-4 opacity-70" />
-                                  Edit Draft
-                                </button>
-                              )}
-
-                              {inv.status !== 'Cancelled' && (
-                                <button
-                                  onClick={() => {
-                                    setActiveDropdownId(null);
-                                    handleSendEmail(inv._id, inv.number);
-                                  }}
-                                  className="flex items-center gap-2 px-3.5 py-2 text-xs font-bold text-navy hover:bg-navy/5 transition-colors w-full"
-                                >
-                                  <Send className="h-4 w-4 opacity-70" />
-                                  Send Email
-                                </button>
-                              )}
-
-                              {inv.status !== 'Paid' && inv.status !== 'Cancelled' && (
-                                <button
-                                  onClick={() => {
-                                    setActiveDropdownId(null);
-                                    setPaymentInvoice(inv);
-                                  }}
-                                  className="flex items-center gap-2 px-3.5 py-2 text-xs font-bold text-navy hover:bg-navy/5 transition-colors w-full"
-                                >
-                                  <DollarSign className="h-4 w-4 opacity-70" />
-                                  Record Payment
-                                </button>
-                              )}
-
-                              {['Sent', 'Viewed', 'Partially Paid', 'Overdue'].includes(inv.status) && (
-                                <button
-                                  onClick={() => {
-                                    setActiveDropdownId(null);
-                                    handleSendReminder(inv._id, inv.number);
-                                  }}
-                                  className="flex items-center gap-2 px-3.5 py-2 text-xs font-bold text-navy hover:bg-navy/5 transition-colors w-full"
-                                >
-                                  <Clock className="h-4 w-4 opacity-70" />
-                                  Send Reminder
-                                </button>
-                              )}
-
-                              {inv.status !== 'Paid' && (
-                                <button
-                                  onClick={(e) => {
-                                    setActiveDropdownId(null);
-                                    handleDelete(inv._id, e);
-                                  }}
-                                  className="flex items-center gap-2 px-3.5 py-2 text-xs font-bold text-red-500 hover:bg-red-500/5 transition-colors w-full"
-                                >
-                                  <Trash2 className="h-4 w-4 text-red-500 opacity-70" />
-                                  Delete Invoice
-                                </button>
-                              )}
-                            </div>
-                          </>
-                        )}
                       </div>
                     </td>
                   </tr>
@@ -725,6 +660,77 @@ export const InvoiceList: React.FC<InvoiceListProps> = ({ onAddNotification }) =
           </div>
         )}
       </GlassCard>
+
+      {/* ---- Fixed-position Action Dropdown (portal, escapes table overflow) ---- */}
+      {activeDropdownId && dropdownPos && (() => {
+        const inv = invoices.find(i => i._id === activeDropdownId);
+        if (!inv) return null;
+        return (
+          <>
+            {/* Invisible backdrop to close on outside click */}
+            <div
+              className="fixed inset-0 z-[9998]"
+              onClick={() => { setActiveDropdownId(null); setDropdownPos(null); }}
+            />
+            <div
+              style={{ position: 'fixed', top: dropdownPos.top, right: dropdownPos.right, zIndex: 9999 }}
+              className="w-48 bg-white border border-navy/10 rounded-xl shadow-2xl py-1.5 flex flex-col gap-0.5"
+            >
+              <button
+                onClick={() => { setActiveDropdownId(null); setDropdownPos(null); navigateToDetail(inv._id); }}
+                className="flex items-center gap-2 px-3.5 py-2 text-xs font-bold text-navy hover:bg-navy/5 transition-colors w-full text-left"
+              >
+                <Eye className="h-4 w-4 opacity-70" /> View Details
+              </button>
+
+              {inv.status === 'Draft' && (
+                <button
+                  onClick={(e) => { setActiveDropdownId(null); setDropdownPos(null); navigateToEdit(inv._id, e); }}
+                  className="flex items-center gap-2 px-3.5 py-2 text-xs font-bold text-navy hover:bg-navy/5 transition-colors w-full text-left"
+                >
+                  <Edit2 className="h-4 w-4 opacity-70" /> Edit Draft
+                </button>
+              )}
+
+              {inv.status !== 'Cancelled' && (
+                <button
+                  onClick={() => { setActiveDropdownId(null); setDropdownPos(null); handleSendEmail(inv._id, inv.number); }}
+                  className="flex items-center gap-2 px-3.5 py-2 text-xs font-bold text-navy hover:bg-navy/5 transition-colors w-full text-left"
+                >
+                  <Send className="h-4 w-4 opacity-70" /> Send Email
+                </button>
+              )}
+
+              {inv.status !== 'Paid' && inv.status !== 'Cancelled' && (
+                <button
+                  onClick={() => { setActiveDropdownId(null); setDropdownPos(null); setPaymentInvoice(inv); }}
+                  className="flex items-center gap-2 px-3.5 py-2 text-xs font-bold text-navy hover:bg-navy/5 transition-colors w-full text-left"
+                >
+                  <DollarSign className="h-4 w-4 opacity-70" /> Record Payment
+                </button>
+              )}
+
+              {['Sent', 'Viewed', 'Partially Paid', 'Overdue'].includes(inv.status) && (
+                <button
+                  onClick={() => { setActiveDropdownId(null); setDropdownPos(null); handleSendReminder(inv._id, inv.number); }}
+                  className="flex items-center gap-2 px-3.5 py-2 text-xs font-bold text-navy hover:bg-navy/5 transition-colors w-full text-left"
+                >
+                  <Clock className="h-4 w-4 opacity-70" /> Send Reminder
+                </button>
+              )}
+
+              {inv.status !== 'Paid' && (
+                <button
+                  onClick={() => { setActiveDropdownId(null); setDropdownPos(null); handleDelete(inv._id); }}
+                  className="flex items-center gap-2 px-3.5 py-2 text-xs font-bold text-red-500 hover:bg-red-500/5 transition-colors w-full text-left"
+                >
+                  <Trash2 className="h-4 w-4 text-red-500 opacity-70" /> Delete Invoice
+                </button>
+              )}
+            </div>
+          </>
+        );
+      })()}
 
       <RecordPaymentModal
         isOpen={paymentInvoice !== null}
