@@ -14,6 +14,7 @@ import { authMiddleware } from './middleware/authMiddleware';
 import dns from 'dns';
 import cron from 'node-cron';
 import Invoice from './models/Invoice';
+import { runDailyReminders } from './services/reminderScheduler';
 
 // Fix for DNS SRV resolution issues on certain ISPs (like Jio/Airtel in India)
 // by setting the DNS servers to Google and Cloudflare DNS.
@@ -102,6 +103,9 @@ const startServer = () => {
           }
         );
         console.log(`✅ Daily Overdue check completed: marked ${result.modifiedCount} invoices as Overdue.`);
+
+        // Run automated payment reminders scan
+        await runDailyReminders();
       } catch (err) {
         console.error('❌ Error in daily Overdue cron schedule:', err);
       }
@@ -123,6 +127,9 @@ const startServer = () => {
           }
         );
         console.log(`✅ Startup Overdue check completed: marked ${result.modifiedCount} invoices as Overdue.`);
+
+        // Run automated payment reminders scan on boot
+        await runDailyReminders();
       } catch (err) {
         console.error('❌ Error in startup Overdue check:', err);
       }

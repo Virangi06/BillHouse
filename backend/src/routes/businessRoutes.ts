@@ -77,6 +77,7 @@ router.post('/', async (req: AuthRequest, res: Response) => {
       gstNumber, panNumber, taxRegistrationNumber,
       logoBase64, bannerBase64,
       invoicePrefix, invoiceNextNumber, currency, timeZone, invoiceNumberFormat,
+      remindersEnabled, remindersIntervals,
       bankName, bankAccount, bankIfsc, bankUpi
     } = req.body;
 
@@ -120,6 +121,8 @@ router.post('/', async (req: AuthRequest, res: Response) => {
       currency: currency || 'INR',
       timeZone: timeZone || 'Asia/Kolkata',
       invoiceNumberFormat: invoiceNumberFormat || '{prefix}-{number}',
+      remindersEnabled: remindersEnabled !== undefined ? remindersEnabled : true,
+      remindersIntervals: remindersIntervals || [7, 14, 30],
       bankName: bankName?.trim(),
       bankAccount: bankAccount?.trim(),
       bankIfsc: bankIfsc?.trim().toUpperCase(),
@@ -157,6 +160,7 @@ router.put('/', async (req: AuthRequest, res: Response) => {
       gstNumber, panNumber, taxRegistrationNumber,
       logoBase64, bannerBase64,
       invoicePrefix, invoiceNextNumber, currency, timeZone, invoiceNumberFormat,
+      remindersEnabled, remindersIntervals,
       bankName, bankAccount, bankIfsc, bankUpi
     } = req.body;
 
@@ -192,6 +196,8 @@ router.put('/', async (req: AuthRequest, res: Response) => {
     if (currency !== undefined) business.currency = currency;
     if (timeZone !== undefined) business.timeZone = timeZone;
     if (invoiceNumberFormat !== undefined) business.invoiceNumberFormat = invoiceNumberFormat;
+    if (remindersEnabled !== undefined) business.remindersEnabled = remindersEnabled;
+    if (remindersIntervals !== undefined) business.remindersIntervals = remindersIntervals;
     if (bankName !== undefined) business.bankName = bankName.trim();
     if (bankAccount !== undefined) business.bankAccount = bankAccount.trim();
     if (bankIfsc !== undefined) business.bankIfsc = bankIfsc.trim().toUpperCase();

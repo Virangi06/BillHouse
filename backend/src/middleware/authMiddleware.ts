@@ -5,6 +5,7 @@ export interface AuthRequest extends Request {
   user?: {
     id: string;
     tenantId: string;
+    name: string;
   };
 }
 
@@ -19,7 +20,7 @@ export function authMiddleware(req: AuthRequest, res: Response, next: NextFuncti
 
   try {
     const secret = process.env.JWT_SECRET || 'billhouse_jwt_secret_dev_key_2026_modern_invoice';
-    const decoded = jwt.verify(token, secret) as { id: string; tenantId: string };
+    const decoded = jwt.verify(token, secret) as { id: string; tenantId: string; name: string };
     
     req.user = decoded;
     next();

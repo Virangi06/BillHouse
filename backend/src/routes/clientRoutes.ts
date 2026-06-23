@@ -3,6 +3,7 @@ import Client from '../models/Client';
 import Invoice from '../models/Invoice';
 import { AuthRequest } from '../middleware/authMiddleware';
 import mongoose from 'mongoose';
+import { logAudit, AuditActions } from '../services/auditService';
 
 const router = Router();
 
@@ -223,6 +224,16 @@ router.post('/', async (req: AuthRequest, res: Response) => {
 
     await client.save();
 
+    // Write audit log (fire-and-forget)
+    logAudit({
+      tenantId,
+      userId,
+      userName: req.user!.name || 'User',
+      action: AuditActions.CLIENT_CREATED,
+      details: `Added client ${name} (${email})`,
+      ipAddress: req.ip
+    });
+
     return res.status(201).json({
       message: 'Client created successfully',
       client
@@ -263,6 +274,18 @@ router.put('/:id', async (req: AuthRequest, res: Response) => {
 
     await client.save();
 
+    // Write audit log (fire-and-forget)
+    logAudit({
+      tenantId,
+      userId: req.user!.id,
+      userName: req.user!.name || 'User',
+      action: isArchived === false ? AuditActions.CLIENT_REACTIVATED : AuditActions.CLIENT_UPDATED,
+      details: isArchived === false
+        ? `Reactivated client ${client.name}`
+        : `Updated client ${client.name}`,
+      ipAddress: req.ip
+    });
+
     return res.status(200).json({
       message: 'Client updated successfully',
       client
@@ -292,6 +315,16 @@ router.delete('/:id', async (req: AuthRequest, res: Response) => {
     const { client } = access;
     client.isArchived = true;
     await client.save();
+
+    // Write audit log (fire-and-forget)
+    logAudit({
+      tenantId,
+      userId: req.user!.id,
+      userName: req.user!.name || 'User',
+      action: AuditActions.CLIENT_ARCHIVED,
+      details: `Archived client ${client.name} (${client.email})`,
+      ipAddress: req.ip
+    });
 
     return res.status(200).json({ message: 'Client archived successfully' });
   } catch (error) {

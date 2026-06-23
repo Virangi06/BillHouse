@@ -1,6 +1,7 @@
 import { Router, Response } from 'express';
 import { AuthRequest } from '../middleware/authMiddleware';
 import { DashboardService } from '../services/dashboardService';
+import AuditLog from '../models/AuditLog';
 
 const router = Router();
 
@@ -38,6 +39,37 @@ router.get('/stats', async (req: AuthRequest, res: Response) => {
   } catch (error) {
     console.error('❌ Dashboard stats error:', error);
     return res.status(500).json({ error: 'Server error retrieving dashboard statistics' });
+  }
+});
+
+// GET /api/dashboard/audit-logs
+// Returns the last 50 audit log entries for the tenant (newest first).
+// Optional query param: ?action=INVOICE_CREATED to filter by action type.
+router.get('/audit-logs', async (req: AuthRequest, res: Response) => {
+  try {
+    if (!req.user) {
+      return res.status(401).json({ error: 'Unauthorized' });
+    }
+
+    const { tenantId } = req.user;
+    const { action, limit } = req.query;
+
+    const query: any = { tenantId };
+    if (action && typeof action === 'string') {
+      query.action = action.toUpperCase();
+    }
+
+    const maxLimit = Math.min(parseInt(limit as string) || 50, 200);
+
+    const logs = await AuditLog.find(query)
+      .sort({ timestamp: -1 })
+      .limit(maxLimit)
+      .select('-__v');
+
+    return res.status(200).json({ logs, total: logs.length });
+  } catch (error) {
+    console.error('❌ Audit logs fetch error:', error);
+    return res.status(500).json({ error: 'Server error retrieving audit logs' });
   }
 });
 

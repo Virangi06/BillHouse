@@ -1,8 +1,12 @@
 import { Router, Response } from 'express';
 import Payment from '../models/Payment';
 import Invoice from '../models/Invoice';
+import Client from '../models/Client';
+import Business from '../models/Business';
 import { AuthRequest } from '../middleware/authMiddleware';
 import mongoose from 'mongoose';
+import { sendPaymentConfirmationEmail } from '../services/emailService';
+import { logAudit, AuditActions } from '../services/auditService';
 
 const router = Router();
 
@@ -92,6 +96,29 @@ router.post('/', async (req: AuthRequest, res: Response) => {
 
     await invoice.save();
 
+    // Send payment confirmation email to client (fire-and-forget, non-blocking)
+    Client.findById(invoice.client).then(async (clientObj) => {
+      if (!clientObj) return;
+      const businessObj = await Business.findOne({ tenantId });
+      sendPaymentConfirmationEmail(
+        clientObj.email,
+        clientObj.name,
+        invoice,
+        payment,
+        businessObj || { name: 'BillHouse Partner' }
+      ).catch((err: any) => console.error('❌ Payment confirmation email failed:', err));
+    }).catch((err: any) => console.error('❌ Could not fetch client for confirmation email:', err));
+
+    // Write audit log (fire-and-forget)
+    logAudit({
+      tenantId,
+      userId: req.user!.id,
+      userName: req.user!.name || 'User',
+      action: AuditActions.PAYMENT_RECORDED,
+      details: `Recorded ₹${parsedAmount} payment via ${method} for invoice ${invoice.number}${transactionId ? ` (Txn: ${transactionId})` : ''}`,
+      ipAddress: req.ip
+    });
+
     return res.status(201).json({
       message: 'Payment recorded successfully',
       payment,
@@ -180,6 +207,16 @@ router.delete('/:id', async (req: AuthRequest, res: Response) => {
 
     await invoice.save();
     await Payment.findByIdAndDelete(id);
+
+    // Write audit log (fire-and-forget)
+    logAudit({
+      tenantId,
+      userId: req.user!.id,
+      userName: req.user!.name || 'User',
+      action: AuditActions.PAYMENT_VOIDED,
+      details: `Voided ₹${payment.amount} payment (${payment.method}) for invoice ${invoice.number}`,
+      ipAddress: req.ip
+    });
 
     return res.status(200).json({
       message: 'Payment voided successfully',

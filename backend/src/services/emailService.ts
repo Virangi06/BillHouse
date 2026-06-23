@@ -273,3 +273,101 @@ export async function sendPaymentReminderEmail(email: string, clientName: string
   const info = await t.sendMail(mailOptions);
   return info;
 }
+
+export async function sendPaymentConfirmationEmail(
+  email: string,
+  clientName: string,
+  invoice: any,
+  payment: any,
+  business: any
+) {
+  const t = await getTransporter();
+  const currencySymbol = invoice.currency === 'INR' ? '₹' : invoice.currency || '₹';
+  const amountPaidStr = new Intl.NumberFormat('en-IN', { style: 'currency', currency: 'INR', maximumFractionDigits: 0 }).format(payment.amount);
+  const amountDueStr = new Intl.NumberFormat('en-IN', { style: 'currency', currency: 'INR', maximumFractionDigits: 0 }).format(invoice.amountDue);
+  const isFullyPaid = invoice.amountDue <= 0;
+  const paymentDateStr = new Date(payment.date).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' });
+  const themeColor = '#2F8F7A'; // Always use success green for payment receipts
+
+  const mailOptions = {
+    from: process.env.SENDGRID_FROM_EMAIL || '"BillHouse" <noreply@billhouse.com>',
+    to: email,
+    subject: `Payment Receipt: ${amountPaidStr} received for Invoice ${invoice.number}`,
+    text: `Hello ${clientName},\n\nThank you! We have received your payment of ${amountPaidStr} for invoice ${invoice.number}.\n\nPayment Date: ${paymentDateStr}\nPayment Method: ${payment.method}${payment.transactionId ? `\nTransaction ID: ${payment.transactionId}` : ''}\n${isFullyPaid ? 'Invoice is now fully settled.' : `Outstanding Balance: ${amountDueStr}`}\n\nThank you for your business!\n${business.name}`,
+    html: `
+      <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px; border: 1px solid #f0f0f0; border-radius: 8px;">
+        
+        <!-- Header -->
+        <div style="text-align: center; border-bottom: 3px solid ${themeColor}; padding-bottom: 15px; margin-bottom: 20px;">
+          <h2 style="color: #061B2D; margin: 0;">${business.name}</h2>
+          <p style="font-size: 12px; color: #5f6b76; margin: 5px 0 0 0;">Payment Receipt</p>
+        </div>
+
+        <!-- Success Badge -->
+        <div style="text-align: center; margin: 20px 0;">
+          <div style="display: inline-block; background-color: #EAF8F2; border: 2px solid ${themeColor}; border-radius: 50%; width: 60px; height: 60px; line-height: 60px; font-size: 28px;">✓</div>
+          <h3 style="color: ${themeColor}; margin: 12px 0 4px 0; font-size: 20px;">Payment Received!</h3>
+          <p style="color: #5f6b76; font-size: 13px; margin: 0;">Thank you, <strong>${clientName}</strong>. Your payment has been recorded.</p>
+        </div>
+
+        <!-- Payment Summary Card -->
+        <div style="background-color: #f8fafc; border-radius: 8px; padding: 20px; margin: 20px 0;">
+          <table style="width: 100%; font-size: 13px; color: #061B2D; border-collapse: collapse;">
+            <tr>
+              <td style="padding: 6px 0; color: #5f6b76;">Invoice Number</td>
+              <td style="padding: 6px 0; text-align: right; font-weight: bold;">${invoice.number}</td>
+            </tr>
+            <tr>
+              <td style="padding: 6px 0; color: #5f6b76;">Payment Date</td>
+              <td style="padding: 6px 0; text-align: right; font-weight: bold;">${paymentDateStr}</td>
+            </tr>
+            <tr>
+              <td style="padding: 6px 0; color: #5f6b76;">Payment Method</td>
+              <td style="padding: 6px 0; text-align: right; font-weight: bold;">${payment.method}</td>
+            </tr>
+            ${payment.transactionId ? `
+            <tr>
+              <td style="padding: 6px 0; color: #5f6b76;">Transaction ID</td>
+              <td style="padding: 6px 0; text-align: right; font-weight: bold; font-size: 11px; color: #5f6b76;">${payment.transactionId}</td>
+            </tr>` : ''}
+            <tr><td colspan="2" style="border-top: 1px solid #e0e0e0; padding-top: 10px; margin-top: 6px;"></td></tr>
+            <tr>
+              <td style="padding: 8px 0; font-size: 15px; font-weight: bold; color: #061B2D;">Amount Paid</td>
+              <td style="padding: 8px 0; text-align: right; font-size: 18px; font-weight: 900; color: ${themeColor};">${amountPaidStr}</td>
+            </tr>
+            ${!isFullyPaid ? `
+            <tr>
+              <td style="padding: 6px 0; color: #E4A11B; font-weight: bold;">Remaining Balance</td>
+              <td style="padding: 6px 0; text-align: right; color: #E4A11B; font-weight: bold;">${amountDueStr}</td>
+            </tr>` : `
+            <tr>
+              <td colspan="2" style="padding: 8px 0; text-align: center;">
+                <span style="background-color: #EAF8F2; color: ${themeColor}; font-size: 12px; font-weight: bold; padding: 4px 12px; border-radius: 20px; border: 1px solid ${themeColor};">✓ Invoice Fully Settled</span>
+              </td>
+            </tr>`}
+          </table>
+        </div>
+
+        ${payment.notes ? `
+        <div style="background-color: #fff6dd; border-left: 3px solid #E4A11B; padding: 12px 15px; border-radius: 4px; margin: 15px 0; font-size: 12px; color: #5f6b76;">
+          <strong>Note:</strong> ${payment.notes}
+        </div>` : ''}
+
+        <hr style="border: 0; border-top: 1px solid #e0e0e0; margin: 20px 0;">
+        <p style="font-size: 11px; color: #5F6B76; text-align: center; margin: 0;">
+          This is an automated payment receipt from <strong>${business.name}</strong> via BillHouse.<br>
+          Please keep this for your records.
+        </p>
+      </div>
+    `
+  };
+
+  const info = await t.sendMail(mailOptions);
+  const previewUrl = nodemailer.getTestMessageUrl(info);
+  if (previewUrl) {
+    console.log(`📧 Payment confirmation email sent. Preview URL: ${previewUrl}`);
+  } else {
+    console.log(`📧 Payment confirmation email sent to ${email} for invoice ${invoice.number}`);
+  }
+  return info;
+}

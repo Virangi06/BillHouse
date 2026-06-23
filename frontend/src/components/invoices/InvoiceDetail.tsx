@@ -147,6 +147,9 @@ export const InvoiceDetail: React.FC<{
         message: res.data.message || 'Payment reminder sent successfully.',
         isOpen: true
       });
+      if (res.data?.invoice) {
+        setInvoice(res.data.invoice);
+      }
       if (onAddNotification) {
         onAddNotification('invoice', 'Reminder Dispatched', `Payment reminder for ${invoice.number} sent to client.`);
       }
@@ -433,6 +436,37 @@ export const InvoiceDetail: React.FC<{
     }
   };
 
+  const renderReminderBadges = (inv: any) => {
+    if (!inv.remindersSent || inv.remindersSent.length === 0) return null;
+    const uniqueTypes = Array.from(new Set(inv.remindersSent.map((r: any) => r.type)));
+    return (
+      <div className="flex flex-wrap gap-1 items-center">
+        {uniqueTypes.map((type: any) => {
+          let label = '';
+          let colorClass = '';
+          if (type === '7d') {
+            label = '7d';
+            colorClass = 'bg-amber-500/10 text-amber-700 border-amber-500/20';
+          } else if (type === '14d') {
+            label = '14d';
+            colorClass = 'bg-amber-600/10 text-amber-800 border-amber-600/20';
+          } else if (type === '30d') {
+            label = '30d';
+            colorClass = 'bg-rose-500/10 text-rose-700 border-rose-500/20';
+          } else if (type === 'manual') {
+            label = 'Manual';
+            colorClass = 'bg-blue-500/10 text-blue-700 border-blue-500/20';
+          }
+          return (
+            <span key={type} className={`inline-flex items-center px-1.5 py-0.5 rounded text-[9px] font-black border uppercase tracking-wider ${colorClass}`} title={`${label} reminder sent`}>
+              {label} Reminder
+            </span>
+          );
+        })}
+      </div>
+    );
+  };
+
   const getStatusBarColor = (status: string) => {
     switch (status) {
       case 'Paid': return 'border-l-[6px] md:border-l-[8px] border-green';
@@ -564,9 +598,10 @@ export const InvoiceDetail: React.FC<{
             <ChevronLeft className="h-4 w-4" />
           </button>
           <div className="flex flex-col">
-            <div className="flex items-center gap-2">
+            <div className="flex items-center gap-2 flex-wrap">
               <h2 className="text-sm font-extrabold text-navy">{invoice.number}</h2>
               {getStatusBadge(invoice.status)}
+              {renderReminderBadges(invoice)}
             </div>
             <span className="text-[10px] text-text-secondary font-bold mt-0.5">₹ INR Tax Invoicing System</span>
           </div>
@@ -960,6 +995,49 @@ export const InvoiceDetail: React.FC<{
                             >
                               Void
                             </button>
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+            )}
+
+            {/* Sent Reminders History Log */}
+            {invoice.remindersSent && invoice.remindersSent.length > 0 && (
+              <div className="mt-6 border-t border-slate-200 pt-5 print:hidden">
+                <h4 className="text-xs font-black text-navy uppercase tracking-wider mb-3 flex items-center gap-1">
+                  <span>⏰</span> Sent Reminders History
+                </h4>
+                <div className="overflow-x-auto w-full">
+                  <table className="w-full text-left text-xs border-collapse">
+                    <thead>
+                      <tr className="border-b border-slate-200 text-[10px] font-black uppercase text-[#5f6b76] tracking-wider">
+                        <th className="py-2 pr-4">Sent At</th>
+                        <th className="py-2 px-4">Type</th>
+                        <th className="py-2 px-4">Channel</th>
+                        <th className="py-2 pl-4 text-right">Status</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-slate-100 font-semibold text-[#5f6b76]">
+                      {invoice.remindersSent.map((r, idx) => (
+                        <tr key={idx} className="hover:bg-slate-50/50">
+                          <td className="py-2.5 pr-4 text-navy">
+                            {new Date(r.sentAt).toLocaleString('en-IN', {
+                              day: 'numeric',
+                              month: 'short',
+                              year: 'numeric',
+                              hour: '2-digit',
+                              minute: '2-digit'
+                            })}
+                          </td>
+                          <td className="py-2.5 px-4 uppercase text-[10px]">
+                            {r.type === 'manual' ? 'Manual Overdue' : `Automated ${r.type.replace('d', '-Day')}`}
+                          </td>
+                          <td className="py-2.5 px-4 text-[10px]">Email</td>
+                          <td className="py-2.5 pl-4 text-right text-green font-bold flex items-center justify-end gap-1">
+                            <span className="w-1.5 h-1.5 bg-green rounded-full animate-pulse"></span> Dispatched
                           </td>
                         </tr>
                       ))}

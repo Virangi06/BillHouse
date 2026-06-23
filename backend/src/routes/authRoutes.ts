@@ -9,9 +9,9 @@ import { authMiddleware, AuthRequest } from '../middleware/authMiddleware';
 const router = Router();
 
 // Helper to generate JWT
-const generateToken = (userId: string, tenantId: string): string => {
+const generateToken = (userId: string, tenantId: string, name: string): string => {
   const secret = process.env.JWT_SECRET || 'billhouse_jwt_secret_dev_key_2026_modern_invoice';
-  return jwt.sign({ id: userId, tenantId }, secret, { expiresIn: '7d' });
+  return jwt.sign({ id: userId, tenantId, name }, secret, { expiresIn: '7d' });
 };
 
 // Helper to validate strong password criteria
@@ -151,7 +151,7 @@ router.post('/login', async (req: any, res: any) => {
       });
     }
 
-    const token = generateToken(user._id.toString(), user.tenantId);
+    const token = generateToken(user._id.toString(), user.tenantId, user.name);
 
     return res.status(200).json({
       token,

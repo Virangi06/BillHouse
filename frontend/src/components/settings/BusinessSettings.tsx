@@ -5,7 +5,7 @@ import {
   Building2, User, Briefcase, MapPin, Upload, X,
   Save, CheckCircle, AlertCircle, Banknote, FileText,
   Shield, BadgePercent, Sparkles, RefreshCw, Globe,
-  Clock, Layout, DollarSign, Phone
+  Clock, Layout, DollarSign, Phone, Bell
 } from 'lucide-react';
 
 const BUSINESS_TYPES = [
@@ -79,6 +79,8 @@ const BusinessSettings: React.FC = () => {
     bankAccount: '',
     bankIfsc: '',
     bankUpi: '',
+    remindersEnabled: true,
+    remindersIntervals: [7, 14, 30] as number[],
   });
 
   // Pre-fill form with existing profile
@@ -110,13 +112,15 @@ const BusinessSettings: React.FC = () => {
         bankAccount: businessProfile.bankAccount || '',
         bankIfsc: businessProfile.bankIfsc || '',
         bankUpi: businessProfile.bankUpi || '',
+        remindersEnabled: businessProfile.remindersEnabled !== undefined ? businessProfile.remindersEnabled : true,
+        remindersIntervals: businessProfile.remindersIntervals || [7, 14, 30],
       });
       setLogoPreview(businessProfile.logoBase64 || '');
       setBannerPreview(businessProfile.bannerBase64 || '');
     }
   }, [businessProfile]);
 
-  const set = (field: string, value: string) => {
+  const set = (field: string, value: any) => {
     setForm(prev => ({ ...prev, [field]: value }));
     setSuccessMsg(null);
     setErrorMsg(null);
@@ -206,6 +210,8 @@ const BusinessSettings: React.FC = () => {
         bankAccount: form.bankAccount.trim(),
         bankIfsc: form.bankIfsc.trim().toUpperCase(),
         bankUpi: form.bankUpi.trim(),
+        remindersEnabled: form.remindersEnabled,
+        remindersIntervals: form.remindersIntervals,
       };
 
       if (businessProfile) {
@@ -563,6 +569,71 @@ const BusinessSettings: React.FC = () => {
                   value={form.taxRegistrationNumber}
                   onChange={e => set('taxRegistrationNumber', e.target.value)} />
               </div>
+            </div>
+          </SectionCard>
+
+          {/* Section 7: Notification Preferences */}
+          <SectionCard icon={Bell} title="Reminder Notifications">
+            <div className="flex flex-col gap-4">
+              <div className="flex items-start gap-3 bg-green/5 border border-green/15 rounded-xl px-4 py-3">
+                <Bell className="h-4 w-4 text-green shrink-0 mt-0.5" />
+                <p className="text-[11px] text-[#0C4737] font-semibold leading-relaxed">
+                  Automate your receivables pipeline by scheduling polite, automatic payment reminders to clients.
+                </p>
+              </div>
+              
+              <div className="flex items-center justify-between p-3.5 bg-slate-50 border border-navy/5 rounded-xl">
+                <div className="flex flex-col gap-0.5">
+                  <span className="text-xs font-bold text-navy">Automated Reminders</span>
+                  <span className="text-[10px] text-text-secondary font-semibold">Email clients when invoices become overdue</span>
+                </div>
+                <label className="relative inline-flex items-center cursor-pointer select-none">
+                  <input 
+                    type="checkbox" 
+                    checked={form.remindersEnabled} 
+                    onChange={e => set('remindersEnabled', e.target.checked)} 
+                    className="sr-only peer" 
+                  />
+                  <div className="w-9 h-5 bg-slate-200 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-slate-300 after:border after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:bg-green"></div>
+                </label>
+              </div>
+
+              {form.remindersEnabled && (
+                <div className="flex flex-col gap-2 bg-[#FAFCFB] border border-navy/5 p-4 rounded-xl animate-fade-in">
+                  <label className={labelClass}>Overdue Reminder Milestones</label>
+                  <p className="text-[10px] text-text-secondary font-semibold mb-2">
+                    Polite reminder emails will be dispatched to clients at these specific day counts following the invoice due date.
+                  </p>
+                  
+                  <div className="flex flex-wrap gap-2">
+                    {[7, 14, 30].map(day => {
+                      const isActive = form.remindersIntervals.includes(day);
+                      return (
+                        <button
+                          key={day}
+                          type="button"
+                          onClick={() => {
+                            let newIntervals = [...form.remindersIntervals];
+                            if (isActive) {
+                              newIntervals = newIntervals.filter(d => d !== day);
+                            } else {
+                              newIntervals = [...newIntervals, day].sort((a, b) => a - b);
+                            }
+                            set('remindersIntervals', newIntervals);
+                          }}
+                          className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all border ${
+                            isActive
+                              ? 'bg-green border-green text-white shadow-sm'
+                              : 'bg-white border-navy/10 text-navy/60 hover:bg-navy/5'
+                          }`}
+                        >
+                          {day} Days
+                        </button>
+                      );
+                    })}
+                  </div>
+                </div>
+              )}
             </div>
           </SectionCard>
         </div>

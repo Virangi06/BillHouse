@@ -10,6 +10,11 @@ export interface IInvoiceItem {
   createdAt: Date;
 }
 
+export interface IInvoiceReminder {
+  type: '7d' | '14d' | '30d' | 'manual';
+  sentAt: Date;
+}
+
 export interface IInvoice extends Document {
   tenantId: string;
   businessId?: string; // Links to tenant profile
@@ -35,6 +40,7 @@ export interface IInvoice extends Document {
   sentAt?: Date;
   paidAt?: Date;
   items: IInvoiceItem[];
+  remindersSent?: IInvoiceReminder[];
   createdBy: mongoose.Types.ObjectId; // References User model
   createdAt: Date;
   updatedAt: Date;
@@ -92,6 +98,12 @@ const InvoiceSchema: Schema = new Schema(
     sentAt: { type: Date },
     paidAt: { type: Date },
     items: [InvoiceItemSchema],
+    remindersSent: [
+      {
+        type: { type: String, enum: ['7d', '14d', '30d', 'manual'], required: true },
+        sentAt: { type: Date, default: Date.now }
+      }
+    ],
     createdBy: { type: Schema.Types.ObjectId, ref: 'User', required: true }
   },
   {

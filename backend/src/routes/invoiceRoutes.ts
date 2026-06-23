@@ -5,6 +5,7 @@ import Business from '../models/Business';
 import { AuthRequest } from '../middleware/authMiddleware';
 import mongoose from 'mongoose';
 import { sendInvoiceEmail, sendPaymentReminderEmail } from '../services/emailService';
+import { logAudit, AuditActions } from '../services/auditService';
 
 const router = Router();
 
@@ -206,6 +207,16 @@ router.post('/', async (req: AuthRequest, res: Response) => {
 
     await invoice.save();
 
+    // Write audit log (fire-and-forget)
+    logAudit({
+      tenantId,
+      userId,
+      userName: req.user!.name || 'User',
+      action: AuditActions.INVOICE_CREATED,
+      details: `Created invoice ${number} for ${clientObj.name} — ₹${totalAmount.toLocaleString('en-IN')}`,
+      ipAddress: req.ip
+    });
+
     return res.status(201).json({
       message: 'Invoice created successfully',
       invoice
@@ -350,6 +361,16 @@ router.put('/:id', async (req: AuthRequest, res: Response) => {
 
     await invoice.save();
 
+    // Write audit log (fire-and-forget)
+    logAudit({
+      tenantId,
+      userId: req.user!.id,
+      userName: req.user!.name || 'User',
+      action: AuditActions.INVOICE_UPDATED,
+      details: `Updated invoice ${invoice.number}`,
+      ipAddress: req.ip
+    });
+
     return res.status(200).json({
       message: 'Invoice updated successfully',
       invoice
@@ -405,6 +426,16 @@ router.patch('/:id/status', async (req: AuthRequest, res: Response) => {
     }
 
     await invoice.save();
+
+    // Write audit log (fire-and-forget)
+    logAudit({
+      tenantId,
+      userId: req.user!.id,
+      userName: req.user!.name || 'User',
+      action: AuditActions.INVOICE_STATUS_CHANGED,
+      details: `Invoice ${invoice.number} status changed to ${status}`,
+      ipAddress: req.ip
+    });
 
     return res.status(200).json({
       message: `Invoice status updated to ${status} successfully`,
@@ -469,6 +500,16 @@ router.delete('/:id', async (req: AuthRequest, res: Response) => {
 
     await Invoice.findByIdAndDelete(id);
 
+    // Write audit log (fire-and-forget)
+    logAudit({
+      tenantId,
+      userId: req.user!.id,
+      userName: req.user!.name || 'User',
+      action: AuditActions.INVOICE_DELETED,
+      details: `Deleted invoice ${invoice.number} for ${invoice.clientName}`,
+      ipAddress: req.ip
+    });
+
     return res.status(200).json({ message: 'Invoice deleted successfully' });
   } catch (error) {
     console.error('❌ Delete invoice error:', error);
@@ -512,6 +553,16 @@ router.post('/:id/send', async (req: AuthRequest, res: Response) => {
       invoice.sentAt = new Date();
       await invoice.save();
     }
+
+    // Write audit log (fire-and-forget)
+    logAudit({
+      tenantId,
+      userId: req.user!.id,
+      userName: req.user!.name || 'User',
+      action: AuditActions.INVOICE_SENT,
+      details: `Invoice ${invoice.number} emailed to ${clientObj.email}`,
+      ipAddress: req.ip
+    });
 
     return res.status(200).json({
       message: `Invoice ${invoice.number} sent to ${clientObj.email} successfully`,
@@ -557,8 +608,29 @@ router.post('/:id/reminder', async (req: AuthRequest, res: Response) => {
     // Send the reminder email
     await sendPaymentReminderEmail(clientObj.email, clientObj.name, invoice, businessMeta);
 
+    // Record reminder sent
+    if (!invoice.remindersSent) {
+      invoice.remindersSent = [];
+    }
+    invoice.remindersSent.push({
+      type: 'manual',
+      sentAt: new Date()
+    });
+    await invoice.save();
+
+    // Log audit log (fire-and-forget)
+    logAudit({
+      tenantId,
+      userId: req.user.id,
+      userName: req.user.name || 'User',
+      action: AuditActions.INVOICE_REMINDER_SENT,
+      details: `Manual payment reminder emailed to ${clientObj.email} for invoice ${invoice.number}`,
+      ipAddress: req.ip
+    });
+
     return res.status(200).json({
-      message: `Payment reminder for invoice ${invoice.number} sent to ${clientObj.email} successfully`
+      message: `Payment reminder for invoice ${invoice.number} sent to ${clientObj.email} successfully`,
+      invoice
     });
   } catch (error) {
     console.error('❌ Send invoice reminder error:', error);

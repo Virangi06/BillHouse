@@ -31,6 +31,7 @@ export interface InvoiceData {
   totalAmount: number;
   amountPaid: number;
   amountDue: number;
+  remindersSent?: Array<{ type: '7d' | '14d' | '30d' | 'manual'; sentAt: string }>;
 }
 
 interface InvoiceListProps {
@@ -263,6 +264,37 @@ export const InvoiceList: React.FC<InvoiceListProps> = ({ onAddNotification }) =
           </span>
         );
     }
+  };
+
+  const renderReminderBadges = (inv: InvoiceData) => {
+    if (!inv.remindersSent || inv.remindersSent.length === 0) return null;
+    const uniqueTypes = Array.from(new Set(inv.remindersSent.map(r => r.type)));
+    return (
+      <div className="flex flex-wrap gap-1 mt-1 max-w-[120px]">
+        {uniqueTypes.map(type => {
+          let label = '';
+          let colorClass = '';
+          if (type === '7d') {
+            label = '7d';
+            colorClass = 'bg-amber-500/10 text-amber-700 border-amber-500/20';
+          } else if (type === '14d') {
+            label = '14d';
+            colorClass = 'bg-amber-600/10 text-amber-800 border-amber-600/20';
+          } else if (type === '30d') {
+            label = '30d';
+            colorClass = 'bg-rose-500/10 text-rose-700 border-rose-500/20';
+          } else if (type === 'manual') {
+            label = 'Manual';
+            colorClass = 'bg-blue-500/10 text-blue-700 border-blue-500/20';
+          }
+          return (
+            <span key={type} className={`inline-flex items-center px-1.5 py-0.5 rounded text-[9px] font-black border uppercase tracking-wider ${colorClass}`} title={`${label} reminder sent`}>
+              {label}
+            </span>
+          );
+        })}
+      </div>
+    );
   };
 
   const formatCurrency = (val: number) => {
@@ -581,7 +613,10 @@ export const InvoiceList: React.FC<InvoiceListProps> = ({ onAddNotification }) =
                     </td>
 
                     <td className="py-4.5 px-6" onClick={(e) => e.stopPropagation()}>
-                      {getStatusBadge(inv.status)}
+                      <div className="flex flex-col items-start gap-1">
+                        {getStatusBadge(inv.status)}
+                        {renderReminderBadges(inv)}
+                      </div>
                     </td>
 
                     <td className="py-4.5 px-6 text-right relative" onClick={(e) => e.stopPropagation()}>

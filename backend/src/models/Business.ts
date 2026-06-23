@@ -29,6 +29,9 @@ export interface IBusiness extends Document {
   currency: string;
   timeZone?: string;
   invoiceNumberFormat?: string;
+  // Notification preferences
+  remindersEnabled?: boolean;
+  remindersIntervals?: number[];
   // Bank details (shown on printed invoice)
   bankName?: string;
   bankAccount?: string;
@@ -73,6 +76,9 @@ const BusinessSchema: Schema = new Schema(
     currency: { type: String, default: 'INR' },
     timeZone: { type: String, default: 'Asia/Kolkata', trim: true },
     invoiceNumberFormat: { type: String, default: '{prefix}-{number}', trim: true },
+    // Notification preferences
+    remindersEnabled: { type: Boolean, default: true },
+    remindersIntervals: { type: [Number], default: [7, 14, 30] },
     // Bank details
     bankName: { type: String, trim: true },
     bankAccount: { type: String, trim: true },

@@ -37,6 +37,9 @@ export interface BusinessProfile {
   bankAccount?: string;
   bankIfsc?: string;
   bankUpi?: string;
+  // Notification config
+  remindersEnabled?: boolean;
+  remindersIntervals?: number[];
 }
 
 interface BusinessContextType {
