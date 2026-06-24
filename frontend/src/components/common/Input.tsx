@@ -5,10 +5,11 @@ interface InputProps extends React.InputHTMLAttributes<HTMLInputElement> {
   label: string;
   error?: string;
   rightLabel?: React.ReactNode;
+  required?: boolean;
 }
 
 export const Input = forwardRef<HTMLInputElement, InputProps>(
-  ({ label, error, type = 'text', className = '', id, rightLabel, ...props }, ref) => {
+  ({ label, error, type = 'text', className = '', id, rightLabel, required, ...props }, ref) => {
     const [showPassword, setShowPassword] = useState(false);
     const inputId = id || `input-${label.toLowerCase().replace(/\s+/g, '-')}`;
     const isPasswordType = type === 'password';
@@ -18,9 +19,10 @@ export const Input = forwardRef<HTMLInputElement, InputProps>(
         <div className="flex justify-between items-center w-full">
           <label
             htmlFor={inputId}
-            className="text-xs font-semibold uppercase tracking-wider text-text-secondary select-none"
+            className="text-xs font-semibold uppercase tracking-wider text-text-secondary select-none flex items-center gap-0.5"
           >
             {label}
+            {required && <span className="text-red-500 font-bold text-sm leading-none">*</span>}
           </label>
           {rightLabel}
         </div>

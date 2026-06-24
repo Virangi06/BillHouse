@@ -92,6 +92,7 @@ export const ForgotPassword: React.FC = () => {
             type="email"
             placeholder="you@company.com"
             error={errors.email?.message}
+            required
             {...register('email', {
               required: 'Email is required',
               pattern: {

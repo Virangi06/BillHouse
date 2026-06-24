@@ -102,6 +102,7 @@ export const Register: React.FC = () => {
             label="Full Name"
             placeholder="Enter Your Full Name"
             error={errors.name?.message}
+            required
             {...register('name', { required: 'Name is required' })}
           />
 
@@ -120,6 +121,7 @@ export const Register: React.FC = () => {
               type="email"
               placeholder="you@company.com"
               error={errors.email?.message}
+              required
               {...register('email', {
                 required: 'Email is required',
                 pattern: {
@@ -137,6 +139,7 @@ export const Register: React.FC = () => {
               type="password"
               placeholder="••••••••"
               error={errors.passwordHash?.message}
+              required
               {...register('passwordHash', {
                 required: 'Password is required',
                 validate: {
@@ -160,6 +163,7 @@ export const Register: React.FC = () => {
               type="password"
               placeholder="••••••••"
               error={errors.confirmPassword?.message}
+              required
               {...register('confirmPassword', {
                 required: 'Please confirm your password',
                 validate: (value) => value === passwordValue || 'Passwords do not match',

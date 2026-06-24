@@ -16,6 +16,12 @@
     color: rgb(var(--navy));
     font-feature-settings: "cv02", "cv03", "cv04", "cv11";
   }
+
+  /* Hide default browser password reveal/clear buttons (e.g. Edge/IE) to prevent duplicate eye icons */
+  input::-ms-reveal,
+  input::-ms-clear {
+    display: none !important;
+  }
 }
 
 @layer utilities {

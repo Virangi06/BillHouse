@@ -79,6 +79,7 @@ export const Login: React.FC = () => {
             type="email"
             placeholder="you@company.com"
             error={errors.email?.message}
+            required
             {...register('email', {
               required: 'Email is required',
               pattern: {
@@ -94,6 +95,7 @@ export const Login: React.FC = () => {
             type="password"
             placeholder="••••••••"
             error={errors.password?.message}
+            required
             rightLabel={
               <Link
                 to="/forgot-password"

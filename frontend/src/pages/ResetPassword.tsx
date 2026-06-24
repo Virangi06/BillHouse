@@ -110,22 +110,28 @@ export const ResetPassword: React.FC = () => {
           <form onSubmit={handleSubmit(onSubmit)} className="flex flex-col gap-4">
             
             {/* New Password field */}
-            <Input
-              label="New Password"
-              type="password"
-              placeholder="••••••••"
-              error={errors.passwordHash?.message}
-              {...register('passwordHash', {
-                required: 'Password is required',
-                validate: {
-                  minLength: (v) => v.length >= 8 || 'Password must be at least 8 characters',
-                  uppercase: (v) => /[A-Z]/.test(v) || 'Password must contain at least one uppercase letter',
-                  lowercase: (v) => /[a-z]/.test(v) || 'Password must contain at least one lowercase letter',
-                  number: (v) => /[0-9]/.test(v) || 'Password must contain at least one number',
-                  special: (v) => /[^A-Za-z0-9]/.test(v) || 'Password must contain at least one special character',
-                }
-              })}
-            />
+            <div className="flex flex-col gap-1.5 w-full">
+              <Input
+                label="New Password"
+                type="password"
+                placeholder="••••••••"
+                error={errors.passwordHash?.message}
+                required
+                {...register('passwordHash', {
+                  required: 'Password is required',
+                  validate: {
+                    minLength: (v) => v.length >= 8 || 'Password must be at least 8 characters',
+                    uppercase: (v) => /[A-Z]/.test(v) || 'Password must contain at least one uppercase letter',
+                    lowercase: (v) => /[a-z]/.test(v) || 'Password must contain at least one lowercase letter',
+                    number: (v) => /[0-9]/.test(v) || 'Password must contain at least one number',
+                    special: (v) => /[^A-Za-z0-9]/.test(v) || 'Password must contain at least one special character',
+                  }
+                })}
+              />
+              <p className="text-[10px] text-text-secondary font-medium leading-normal px-1 mt-0.5">
+                Must be 8+ chars: 1 uppercase, 1 lowercase, 1 number, 1 symbol.
+              </p>
+            </div>
 
             {/* Confirm Password field */}
             <div className="flex flex-col gap-1.5 w-full">
@@ -134,6 +140,7 @@ export const ResetPassword: React.FC = () => {
                 type="password"
                 placeholder="••••••••"
                 error={errors.confirmPassword?.message}
+                required
                 {...register('confirmPassword', {
                   required: 'Please confirm your new password',
                   validate: (value) => value === passwordValue || 'Passwords do not match',

@@ -225,7 +225,7 @@ export const InvoiceForm: React.FC<InvoiceFormProps> = ({ onAddNotification }) =
       setSelectedClientId(newClient._id);
       setIsClientModalOpen(false);
       if (onAddNotification) {
-        onAddNotification('client', 'New Client Registered', `${clientForm.name} was registered via Invoice Form.`);
+        onAddNotification('client', 'New Client Registered', `Client ${clientForm.name} registered (Email: ${clientForm.email})`);
       }
       setClientForm({ name: '', email: '', phone: '', taxId: '', address: '' });
     } catch (err: any) {

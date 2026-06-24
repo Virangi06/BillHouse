@@ -236,7 +236,7 @@ export const DashboardStub: React.FC = () => {
           let title = 'System Update';
           if (act.type === 'client_created') {
             notifType = 'client';
-            title = 'New Client';
+            title = 'New Client Registered';
           } else if (act.type === 'invoice_paid') {
             notifType = 'payment';
             title = 'Invoice Paid';
@@ -558,7 +558,7 @@ export const DashboardStub: React.FC = () => {
         const response = await API.post('/clients', clientForm);
         setSuccessMsg('New client added successfully!');
         setClients(prev => [response.data.client, ...prev]);
-        addNotification('client', 'New Client Registered', `${clientForm.name} was registered in the database.`);
+        addNotification('client', 'New Client Registered', `Client ${clientForm.name} registered (Email: ${clientForm.email})`);
       }
       setIsClientModalOpen(false);
       fetchDashboardStats(); // Refresh stats counters
