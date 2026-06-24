@@ -2,6 +2,7 @@ import React, { useState, useRef, useEffect } from 'react';
 import API from '../../utils/api';
 import { useBusinessProfile, getLogoUrl } from '../../context/BusinessContext';
 import { useAuth } from '../../context/AuthContext';
+import UpgradeModal from '../common/UpgradeModal';
 import {
   Building2, User, Briefcase, MapPin, Upload, X,
   Save, CheckCircle, AlertCircle, Banknote, FileText,
@@ -92,6 +93,44 @@ const BusinessSettings: React.FC<BusinessSettingsProps> = ({ defaultTab = 'profi
   const [deleteConfirmText, setDeleteConfirmText] = useState('');
   const [deletingAccount, setDeletingAccount] = useState(false);
   const [deleteError, setDeleteError] = useState<string | null>(null);
+
+  const [isUpgradeModalOpen, setIsUpgradeModalOpen] = useState(false);
+  const [cancellingSub, setCancellingSub] = useState(false);
+  const [reactivatingSub, setReactivatingSub] = useState(false);
+  const [showCancelModal, setShowCancelModal] = useState(false);
+
+  const handleCancelSubscription = async () => {
+    setCancellingSub(true);
+    setPasswordError(null);
+    setPasswordSuccess(null);
+    try {
+      const response = await API.post('/subscription/cancel-subscription');
+      await refreshBusinessProfile();
+      setSuccessMsg(response.data.message || 'Auto-renewal turned off successfully.');
+      setTimeout(() => setSuccessMsg(null), 4000);
+      setShowCancelModal(false);
+    } catch (err: any) {
+      setErrorMsg(err.response?.data?.error || 'Failed to cancel subscription.');
+    } finally {
+      setCancellingSub(false);
+    }
+  };
+
+  const handleReactivateSubscription = async () => {
+    setReactivatingSub(true);
+    setPasswordError(null);
+    setPasswordSuccess(null);
+    try {
+      const response = await API.post('/subscription/reactivate-subscription');
+      await refreshBusinessProfile();
+      setSuccessMsg(response.data.message || 'Auto-renewal reactivated successfully.');
+      setTimeout(() => setSuccessMsg(null), 4000);
+    } catch (err: any) {
+      setErrorMsg(err.response?.data?.error || 'Failed to reactivate subscription.');
+    } finally {
+      setReactivatingSub(false);
+    }
+  };
 
   const handlePasswordChange = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -631,108 +670,220 @@ const BusinessSettings: React.FC<BusinessSettingsProps> = ({ defaultTab = 'profi
                     <p className="text-xs font-extrabold text-navy">{form.bankIfsc}</p></div>
                 )}
                 {form.bankUpi && (
-                  <div><p className="text-[10px] text-navy/40 font-bold uppercase tracking-wider">UPI</p>
-                    <p className="text-xs font-extrabold text-navy">{form.bankUpi}</p></div>
+                     case 'account': return (
+        <div className="flex flex-col gap-8 text-left animate-fade-in">
+          
+          {/* Top Grid: Subscription & Password */}
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 items-stretch">
+            
+            {/* Card 1: Subscription & Billing */}
+            <div className={`p-6 rounded-3xl border flex flex-col justify-between gap-6 transition-all ${
+              businessProfile?.isPro 
+                ? 'bg-gradient-to-br from-green/5 via-mint/5 to-white border-green/20 shadow-sm shadow-green/5' 
+                : 'bg-[#FAFCFB] border-navy/5 shadow-sm'
+            }`}>
+              <div className="flex flex-col gap-4">
+                <div className="flex items-center justify-between">
+                  <h4 className="text-sm font-black text-navy flex items-center gap-2">
+                    <CreditCard className="h-4.5 w-4.5 text-green" />
+                    Subscription & Plan
+                  </h4>
+                  {businessProfile?.isPro ? (
+                    <span className="px-3 py-1 rounded-full text-[10px] font-black bg-green text-white uppercase tracking-wider shadow-sm">
+                      PRO PLAN
+                    </span>
+                  ) : (
+                    <span className="px-3 py-1 rounded-full text-[10px] font-black bg-navy/10 text-navy/60 uppercase tracking-wider">
+                      FREE PLAN
+                    </span>
+                  )}
+                </div>
+                
+                <p className="text-xs text-text-secondary leading-relaxed font-medium">
+                  {businessProfile?.isPro 
+                    ? "Thank you for supporting BillHouse! You have unlimited access to all premium features." 
+                    : "You are currently using the Free tier. Upgrade to unlock full branding controls, automatic payment follow-ups, and financial metrics."}
+                </p>
+
+                {/* Plan Metadata */}
+                <div className="p-4 bg-white border border-navy/8 rounded-2xl flex flex-col gap-3">
+                  <div className="flex justify-between items-center text-xs font-bold">
+                    <span className="text-text-secondary">Current Billing Plan:</span>
+                    <span className="text-navy uppercase">
+                      {businessProfile?.isPro ? `${businessProfile?.subscriptionPlan} billing` : 'None (Free)'}
+                    </span>
+                  </div>
+                  {businessProfile?.isPro && businessProfile.subscriptionExpiresAt && (
+                    <div className="flex justify-between items-center text-xs font-bold">
+                      <span className="text-text-secondary">
+                        {businessProfile.cancelAtPeriodEnd ? "Access Ends On:" : "Next Renewal Date:"}
+                      </span>
+                      <span className={`font-black ${businessProfile.cancelAtPeriodEnd ? 'text-orange-600' : 'text-green'}`}>
+                        {new Date(businessProfile.subscriptionExpiresAt).toLocaleDateString()}
+                      </span>
+                    </div>
+                  )}
+                </div>
+
+                {/* Feature Checklist */}
+                <div className="flex flex-col gap-2 mt-1">
+                  <p className="text-[10px] font-extrabold uppercase text-navy/40 tracking-wider">Plan Inclusions</p>
+                  <div className="grid grid-cols-2 gap-x-4 gap-y-2">
+                    {[
+                      { label: 'Professional Invoices', active: true },
+                      { label: 'GST Tax Calculations', active: true },
+                      { label: 'Automated Reminders', active: !!businessProfile?.isPro },
+                      { label: 'Financial Analytics', active: !!businessProfile?.isPro },
+                      { label: 'Custom PDF Branding', active: !!businessProfile?.isPro },
+                      { label: 'Priority Support', active: !!businessProfile?.isPro }
+                    ].map((f, i) => (
+                      <div key={i} className="flex items-center gap-2 text-xs font-bold text-navy/70 select-none">
+                        <span className={`text-sm ${f.active ? 'text-green font-bold' : 'text-navy/20'}`}>
+                          {f.active ? '✓' : '○'}
+                        </span>
+                        <span className={f.active ? 'text-navy font-bold' : 'text-text-secondary line-through opacity-50 font-medium'}>
+                          {f.label}
+                        </span>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              </div>
+
+              {/* Action Button */}
+              <div className="pt-4 border-t border-navy/5 flex justify-end">
+                {businessProfile?.isPro ? (
+                  businessProfile.cancelAtPeriodEnd ? (
+                    <button
+                      type="button"
+                      onClick={handleReactivateSubscription}
+                      disabled={reactivatingSub}
+                      className="bg-green hover:bg-[#2F8F7A] text-white px-5 py-3 rounded-xl text-xs font-black transition-all shadow-md cursor-pointer whitespace-nowrap active:scale-98"
+                    >
+                      {reactivatingSub ? 'Processing...' : 'Reactivate Auto-Renewal'}
+                    </button>
+                  ) : (
+                    <button
+                      type="button"
+                      onClick={() => setShowCancelModal(true)}
+                      disabled={cancellingSub}
+                      className="bg-navy/5 hover:bg-red-500/10 text-navy hover:text-red-500 px-5 py-3 rounded-xl text-xs font-bold transition-all border border-navy/10 hover:border-red-500/20 cursor-pointer whitespace-nowrap active:scale-98"
+                    >
+                      Turn Off Auto-Renewal
+                    </button>
+                  )
+                ) : (
+                  <button
+                    type="button"
+                    onClick={() => setIsUpgradeModalOpen(true)}
+                    className="w-full sm:w-auto bg-green hover:bg-[#0C4737] text-white px-6 py-3 rounded-xl text-xs font-black transition-all shadow-md cursor-pointer whitespace-nowrap active:scale-98 flex items-center justify-center gap-2"
+                  >
+                    <Sparkles className="h-4 w-4" />
+                    Upgrade to Professional
+                  </button>
                 )}
               </div>
             </div>
-          )}
-        </div>
-      );
 
-      case 'account': return (
-        <div className="flex flex-col gap-6 text-left">
-          {/* Change Password Form */}
-          <form onSubmit={handlePasswordChange} className="flex flex-col gap-4 bg-[#FAFCFB] border border-navy/5 p-5 rounded-2xl">
-            <h4 className="text-sm font-extrabold text-navy flex items-center gap-2">
-              <Shield className="h-4 w-4 text-green" />
-              Change Password
-            </h4>
-            <p className="text-[11px] text-navy/55 font-semibold -mt-2">
-              Ensure your account uses a secure password to prevent unauthorized access.
-            </p>
+            {/* Card 2: Security / Password */}
+            <form onSubmit={handlePasswordChange} className="p-6 rounded-3xl border border-navy/5 bg-[#FAFCFB] flex flex-col justify-between gap-5 text-left shadow-sm">
+              <div className="flex flex-col gap-4">
+                <h4 className="text-sm font-black text-navy flex items-center gap-2">
+                  <Shield className="h-4.5 w-4.5 text-green" />
+                  Security & Password
+                </h4>
+                <p className="text-xs text-text-secondary leading-relaxed font-medium">
+                  Modify your login password below. Requirements: 8+ characters, uppercase, lowercase, numbers & symbols.
+                </p>
 
-            {passwordSuccess && (
-              <div className="p-3 bg-green/10 border border-green/20 text-green-dark text-xs font-bold rounded-xl flex items-center gap-2">
-                <CheckCircle className="h-4 w-4 text-green" />
-                {passwordSuccess}
-              </div>
-            )}
-            
-            {passwordError && (
-              <div className="p-3 bg-red-50 border border-red-250 text-red-650 text-xs font-bold rounded-xl flex items-center gap-2">
-                <AlertCircle className="h-4 w-4 text-red-500" />
-                {passwordError}
-              </div>
-            )}
+                {passwordSuccess && (
+                  <div className="p-3 bg-green/10 border border-green/20 text-green-dark text-xs font-bold rounded-xl flex items-center gap-2">
+                    <CheckCircle className="h-4 w-4 text-green" />
+                    {passwordSuccess}
+                  </div>
+                )}
+                
+                {passwordError && (
+                  <div className="p-3 bg-red-50 border border-red-200 text-red-650 text-xs font-bold rounded-xl flex items-center gap-2">
+                    <AlertCircle className="h-4 w-4 text-red-500" />
+                    {passwordError}
+                  </div>
+                )}
 
-            <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 mt-1">
-              <div className="flex flex-col gap-1.5">
-                <label className={labelClass}>Current Password</label>
-                <input
-                  id="account-curr-pwd"
-                  type="password"
-                  className={inputClass}
-                  placeholder="••••••••"
-                  value={currentPassword}
-                  onChange={e => { setCurrentPassword(e.target.value); setPasswordError(null); }}
-                />
+                <div className="flex flex-col gap-3.5">
+                  <div className="flex flex-col gap-1">
+                    <label className={labelClass}>Current Password</label>
+                    <input
+                      id="account-curr-pwd"
+                      type="password"
+                      className={inputClass}
+                      placeholder="••••••••"
+                      value={currentPassword}
+                      onChange={e => { setCurrentPassword(e.target.value); setPasswordError(null); }}
+                    />
+                  </div>
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3.5">
+                    <div className="flex flex-col gap-1">
+                      <label className={labelClass}>New Password</label>
+                      <input
+                        id="account-new-pwd"
+                        type="password"
+                        className={inputClass}
+                        placeholder="••••••••"
+                        value={newPassword}
+                        onChange={e => { setNewPassword(e.target.value); setPasswordError(null); }}
+                      />
+                    </div>
+                    <div className="flex flex-col gap-1">
+                      <label className={labelClass}>Confirm Password</label>
+                      <input
+                        id="account-conf-pwd"
+                        type="password"
+                        className={inputClass}
+                        placeholder="••••••••"
+                        value={confirmNewPassword}
+                        onChange={e => { setConfirmNewPassword(e.target.value); setPasswordError(null); }}
+                      />
+                    </div>
+                  </div>
+                </div>
               </div>
-              <div className="flex flex-col gap-1.5">
-                <label className={labelClass}>New Password</label>
-                <input
-                  id="account-new-pwd"
-                  type="password"
-                  className={inputClass}
-                  placeholder="••••••••"
-                  value={newPassword}
-                  onChange={e => { setNewPassword(e.target.value); setPasswordError(null); }}
-                />
-              </div>
-              <div className="flex flex-col gap-1.5">
-                <label className={labelClass}>Confirm New Password</label>
-                <input
-                  id="account-conf-pwd"
-                  type="password"
-                  className={inputClass}
-                  placeholder="••••••••"
-                  value={confirmNewPassword}
-                  onChange={e => { setConfirmNewPassword(e.target.value); setPasswordError(null); }}
-                />
-              </div>
-            </div>
 
-            <div className="flex justify-end mt-2">
-              <button
-                type="submit"
-                disabled={passwordUpdating}
-                className="bg-[#0C4737] hover:bg-[#0A3B2F] text-white px-5 py-2.5 rounded-xl text-xs font-black transition-all shadow-md disabled:opacity-60 cursor-pointer active:scale-98"
-              >
-                {passwordUpdating ? 'Updating Password...' : 'Update Password'}
-              </button>
-            </div>
-          </form>
+              <div className="pt-4 border-t border-navy/5 flex justify-end">
+                <button
+                  type="submit"
+                  disabled={passwordUpdating}
+                  className="bg-[#0C4737] hover:bg-[#0A3B2F] text-white px-5 py-3 rounded-xl text-xs font-black transition-all shadow-md disabled:opacity-60 cursor-pointer active:scale-98"
+                >
+                  {passwordUpdating ? 'Updating Password...' : 'Update Password'}
+                </button>
+              </div>
+            </form>
+          </div>
 
-          {/* Danger Zone */}
-          <div className="flex flex-col gap-4 border border-red-200/60 bg-red-50/10 p-5 rounded-2xl mt-2 text-left">
-            <h4 className="text-sm font-extrabold text-red-600 flex items-center gap-2">
-              <AlertCircle className="h-4 w-4 text-red-500" />
-              Danger Zone
-            </h4>
-            <p className="text-[11px] text-navy/55 font-semibold -mt-2">
-              Permanently delete your profile and all associated data under this tenant.
-            </p>
-            <div className="flex items-center justify-between bg-white border border-red-150 p-4 rounded-xl mt-1">
+          {/* Card 3: Danger Zone */}
+          <div className="border border-red-200/50 bg-red-50/5 p-6 rounded-3xl flex flex-col gap-4 text-left shadow-sm">
+            <div className="flex items-center gap-2">
+              <div className="p-2 bg-red-500/10 rounded-xl">
+                <AlertCircle className="h-5 w-5 text-red-500" />
+              </div>
               <div>
-                <p className="text-xs font-extrabold text-navy">Delete Account</p>
-                <p className="text-[10px] text-navy/40 font-semibold mt-0.5">
-                  Once deleted, your profile, clients, invoices, and payments are permanently destroyed and cannot be recovered.
+                <h4 className="text-sm font-black text-red-600">Danger Zone</h4>
+                <p className="text-[11px] text-navy/40 font-semibold mt-0.5">Permanent account and data removal options.</p>
+              </div>
+            </div>
+            
+            <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between bg-white border border-red-100 p-5 rounded-2xl gap-4">
+              <div className="max-w-2xl">
+                <p className="text-xs font-extrabold text-navy">Permanently Delete Workspace</p>
+                <p className="text-[11px] text-text-secondary leading-relaxed font-semibold mt-1">
+                  Once initiated, your business profile, invoices, payments, client directory, and user login are completely destroyed. This action is irreversible.
                 </p>
               </div>
               <button
                 type="button"
                 onClick={() => { setShowDeleteModal(true); setDeleteConfirmText(''); setDeleteError(null); }}
-                className="bg-red-500 hover:bg-red-600 text-white px-4 py-2.5 rounded-xl text-xs font-extrabold transition-all shadow-sm cursor-pointer"
+                className="w-full sm:w-auto bg-red-500 hover:bg-red-600 text-white px-5 py-3 rounded-xl text-xs font-black transition-all shadow-md hover:shadow-red-500/15 cursor-pointer text-center active:scale-98"
               >
                 Delete Account...
               </button>
@@ -786,6 +937,48 @@ const BusinessSettings: React.FC<BusinessSettingsProps> = ({ defaultTab = 'profi
                     className="flex-1 py-3 text-xs font-black bg-red-600 hover:bg-red-700 text-white rounded-xl shadow-md transition-all disabled:opacity-50 cursor-pointer"
                   >
                     {deletingAccount ? 'Purging Data...' : 'Confirm Purge'}
+                  </button>
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* Pro Subscription Cancellation Confirmation Modal */}
+          {showCancelModal && (
+            <div className="fixed inset-0 bg-[#06121E]/65 backdrop-blur-sm z-[2000] flex items-center justify-center p-4">
+              <div className="w-full max-w-md bg-white rounded-3xl border border-navy/5 shadow-2xl p-6 md:p-8 flex flex-col gap-6 animate-float-fast relative text-left">
+                <div>
+                  <h3 className="text-lg font-black text-navy flex items-center gap-2">
+                    <AlertCircle className="h-5 w-5 text-green" />
+                    Turn Off Auto-Renewal?
+                  </h3>
+                  <p className="text-xs text-text-secondary font-semibold mt-2 leading-relaxed">
+                    Are you sure you want to turn off auto-renewal for your Pro subscription?
+                  </p>
+                  <p className="text-xs text-text-secondary font-semibold mt-3 leading-relaxed">
+                    Your account will remain **Pro** with all features (reports, automated reminders, custom logos) fully unlocked until the end of your paid billing period on <strong className="text-navy">{businessProfile?.subscriptionExpiresAt ? new Date(businessProfile.subscriptionExpiresAt).toLocaleDateString() : 'expiry date'}</strong>. 
+                  </p>
+                  <p className="text-xs text-text-secondary font-semibold mt-2 leading-relaxed">
+                    After this date, your business profile will be automatically downgraded to the Free Plan.
+                  </p>
+                </div>
+
+                <div className="flex gap-3 pt-2">
+                  <button
+                    type="button"
+                    onClick={() => setShowCancelModal(false)}
+                    disabled={cancellingSub}
+                    className="flex-1 py-3 text-xs font-bold border border-navy/15 text-navy hover:bg-navy/5 rounded-xl transition-all cursor-pointer"
+                  >
+                    Keep Auto-Renew On
+                  </button>
+                  <button
+                    type="button"
+                    onClick={handleCancelSubscription}
+                    disabled={cancellingSub}
+                    className="flex-1 py-3 text-xs font-black bg-navy hover:bg-[#0A3B2F] text-white rounded-xl shadow-md transition-all disabled:opacity-50 cursor-pointer"
+                  >
+                    {cancellingSub ? 'Processing...' : 'Turn Off Auto-Renewal'}
                   </button>
                 </div>
               </div>
@@ -926,6 +1119,17 @@ const BusinessSettings: React.FC<BusinessSettingsProps> = ({ defaultTab = 'profi
           )}
         </div>
       </div>
+
+      {/* Upgrade Checkout Modal */}
+      <UpgradeModal
+        isOpen={isUpgradeModalOpen}
+        onClose={() => setIsUpgradeModalOpen(false)}
+        onSuccess={() => {
+          refreshBusinessProfile();
+          setSuccessMsg("Congratulations! You have successfully upgraded to the Pro plan.");
+          setTimeout(() => setSuccessMsg(null), 4000);
+        }}
+      />
     </div>
   );
 };

@@ -19,6 +19,7 @@ import { authMiddleware } from './middleware/authMiddleware';
 import dns from 'dns';
 import cron from 'node-cron';
 import Invoice from './models/Invoice';
+import Business from './models/Business';
 import { runDailyReminders } from './services/reminderScheduler';
 
 // Fix for DNS SRV resolution issues on certain ISPs (like Jio/Airtel in India)
@@ -109,6 +110,24 @@ const startServer = () => {
 
         // Run automated payment reminders scan
         await runDailyReminders();
+
+        // Check for expired Pro subscriptions
+        const expiredResult = await Business.updateMany(
+          {
+            isPro: true,
+            subscriptionExpiresAt: { $lte: new Date() }
+          },
+          {
+            $set: {
+              isPro: false,
+              subscriptionPlan: 'none',
+              cancelAtPeriodEnd: false
+            }
+          }
+        );
+        if (expiredResult.modifiedCount > 0) {
+          console.log(`✅ Daily check: Downgraded ${expiredResult.modifiedCount} expired subscriptions to Free plan.`);
+        }
       } catch (err) {
         console.error('❌ Error in daily Overdue cron schedule:', err);
       }
@@ -133,6 +152,24 @@ const startServer = () => {
 
         // Run automated payment reminders scan on boot
         await runDailyReminders();
+
+        // Check for expired Pro subscriptions on startup
+        const expiredResult = await Business.updateMany(
+          {
+            isPro: true,
+            subscriptionExpiresAt: { $lte: new Date() }
+          },
+          {
+            $set: {
+              isPro: false,
+              subscriptionPlan: 'none',
+              cancelAtPeriodEnd: false
+            }
+          }
+        );
+        if (expiredResult.modifiedCount > 0) {
+          console.log(`✅ Startup check: Downgraded ${expiredResult.modifiedCount} expired subscriptions to Free plan.`);
+        }
       } catch (err) {
         console.error('❌ Error in startup Overdue check:', err);
       }

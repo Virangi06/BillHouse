@@ -143,6 +143,7 @@ router.post('/razorpay/verify-payment', async (req: AuthRequest, res: Response) 
     business.isPro = true;
     business.subscriptionPlan = planType;
     business.subscriptionExpiresAt = expiresAt;
+    business.cancelAtPeriodEnd = false;
     await business.save();
 
     // Log audit trail
@@ -162,6 +163,82 @@ router.post('/razorpay/verify-payment', async (req: AuthRequest, res: Response) 
   } catch (error) {
     console.error('❌ Verify Razorpay payment error:', error);
     return res.status(500).json({ error: 'Failed to verify subscription payment.' });
+  }
+});
+
+// 3. CANCEL / TURN OFF PRO SUBSCRIPTION (Grace period cancellation)
+router.post('/cancel-subscription', async (req: AuthRequest, res: Response) => {
+  try {
+    if (!req.user) {
+      return res.status(401).json({ error: 'Unauthorized' });
+    }
+
+    const { tenantId, id: userId } = req.user;
+
+    // Find and update business
+    const business = await Business.findOne({ tenantId });
+    if (!business) {
+      return res.status(404).json({ error: 'Business profile not found.' });
+    }
+
+    business.cancelAtPeriodEnd = true;
+    await business.save();
+
+    // Log audit trail
+    logAudit({
+      tenantId,
+      userId,
+      userName: req.user.name || 'User',
+      action: AuditActions.BUSINESS_UPDATED,
+      details: 'Scheduled Pro subscription cancellation at period end.',
+      ipAddress: req.ip
+    });
+
+    return res.status(200).json({
+      message: 'Pro subscription set to cancel at the end of the billing period.',
+      business
+    });
+  } catch (error) {
+    console.error('❌ Cancel subscription error:', error);
+    return res.status(500).json({ error: 'Failed to cancel subscription.' });
+  }
+});
+
+// 4. REACTIVATE AUTO-RENEWAL FOR PRO PLAN
+router.post('/reactivate-subscription', async (req: AuthRequest, res: Response) => {
+  try {
+    if (!req.user) {
+      return res.status(401).json({ error: 'Unauthorized' });
+    }
+
+    const { tenantId, id: userId } = req.user;
+
+    // Find and update business
+    const business = await Business.findOne({ tenantId });
+    if (!business) {
+      return res.status(404).json({ error: 'Business profile not found.' });
+    }
+
+    business.cancelAtPeriodEnd = false;
+    await business.save();
+
+    // Log audit trail
+    logAudit({
+      tenantId,
+      userId,
+      userName: req.user.name || 'User',
+      action: AuditActions.BUSINESS_UPDATED,
+      details: 'Reactivated Pro subscription auto-renewal.',
+      ipAddress: req.ip
+    });
+
+    return res.status(200).json({
+      message: 'Pro subscription auto-renewal reactivated successfully.',
+      business
+    });
+  } catch (error) {
+    console.error('❌ Reactivate subscription error:', error);
+    return res.status(500).json({ error: 'Failed to reactivate subscription.' });
   }
 });
 

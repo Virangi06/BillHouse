@@ -42,6 +42,7 @@ export interface IBusiness extends Document {
   isPro?: boolean;
   subscriptionPlan?: 'monthly' | 'annual' | 'none';
   subscriptionExpiresAt?: Date;
+  cancelAtPeriodEnd?: boolean;
   // Timestamps
   createdAt: Date;
   updatedAt: Date;
@@ -93,7 +94,8 @@ const BusinessSchema: Schema = new Schema(
     // Pro Subscription Tier
     isPro: { type: Boolean, default: false },
     subscriptionPlan: { type: String, enum: ['monthly', 'annual', 'none'], default: 'none' },
-    subscriptionExpiresAt: { type: Date }
+    subscriptionExpiresAt: { type: Date },
+    cancelAtPeriodEnd: { type: Boolean, default: false }
   },
   {
     timestamps: true
