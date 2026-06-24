@@ -670,7 +670,16 @@ const BusinessSettings: React.FC<BusinessSettingsProps> = ({ defaultTab = 'profi
                     <p className="text-xs font-extrabold text-navy">{form.bankIfsc}</p></div>
                 )}
                 {form.bankUpi && (
-                     case 'account': return (
+                  <div><p className="text-[10px] text-navy/40 font-bold uppercase tracking-wider">UPI</p>
+                    <p className="text-xs font-extrabold text-navy">{form.bankUpi}</p></div>
+                )}
+              </div>
+            </div>
+          )}
+        </div>
+      );
+
+      case 'account': return (
         <div className="flex flex-col gap-8 text-left animate-fade-in">
           
           {/* Top Grid: Subscription & Password */}
