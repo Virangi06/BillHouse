@@ -5,6 +5,11 @@ import bcryptjs from 'bcryptjs';
 import User from '../models/User';
 import { sendVerificationEmail, sendResetPasswordEmail } from '../services/emailService';
 import { authMiddleware, AuthRequest } from '../middleware/authMiddleware';
+import Business from '../models/Business';
+import Client from '../models/Client';
+import Invoice from '../models/Invoice';
+import Payment from '../models/Payment';
+import AuditLog from '../models/AuditLog';
 
 const router = Router();
 
@@ -262,6 +267,75 @@ router.get('/me', authMiddleware, async (req: AuthRequest, res: Response) => {
   } catch (error) {
     console.error('❌ Get user error:', error);
     return res.status(500).json({ error: 'Server error fetching user details' });
+  }
+});
+
+// 7. CHANGE PASSWORD (PROTECTED)
+router.put('/change-password', authMiddleware, async (req: AuthRequest, res: Response) => {
+  try {
+    if (!req.user) {
+      return res.status(401).json({ error: 'Unauthorized' });
+    }
+
+    const { currentPassword, newPassword } = req.body;
+    if (!currentPassword || !newPassword) {
+      return res.status(400).json({ error: 'Current password and new password are required' });
+    }
+
+    const user = await User.findById(req.user.id);
+    if (!user) {
+      return res.status(404).json({ error: 'User not found' });
+    }
+
+    // Verify current password
+    const isMatch = await user.comparePassword(currentPassword);
+    if (!isMatch) {
+      return res.status(400).json({ error: 'Incorrect current password' });
+    }
+
+    // Validate strength of the new password
+    const passwordError = validatePassword(newPassword);
+    if (passwordError) {
+      return res.status(400).json({ error: passwordError });
+    }
+
+    // Hash and save new password
+    const salt = await bcryptjs.genSalt(10);
+    user.passwordHash = await bcryptjs.hash(newPassword, salt);
+    await user.save();
+
+    return res.status(200).json({ message: 'Password changed successfully' });
+  } catch (error) {
+    console.error('❌ Change password error:', error);
+    return res.status(500).json({ error: 'Server error changing password' });
+  }
+});
+
+// 8. DELETE ACCOUNT & PURGE TENANT DATA (PROTECTED)
+router.delete('/delete-account', authMiddleware, async (req: AuthRequest, res: Response) => {
+  try {
+    if (!req.user) {
+      return res.status(401).json({ error: 'Unauthorized' });
+    }
+
+    const { tenantId } = req.user;
+
+    // Purge user's tenant-related database collections in parallel
+    await Promise.all([
+      User.deleteMany({ tenantId }), // Delete all users under this tenant
+      Business.deleteOne({ tenantId }), // Delete business profile
+      Client.deleteMany({ tenantId }), // Delete all clients
+      Invoice.deleteMany({ tenantId }), // Delete all invoices
+      Payment.deleteMany({ tenantId }), // Delete all payments
+      AuditLog.deleteMany({ tenantId }) // Delete audit logs
+    ]);
+
+    console.log(`🧹 Account Purged: Successfully deleted tenant data for ID ${tenantId}`);
+
+    return res.status(200).json({ message: 'Account and all associated tenant data deleted successfully' });
+  } catch (error) {
+    console.error('❌ Delete account error:', error);
+    return res.status(500).json({ error: 'Server error during account deletion' });
   }
 });
 

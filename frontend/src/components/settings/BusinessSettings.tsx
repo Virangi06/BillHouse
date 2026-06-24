@@ -1,6 +1,7 @@
 import React, { useState, useRef, useEffect } from 'react';
 import API from '../../utils/api';
 import { useBusinessProfile, getLogoUrl } from '../../context/BusinessContext';
+import { useAuth } from '../../context/AuthContext';
 import {
   Building2, User, Briefcase, MapPin, Upload, X,
   Save, CheckCircle, AlertCircle, Banknote, FileText,
@@ -44,7 +45,7 @@ const INVOICE_FORMATS = [
   { value: '{prefix}{number}', label: 'INV000001 (Continuous)' },
 ];
 
-type TabKey = 'profile' | 'address' | 'branding' | 'invoice' | 'tax' | 'bank';
+type TabKey = 'profile' | 'address' | 'branding' | 'invoice' | 'tax' | 'bank' | 'account';
 
 const TABS: { key: TabKey; label: string; icon: React.ElementType; description: string }[] = [
   { key: 'profile',       label: 'Business Profile',   icon: Building2,     description: 'Name, type & contact' },
@@ -53,19 +54,95 @@ const TABS: { key: TabKey; label: string; icon: React.ElementType; description: 
   { key: 'invoice',       label: 'Invoice Config',     icon: FileText,      description: 'Numbering & currency' },
   { key: 'tax',           label: 'Tax Registry',       icon: BadgePercent,  description: 'GST, PAN & tax IDs' },
   { key: 'bank',          label: 'Bank & Payment',     icon: Banknote,      description: 'Account & UPI details' },
+  { key: 'account',       label: 'Account',            icon: User,          description: 'Password & account deletion' },
 ];
 
-const BusinessSettings: React.FC = () => {
+interface BusinessSettingsProps {
+  defaultTab?: TabKey;
+  hideTabs?: boolean;
+}
+
+const BusinessSettings: React.FC<BusinessSettingsProps> = ({ defaultTab = 'profile', hideTabs = false }) => {
   const { businessProfile, refreshBusinessProfile } = useBusinessProfile();
+  const { logout } = useAuth();
   const fileInputRef  = useRef<HTMLInputElement>(null);
   const bannerInputRef = useRef<HTMLInputElement>(null);
 
-  const [activeTab, setActiveTab] = useState<TabKey>('profile');
+  const [activeTab, setActiveTab] = useState<TabKey>(defaultTab);
+
+  // Sync state if defaultTab changes (e.g. switching tabs via sidebar)
+  useEffect(() => {
+    setActiveTab(defaultTab);
+  }, [defaultTab]);
   const [saving, setSaving] = useState(false);
   const [successMsg, setSuccessMsg] = useState<string | null>(null);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
   const [logoPreview, setLogoPreview] = useState<string>('');
   const [bannerPreview, setBannerPreview] = useState<string>('');
+
+  // Account settings states
+  const [currentPassword, setCurrentPassword] = useState('');
+  const [newPassword, setNewPassword] = useState('');
+  const [confirmNewPassword, setConfirmNewPassword] = useState('');
+  const [passwordUpdating, setPasswordUpdating] = useState(false);
+  const [passwordSuccess, setPasswordSuccess] = useState<string | null>(null);
+  const [passwordError, setPasswordError] = useState<string | null>(null);
+
+  const [showDeleteModal, setShowDeleteModal] = useState(false);
+  const [deleteConfirmText, setDeleteConfirmText] = useState('');
+  const [deletingAccount, setDeletingAccount] = useState(false);
+  const [deleteError, setDeleteError] = useState<string | null>(null);
+
+  const handlePasswordChange = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setPasswordError(null);
+    setPasswordSuccess(null);
+
+    if (!currentPassword || !newPassword || !confirmNewPassword) {
+      setPasswordError('All fields are required.');
+      return;
+    }
+
+    if (newPassword !== confirmNewPassword) {
+      setPasswordError('New passwords do not match.');
+      return;
+    }
+
+    setPasswordUpdating(true);
+    try {
+      await API.put('/auth/change-password', {
+        currentPassword,
+        newPassword
+      });
+      setPasswordSuccess('Password updated successfully!');
+      setCurrentPassword('');
+      setNewPassword('');
+      setConfirmNewPassword('');
+    } catch (err: any) {
+      setPasswordError(err.response?.data?.error || 'Failed to update password.');
+    } finally {
+      setPasswordUpdating(false);
+    }
+  };
+
+  const handleDeleteAccount = async () => {
+    if (deleteConfirmText !== 'DELETE') {
+      setDeleteError('Please type DELETE to confirm.');
+      return;
+    }
+
+    setDeletingAccount(true);
+    setDeleteError(null);
+    try {
+      await API.delete('/auth/delete-account');
+      setShowDeleteModal(false);
+      logout();
+      window.location.href = '/';
+    } catch (err: any) {
+      setDeleteError(err.response?.data?.error || 'Failed to delete account.');
+      setDeletingAccount(false);
+    }
+  };
 
   const [form, setForm] = useState({
     name: '', legalName: '', type: 'freelancer' as 'freelancer' | 'agency' | 'business',
@@ -563,6 +640,160 @@ const BusinessSettings: React.FC = () => {
         </div>
       );
 
+      case 'account': return (
+        <div className="flex flex-col gap-6 text-left">
+          {/* Change Password Form */}
+          <form onSubmit={handlePasswordChange} className="flex flex-col gap-4 bg-[#FAFCFB] border border-navy/5 p-5 rounded-2xl">
+            <h4 className="text-sm font-extrabold text-navy flex items-center gap-2">
+              <Shield className="h-4 w-4 text-green" />
+              Change Password
+            </h4>
+            <p className="text-[11px] text-navy/55 font-semibold -mt-2">
+              Ensure your account uses a secure password to prevent unauthorized access.
+            </p>
+
+            {passwordSuccess && (
+              <div className="p-3 bg-green/10 border border-green/20 text-green-dark text-xs font-bold rounded-xl flex items-center gap-2">
+                <CheckCircle className="h-4 w-4 text-green" />
+                {passwordSuccess}
+              </div>
+            )}
+            
+            {passwordError && (
+              <div className="p-3 bg-red-50 border border-red-250 text-red-650 text-xs font-bold rounded-xl flex items-center gap-2">
+                <AlertCircle className="h-4 w-4 text-red-500" />
+                {passwordError}
+              </div>
+            )}
+
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 mt-1">
+              <div className="flex flex-col gap-1.5">
+                <label className={labelClass}>Current Password</label>
+                <input
+                  id="account-curr-pwd"
+                  type="password"
+                  className={inputClass}
+                  placeholder="••••••••"
+                  value={currentPassword}
+                  onChange={e => { setCurrentPassword(e.target.value); setPasswordError(null); }}
+                />
+              </div>
+              <div className="flex flex-col gap-1.5">
+                <label className={labelClass}>New Password</label>
+                <input
+                  id="account-new-pwd"
+                  type="password"
+                  className={inputClass}
+                  placeholder="••••••••"
+                  value={newPassword}
+                  onChange={e => { setNewPassword(e.target.value); setPasswordError(null); }}
+                />
+              </div>
+              <div className="flex flex-col gap-1.5">
+                <label className={labelClass}>Confirm New Password</label>
+                <input
+                  id="account-conf-pwd"
+                  type="password"
+                  className={inputClass}
+                  placeholder="••••••••"
+                  value={confirmNewPassword}
+                  onChange={e => { setConfirmNewPassword(e.target.value); setPasswordError(null); }}
+                />
+              </div>
+            </div>
+
+            <div className="flex justify-end mt-2">
+              <button
+                type="submit"
+                disabled={passwordUpdating}
+                className="bg-[#0C4737] hover:bg-[#0A3B2F] text-white px-5 py-2.5 rounded-xl text-xs font-black transition-all shadow-md disabled:opacity-60 cursor-pointer active:scale-98"
+              >
+                {passwordUpdating ? 'Updating Password...' : 'Update Password'}
+              </button>
+            </div>
+          </form>
+
+          {/* Danger Zone */}
+          <div className="flex flex-col gap-4 border border-red-200/60 bg-red-50/10 p-5 rounded-2xl mt-2 text-left">
+            <h4 className="text-sm font-extrabold text-red-600 flex items-center gap-2">
+              <AlertCircle className="h-4 w-4 text-red-500" />
+              Danger Zone
+            </h4>
+            <p className="text-[11px] text-navy/55 font-semibold -mt-2">
+              Permanently delete your profile and all associated data under this tenant.
+            </p>
+            <div className="flex items-center justify-between bg-white border border-red-150 p-4 rounded-xl mt-1">
+              <div>
+                <p className="text-xs font-extrabold text-navy">Delete Account</p>
+                <p className="text-[10px] text-navy/40 font-semibold mt-0.5">
+                  Once deleted, your profile, clients, invoices, and payments are permanently destroyed and cannot be recovered.
+                </p>
+              </div>
+              <button
+                type="button"
+                onClick={() => { setShowDeleteModal(true); setDeleteConfirmText(''); setDeleteError(null); }}
+                className="bg-red-500 hover:bg-red-600 text-white px-4 py-2.5 rounded-xl text-xs font-extrabold transition-all shadow-sm cursor-pointer"
+              >
+                Delete Account...
+              </button>
+            </div>
+          </div>
+
+          {/* Account Deletion Confirmation Modal */}
+          {showDeleteModal && (
+            <div className="fixed inset-0 bg-[#06121E]/65 backdrop-blur-sm z-[2000] flex items-center justify-center p-4">
+              <div className="w-full max-w-md bg-white rounded-3xl border border-navy/5 shadow-2xl p-6 md:p-8 flex flex-col gap-6 animate-float-fast relative text-left">
+                <div>
+                  <h3 className="text-lg font-black text-red-600 flex items-center gap-2">
+                    <AlertCircle className="h-5 w-5 text-red-500" />
+                    Are you absolutely sure?
+                  </h3>
+                  <p className="text-xs text-text-secondary font-semibold mt-2 leading-relaxed">
+                    This action is **irreversible**. It will immediately and permanently delete your user account, business profile, and all related database records (clients, invoices, payments, audit history) for this workspace.
+                  </p>
+                  <p className="text-xs text-text-secondary font-semibold mt-3">
+                    To confirm, please type <strong className="text-red-600 select-none">DELETE</strong> in the box below:
+                  </p>
+                </div>
+
+                <div className="flex flex-col gap-3">
+                  <input
+                    id="delete-account-confirm"
+                    type="text"
+                    className="w-full bg-white border border-navy/15 rounded-xl px-4 py-2.5 text-xs text-navy font-bold focus:outline-none focus:ring-2 focus:ring-red-500/20 focus:border-red-500/50 placeholder:text-navy/20"
+                    placeholder="Type DELETE"
+                    value={deleteConfirmText}
+                    onChange={e => { setDeleteConfirmText(e.target.value); setDeleteError(null); }}
+                  />
+                  {deleteError && (
+                    <p className="text-[10px] text-red-600 font-extrabold leading-none">{deleteError}</p>
+                  )}
+                </div>
+
+                <div className="flex gap-3 pt-2">
+                  <button
+                    type="button"
+                    onClick={() => setShowDeleteModal(false)}
+                    disabled={deletingAccount}
+                    className="flex-1 py-3 text-xs font-bold border border-navy/15 text-navy hover:bg-navy/5 rounded-xl transition-all cursor-pointer"
+                  >
+                    Cancel
+                  </button>
+                  <button
+                    type="button"
+                    onClick={handleDeleteAccount}
+                    disabled={deletingAccount || deleteConfirmText !== 'DELETE'}
+                    className="flex-1 py-3 text-xs font-black bg-red-600 hover:bg-red-700 text-white rounded-xl shadow-md transition-all disabled:opacity-50 cursor-pointer"
+                  >
+                    {deletingAccount ? 'Purging Data...' : 'Confirm Purge'}
+                  </button>
+                </div>
+              </div>
+            </div>
+          )}
+        </div>
+      );
+
       default: return null;
     }
   };
@@ -603,13 +834,15 @@ const BusinessSettings: React.FC = () => {
               </div>
             ))}
           </div>
-          <button id="settings-save-btn" onClick={handleSave} disabled={saving}
-            className="flex items-center gap-2 bg-[#0C4737] hover:bg-[#0A3B2F] text-white px-5 py-2.5 rounded-xl text-xs font-black transition-all shadow-md disabled:opacity-60 w-full sm:w-auto justify-center">
-            {saving
-              ? <><RefreshCw className="h-4 w-4 animate-spin" /> Saving...</>
-              : <><Save className="h-4 w-4" /> Save Changes</>
-            }
-          </button>
+          {activeTab !== 'account' && (
+            <button id="settings-save-btn" onClick={handleSave} disabled={saving}
+              className="flex items-center gap-2 bg-[#0C4737] hover:bg-[#0A3B2F] text-white px-5 py-2.5 rounded-xl text-xs font-black transition-all shadow-md disabled:opacity-60 w-full sm:w-auto justify-center">
+              {saving
+                ? <><RefreshCw className="h-4 w-4 animate-spin" /> Saving...</>
+                : <><Save className="h-4 w-4" /> Save Changes</>
+              }
+            </button>
+          )}
         </div>
       </div>
 
@@ -634,27 +867,29 @@ const BusinessSettings: React.FC = () => {
       <div className="flex flex-col gap-4">
 
         {/* Horizontal tab bar */}
-        <div className="bg-white border border-navy/5 rounded-2xl shadow-sm p-1.5 overflow-x-auto">
-          <div className="flex gap-1 min-w-max">
-            {TABS.map(tab => {
-              const Icon = tab.icon;
-              const isActive = activeTab === tab.key;
-              return (
-                <button key={tab.key} onClick={() => setActiveTab(tab.key)}
-                  className={`flex items-center gap-2 px-4 py-2.5 rounded-xl text-xs font-bold transition-all whitespace-nowrap
-                    ${isActive
-                      ? 'bg-navy text-white shadow-sm'
-                      : 'text-navy/55 hover:bg-navy/5 hover:text-navy'}`}>
-                  <div className={`w-6 h-6 rounded-lg flex items-center justify-center shrink-0 transition-all
-                    ${isActive ? 'bg-white/15' : 'bg-navy/5'}`}>
-                    <Icon className={`h-3.5 w-3.5 ${isActive ? 'text-white' : 'text-navy/50'}`} />
-                  </div>
-                  {tab.label}
-                </button>
-              );
-            })}
+        {!hideTabs && (
+          <div className="bg-white border border-navy/5 rounded-2xl shadow-sm p-1.5 overflow-x-auto">
+            <div className="flex gap-1 min-w-max">
+              {TABS.filter(tab => tab.key !== 'account').map(tab => {
+                const Icon = tab.icon;
+                const isActive = activeTab === tab.key;
+                return (
+                  <button key={tab.key} onClick={() => setActiveTab(tab.key)}
+                    className={`flex items-center gap-2 px-4 py-2.5 rounded-xl text-xs font-bold transition-all whitespace-nowrap
+                      ${isActive
+                        ? 'bg-navy text-white shadow-sm'
+                        : 'text-navy/55 hover:bg-navy/5 hover:text-navy'}`}>
+                    <div className={`w-6 h-6 rounded-lg flex items-center justify-center shrink-0 transition-all
+                      ${isActive ? 'bg-white/15' : 'bg-navy/5'}`}>
+                      <Icon className={`h-3.5 w-3.5 ${isActive ? 'text-white' : 'text-navy/50'}`} />
+                    </div>
+                    {tab.label}
+                  </button>
+                );
+              })}
+            </div>
           </div>
-        </div>
+        )}
 
         {/* Tab panel */}
         <div className="bg-white border border-navy/5 rounded-2xl shadow-sm overflow-hidden">
@@ -675,18 +910,20 @@ const BusinessSettings: React.FC = () => {
           </div>
 
           {/* Panel footer */}
-          <div className="flex items-center justify-between px-6 py-4 border-t border-navy/5 bg-[#FAFCFB]">
-            <p className="text-[11px] text-navy/40 font-semibold">
-              Changes apply to all invoices going forward.
-            </p>
-            <button onClick={handleSave} disabled={saving}
-              className="flex items-center gap-2 bg-[#0C4737] hover:bg-[#0A3B2F] text-white px-5 py-2.5 rounded-xl text-xs font-extrabold transition-all shadow-md disabled:opacity-60">
-              {saving
-                ? <><RefreshCw className="h-3.5 w-3.5 animate-spin" /> Saving...</>
-                : <><Save className="h-3.5 w-3.5" /> Save Changes</>
-              }
-            </button>
-          </div>
+          {activeTab !== 'account' && (
+            <div className="flex items-center justify-between px-6 py-4 border-t border-navy/5 bg-[#FAFCFB]">
+              <p className="text-[11px] text-navy/40 font-semibold">
+                Changes apply to all invoices going forward.
+              </p>
+              <button onClick={handleSave} disabled={saving}
+                className="flex items-center gap-2 bg-[#0C4737] hover:bg-[#0A3B2F] text-white px-5 py-2.5 rounded-xl text-xs font-extrabold transition-all shadow-md disabled:opacity-60">
+                {saving
+                  ? <><RefreshCw className="h-3.5 w-3.5 animate-spin" /> Saving...</>
+                  : <><Save className="h-3.5 w-3.5" /> Save Changes</>
+                }
+              </button>
+            </div>
+          )}
         </div>
       </div>
     </div>

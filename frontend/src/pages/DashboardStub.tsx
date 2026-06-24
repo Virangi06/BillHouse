@@ -41,7 +41,8 @@ import {
   BarChart3,
   UserPlus,
   Eye,
-  Menu
+  Menu,
+  Building2
 } from 'lucide-react';
 import {
   AreaChart,
@@ -204,40 +205,7 @@ export const DashboardStub: React.FC = () => {
 
   const [isNotificationsOpen, setIsNotificationsOpen] = useState<boolean>(false);
   const notificationsRef = useRef<HTMLDivElement | null>(null);
-  const [notifications, setNotifications] = useState<NotificationItem[]>([
-    {
-      id: 'n-1',
-      type: 'payment',
-      title: 'Payment Received',
-      message: 'Received ₹45,000.00 from TechCorp Solutions for INV-000001.',
-      time: '2 hours ago',
-      read: false
-    },
-    {
-      id: 'n-2',
-      type: 'invoice',
-      title: 'Invoice Overdue Warning',
-      message: 'Invoice INV-000002 for Acme Corp is 3 days overdue.',
-      time: 'Yesterday',
-      read: false
-    },
-    {
-      id: 'n-3',
-      type: 'client',
-      title: 'New Client Registered',
-      message: 'CloudScale Inc. was registered successfully.',
-      time: '2 days ago',
-      read: false
-    },
-    {
-      id: 'n-4',
-      type: 'system',
-      title: 'Profile Completion 70%',
-      message: 'Complete your tax & branding settings to unlock professional templates.',
-      time: '3 days ago',
-      read: true
-    }
-  ]);
+  const [notifications, setNotifications] = useState<NotificationItem[]>([]);
 
   // Unified global keyboard shortcut for Cmd/Ctrl+K
   useEffect(() => {
@@ -258,6 +226,71 @@ export const DashboardStub: React.FC = () => {
     try {
       const response = await API.get<DashboardStats>('/dashboard/stats');
       setStats(response.data);
+
+      // Map recentActivity to notifications and merge with existing notifications
+      if (response.data.recentActivity) {
+        const dbNotifs = response.data.recentActivity.map((act: any) => {
+          const id = `act-${act.type}-${act.message}-${act.time}`;
+          
+          let notifType: 'payment' | 'invoice' | 'client' | 'system' = 'system';
+          let title = 'System Update';
+          if (act.type === 'client_created') {
+            notifType = 'client';
+            title = 'New Client';
+          } else if (act.type === 'invoice_paid') {
+            notifType = 'payment';
+            title = 'Invoice Paid';
+          } else if (act.type === 'invoice_sent') {
+            notifType = 'invoice';
+            title = 'Invoice Sent';
+          } else if (act.type === 'invoice_created') {
+            notifType = 'invoice';
+            title = 'Invoice Created';
+          } else if (act.type === 'payment_received') {
+            notifType = 'payment';
+            title = 'Payment Received';
+          }
+
+          return {
+            id,
+            type: notifType,
+            title,
+            message: act.message + (act.meta ? ` (${act.meta})` : ''),
+            time: act.time,
+            read: false
+          };
+        });
+
+        setNotifications(prevNotifs => {
+          // Combine existing notifications (e.g. locally triggered ones) and db notifications
+          // Keep read status of existing notifications
+          const combined = [...prevNotifs];
+          
+          dbNotifs.forEach((dbN: any) => {
+            const existingIndex = combined.findIndex(n => n.id === dbN.id);
+            if (existingIndex !== -1) {
+              // Maintain the existing notification's read state
+              combined[existingIndex] = {
+                ...dbN,
+                read: combined[existingIndex].read
+              };
+            } else {
+              // Check if there is an exact same message already in the list
+              const duplicateMessage = combined.some(n => n.message === dbN.message && n.type === dbN.type);
+              if (!duplicateMessage) {
+                combined.push(dbN);
+              }
+            }
+          });
+
+          // Sort by date or id: keep local "Just now" notifications at the top
+          return combined.sort((a, b) => {
+            if (a.time === 'Just now' && b.time !== 'Just now') return -1;
+            if (a.time !== 'Just now' && b.time === 'Just now') return 1;
+            return 0;
+          });
+        });
+      }
     } catch (err: any) {
       console.error(err);
       setErrorMsg(err.response?.data?.error || 'Failed to fetch dashboard metrics');
@@ -837,17 +870,30 @@ export const DashboardStub: React.FC = () => {
             )}
           </button>
 
-          {/* Business Settings */}
+          {/* Business Profile */}
+          <button
+            onClick={() => handleTabChange('profile')}
+            className={`w-full flex items-center gap-3 px-4 py-3 rounded-2xl text-sm font-semibold transition-all duration-200 ${
+              activeTab === 'profile'
+                ? 'bg-green/10 text-green-dark border-l-4 border-green font-bold shadow-sm'
+                : 'text-navy/70 hover:text-navy hover:bg-navy/5'
+            }`}
+          >
+            <Building2 className="h-5 w-5 text-green" />
+            Business Profile
+          </button>
+
+          {/* Account Settings */}
           <button
             onClick={() => handleTabChange('settings')}
             className={`w-full flex items-center gap-3 px-4 py-3 rounded-2xl text-sm font-semibold transition-all duration-200 ${
-              activeTab === 'settings' || activeTab === 'profile'
+              activeTab === 'settings'
                 ? 'bg-green/10 text-green-dark border-l-4 border-green font-bold shadow-sm'
                 : 'text-navy/70 hover:text-navy hover:bg-navy/5'
             }`}
           >
             <Settings className="h-5 w-5 text-green" />
-            Business Settings
+            Settings
           </button>
         </nav>
 
@@ -1329,7 +1375,7 @@ export const DashboardStub: React.FC = () => {
                       </div>
                       {/* Micro sparkline */}
                       <div className="w-16 sm:w-20 h-10 select-none shrink-0">
-                        <ResponsiveContainer width="100%" height="100%">
+                        <ResponsiveContainer width="100%" height="100%" minWidth={0}>
                           <AreaChart data={sparkRevenue} margin={{ top: 2, bottom: 2, left: 2, right: 2 }}>
                             <defs>
                               <linearGradient id="colorRev" x1="0" y1="0" x2="0" y2="1">
@@ -1366,7 +1412,7 @@ export const DashboardStub: React.FC = () => {
                       </div>
                       {/* Micro sparkline */}
                       <div className="w-16 sm:w-20 h-10 select-none shrink-0">
-                        <ResponsiveContainer width="100%" height="100%">
+                        <ResponsiveContainer width="100%" height="100%" minWidth={0}>
                           <AreaChart data={sparkOutstanding} margin={{ top: 2, bottom: 2, left: 2, right: 2 }}>
                             <defs>
                               <linearGradient id="colorOut" x1="0" y1="0" x2="0" y2="1">
@@ -1403,7 +1449,7 @@ export const DashboardStub: React.FC = () => {
                       </div>
                       {/* Micro sparkline */}
                       <div className="w-16 sm:w-20 h-10 select-none shrink-0">
-                        <ResponsiveContainer width="100%" height="100%">
+                        <ResponsiveContainer width="100%" height="100%" minWidth={0}>
                           <AreaChart data={sparkPaid} margin={{ top: 2, bottom: 2, left: 2, right: 2 }}>
                             <defs>
                               <linearGradient id="colorPaid" x1="0" y1="0" x2="0" y2="1">
@@ -1440,7 +1486,7 @@ export const DashboardStub: React.FC = () => {
                       </div>
                       {/* Micro sparkline red */}
                       <div className="w-16 sm:w-20 h-10 select-none shrink-0">
-                        <ResponsiveContainer width="100%" height="100%">
+                        <ResponsiveContainer width="100%" height="100%" minWidth={0}>
                           <AreaChart data={sparkOverdue} margin={{ top: 2, bottom: 2, left: 2, right: 2 }}>
                             <defs>
                               <linearGradient id="colorOverdue" x1="0" y1="0" x2="0" y2="1">
@@ -2131,8 +2177,10 @@ export const DashboardStub: React.FC = () => {
                 </>
               )}
             </div>
-          ) : activeTab === 'settings' || activeTab === 'profile' ? (
-            <BusinessSettings />
+          ) : activeTab === 'profile' ? (
+            <BusinessSettings defaultTab="profile" />
+          ) : activeTab === 'settings' ? (
+            <BusinessSettings defaultTab="account" hideTabs={true} />
           ) : activeTab === 'reports' && isPro ? (
             /* ========================================================
                REPORTS & ANALYTICS VIEW
@@ -2395,8 +2443,10 @@ export const DashboardStub: React.FC = () => {
             </div>
           ) : activeTab === 'reminders' && isPro ? (
             <ReminderSettings />
-          ) : activeTab === 'settings' || activeTab === 'profile' ? (
-            <BusinessSettings />
+          ) : activeTab === 'profile' ? (
+            <BusinessSettings defaultTab="profile" />
+          ) : activeTab === 'settings' ? (
+            <BusinessSettings defaultTab="account" hideTabs={true} />
           ) : null}
 
         </main>

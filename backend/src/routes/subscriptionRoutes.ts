@@ -58,7 +58,7 @@ router.post('/razorpay/create-order', async (req: AuthRequest, res: Response) =>
       const options = {
         amount,
         currency,
-        receipt: `sub_receipt_${req.user.tenantId}_${Date.now()}`,
+        receipt: `rcpt_${req.user.tenantId.toString().slice(-8)}_${Date.now()}`,
         notes: {
           tenantId: req.user.tenantId,
           planType,
