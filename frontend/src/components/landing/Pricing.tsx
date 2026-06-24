@@ -56,6 +56,24 @@ const plans: PricingPlan[] = [
     ctaLink: "/register",
     isPopular: true,
     variant: "dark",
+  },
+  {
+    name: "Growth / Agency",
+    price: "₹999",
+    period: "month",
+    description: "For scaling agencies, teams, and high-volume operators.",
+    features: [
+      { text: "Unlimited invoices & clients", included: true },
+      { text: "Custom email sending domains", included: true },
+      { text: "Multi-user team access", included: true },
+      { text: "Automated payment schedules", included: true },
+      { text: "Dedicated API logs & webhooks", included: true },
+      { text: "Priority 24/7 support agent", included: true },
+    ],
+    ctaText: "Start Growth Trial",
+    ctaLink: "/register",
+    isPopular: false,
+    variant: "mint",
   }
 ];
 
@@ -73,15 +91,15 @@ export const Pricing: React.FC = () => {
         </div>
 
         {/* Pricing Cards Grid */}
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-5 md:gap-8 max-w-4xl mx-auto items-stretch">
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5 md:gap-8 max-w-7xl mx-auto items-stretch">
           {plans.map((plan, idx) => (
             <GlassCard
               key={idx}
               variant={plan.variant}
               className={`p-5 sm:p-8 md:p-10 flex flex-col justify-between relative border-navy/10 ${
                 plan.isPopular 
-                  ? 'ring-2 ring-green shadow-xl scale-100 md:scale-105 z-10' 
-                  : 'shadow-md scale-100 md:scale-100 z-0'
+                  ? 'ring-2 ring-green shadow-xl scale-100 lg:scale-105 z-10' 
+                  : 'shadow-md scale-100 z-0'
               }`}
             >
               {/* Most Popular Badge */}

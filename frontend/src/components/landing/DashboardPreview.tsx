@@ -135,7 +135,7 @@ export const DashboardPreview: React.FC<DashboardPreviewProps> = ({
               {/* Responsive Demo Video Embed */}
               <iframe
                 className="absolute inset-0 w-full h-full border-0"
-                src="https://www.youtube.com/embed/dQw4w9WgXcQ?autoplay=1"
+                src="https://www.youtube.com/embed/8aGhQA3_DQQ?autoplay=1"
                 title="BillHouse Walkthrough Demo"
                 allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
                 allowFullScreen
