@@ -14,6 +14,7 @@ import ReminderSettings from '../components/settings/ReminderSettings';
 import ClientDetail from '../components/clients/ClientDetail';
 import logo from '../assets/Logo_transparent.png';
 import { useBusinessProfile } from '../context/BusinessContext';
+import { usePopup } from '../context/PopupContext';
 import { FileSpreadsheet, Printer as PrintIcon, Download } from 'lucide-react';
 import UpgradeModal from '../components/common/UpgradeModal';
 import * as XLSX from 'xlsx';
@@ -29,7 +30,7 @@ import {
   Calendar,
   TrendingUp,
   TrendingDown,
-  DollarSign,
+  IndianRupee,
   Clock,
   CheckCircle,
   AlertTriangle,
@@ -131,6 +132,7 @@ export const DashboardStub: React.FC = () => {
   const activeTab = searchParams.get('tab') || 'dashboard';
   const action = searchParams.get('action');
   const [isMobileSidebarOpen, setIsMobileSidebarOpen] = useState<boolean>(false);
+  const { showPopup } = usePopup();
 
   // Date range utility
   const getCurrentMonthRange = () => {
@@ -147,8 +149,6 @@ export const DashboardStub: React.FC = () => {
   const [stats, setStats] = useState<DashboardStats | null>(null);
   const [loading, setLoading] = useState<boolean>(false);
   const [statsLoading, setStatsLoading] = useState<boolean>(false);
-  const [errorMsg, setErrorMsg] = useState<string | null>(null);
-  const [successMsg, setSuccessMsg] = useState<string | null>(null);
 
   // Search filter
   const [clientSearchQuery, setClientSearchQuery] = useState<string>('');
@@ -169,7 +169,6 @@ export const DashboardStub: React.FC = () => {
     country: 'India',
     notes: ''
   });
-  const [isDeletingClient, setIsDeletingClient] = useState<ClientData | null>(null);
   // Selected client for detail view
   const [selectedClientId, setSelectedClientId] = useState<string | null>(null);
   // Client list sort/filter
@@ -182,6 +181,7 @@ export const DashboardStub: React.FC = () => {
   const [reportsLoading, setReportsLoading] = useState<boolean>(false);
   const [reportStartDate, setReportStartDate] = useState<string>('');
   const [reportEndDate, setReportEndDate] = useState<string>('');
+  const [exportSuccessModal, setExportSuccessModal] = useState<{ isOpen: boolean; fileType: string; fileName: string }>({ isOpen: false, fileType: '', fileName: '' });
 
   // Profile Dropdown and row menus Refs
   const [isProfileDropdownOpen, setIsProfileDropdownOpen] = useState<boolean>(false);
@@ -293,7 +293,11 @@ export const DashboardStub: React.FC = () => {
       }
     } catch (err: any) {
       console.error(err);
-      setErrorMsg(err.response?.data?.error || 'Failed to fetch dashboard metrics');
+      showPopup({
+        title: 'Error',
+        message: err.response?.data?.error || 'Failed to fetch dashboard metrics',
+        type: 'error'
+      });
     } finally {
       setStatsLoading(false);
     }
@@ -311,7 +315,11 @@ export const DashboardStub: React.FC = () => {
       setClients(response.data);
     } catch (err: any) {
       console.error(err);
-      setErrorMsg(err.response?.data?.error || 'Failed to fetch clients from database');
+      showPopup({
+        title: 'Error',
+        message: err.response?.data?.error || 'Failed to fetch clients from database',
+        type: 'error'
+      });
     } finally {
       setLoading(false);
     }
@@ -340,9 +348,49 @@ export const DashboardStub: React.FC = () => {
       setReportsData(response.data);
     } catch (err: any) {
       console.error(err);
-      setErrorMsg(err.response?.data?.error || 'Failed to fetch reports and analytics');
+      showPopup({
+        title: 'Error',
+        message: err.response?.data?.error || 'Failed to fetch reports and analytics',
+        type: 'error'
+      });
     } finally {
       setReportsLoading(false);
+    }
+  };
+
+  // Apply quick date range filter presets
+  const applyDatePreset = (preset: '30days' | '90days' | 'quarter' | 'fy' | 'all') => {
+    const today = new Date();
+    const formatDate = (date: Date) => date.toISOString().slice(0, 10);
+    
+    if (preset === '30days') {
+      const prior = new Date();
+      prior.setDate(today.getDate() - 30);
+      setReportStartDate(formatDate(prior));
+      setReportEndDate(formatDate(today));
+    } else if (preset === '90days') {
+      const prior = new Date();
+      prior.setDate(today.getDate() - 90);
+      setReportStartDate(formatDate(prior));
+      setReportEndDate(formatDate(today));
+    } else if (preset === 'quarter') {
+      // Start of current calendar quarter: Jan (0), Apr (3), Jul (6), Oct (9)
+      const currentMonth = today.getMonth();
+      const startMonth = Math.floor(currentMonth / 3) * 3;
+      const startQuarter = new Date(today.getFullYear(), startMonth, 1);
+      setReportStartDate(formatDate(startQuarter));
+      setReportEndDate(formatDate(today));
+    } else if (preset === 'fy') {
+      // Indian Financial Year runs from April 1 to March 31
+      const currentYear = today.getFullYear();
+      const currentMonth = today.getMonth();
+      const startYear = currentMonth >= 3 ? currentYear : currentYear - 1;
+      const startFY = new Date(startYear, 3, 1); // April 1st
+      setReportStartDate(formatDate(startFY));
+      setReportEndDate(formatDate(today));
+    } else if (preset === 'all') {
+      setReportStartDate('');
+      setReportEndDate('');
     }
   };
 
@@ -350,53 +398,185 @@ export const DashboardStub: React.FC = () => {
   const exportToExcel = () => {
     if (!reportsData) return;
     try {
-      // 1. Financials Summary Sheet
-      const financialsData = [
-        { Metric: 'Total Invoiced', Value: reportsData.financials.totalInvoiced },
-        { Metric: 'Cash Collected', Value: reportsData.financials.totalCollected },
-        { Metric: 'Outstanding Balance', Value: reportsData.financials.totalOutstanding },
-        { Metric: 'GST Tax Collected', Value: reportsData.financials.totalGstCollected },
-        { Metric: 'TDS Deducted', Value: reportsData.financials.totalTdsDeducted },
-        { Metric: 'Total Invoice Count', Value: reportsData.financials.invoiceCount }
-      ];
-      const wsSummary = XLSX.utils.json_to_sheet(financialsData);
+      const wb = XLSX.utils.book_new();
 
-      // 2. Billing & Tax Trends Sheet
-      const trendsData = reportsData.billingTrend.map((bt: any, index: number) => {
+      // Helper to generate a sheet with title block, metadata, headers, data, and optional totals
+      const createSheetData = (
+        sheetTitle: string,
+        headers: string[],
+        rawRows: any[][],
+        colWidths: number[],
+        numColumnsToFormat: number[] = []
+      ) => {
+        const data: any[][] = [];
+        
+        // Corporate Title Block
+        data.push([`BillHouse Invoicing & Financial Performance Ledger`]);
+        data.push([sheetTitle]);
+        data.push([`Business Profile: ${businessProfile?.name || 'My Business'}`]);
+        data.push([`Reporting Period: ${reportStartDate || 'All Time'} to ${reportEndDate || 'Present'}`]);
+        data.push([`Export Date: ${new Date().toLocaleString()}`]);
+        data.push([]); // blank separator row
+        
+        // Headers (row index 6, which is 1-based row 7)
+        data.push(headers);
+        
+        // Data Rows
+        rawRows.forEach(row => {
+          data.push(row);
+        });
+
+        // Convert array of arrays to worksheet
+        const ws = XLSX.utils.aoa_to_sheet(data);
+        
+        // Set column widths
+        ws['!cols'] = colWidths.map(w => ({ wch: w }));
+        
+        // Apply cell styling types & number format codes (native INR currency style)
+        const startRowIndex = 7; // index 7 starts the actual data rows
+        const totalRowsCount = data.length;
+
+        for (let r = startRowIndex; r < totalRowsCount; r++) {
+          numColumnsToFormat.forEach(colIdx => {
+            const colLetter = XLSX.utils.encode_col(colIdx);
+            const cellRef = `${colLetter}${r + 1}`;
+            const cell = ws[cellRef];
+            if (cell && typeof cell.v === 'number') {
+              cell.t = 'n';
+              // Check if it's the Total Active Invoice Count (plain integer format)
+              if (sheetTitle.includes('Overview') && r === startRowIndex + 5) {
+                cell.z = '#,##0';
+              } else {
+                cell.z = '"₹"#,##,##0.00';
+              }
+            }
+          });
+        }
+        
+        return ws;
+      };
+
+      // 1. Executive Summary Sheet
+      const summaryHeaders = ['Financial KPI Metric', 'Value (INR)'];
+      const summaryRows = [
+        ['Gross Amount Billed (Total Invoiced)', reportsData.financials.totalInvoiced],
+        ['Net Cash Collected (Received Payments)', reportsData.financials.totalCollected],
+        ['Outstanding Receivables (Unpaid Balance)', reportsData.financials.totalOutstanding],
+        ['GST Tax Liability Collected', reportsData.financials.totalGstCollected],
+        ['TDS Deductibles Withheld', reportsData.financials.totalTdsDeducted],
+        ['Total Active Invoice Count', reportsData.financials.invoiceCount]
+      ];
+      
+      const wsSummary = createSheetData(
+        'Executive Financial Overview',
+        summaryHeaders,
+        summaryRows,
+        [42, 22],
+        [1] // Format column 1 (Value)
+      );
+
+      // 2. Monthly Billing & Tax Trends Sheet
+      const trendsHeaders = [
+        'Month', 
+        'Gross Billed Amount (INR)', 
+        'Net Collected Amount (INR)', 
+        'GST Tax Liability (INR)', 
+        'TDS Deductibles (INR)',
+        'Net Cash Flow (Collected - TDS) (INR)'
+      ];
+      
+      const trendsRows = reportsData.billingTrend.map((bt: any, index: number) => {
         const tt = reportsData.taxTrend[index] || { gst: 0, tds: 0 };
-        return {
-          Month: bt.month,
-          'Billed Amount (₹)': bt.billed,
-          'Collected Amount (₹)': bt.collected,
-          'GST Collected (₹)': tt.gst,
-          'TDS Deducted (₹)': tt.tds
-        };
+        const netCashFlow = (bt.collected || 0) - (tt.tds || 0);
+        return [
+          bt.month,
+          bt.billed,
+          bt.collected,
+          tt.gst,
+          tt.tds,
+          netCashFlow
+        ];
       });
-      const wsTrends = XLSX.utils.json_to_sheet(trendsData);
+
+      // Add a Sum Total row at the bottom
+      const totalBilled = reportsData.billingTrend.reduce((sum: number, bt: any) => sum + (bt.billed || 0), 0);
+      const totalCollected = reportsData.billingTrend.reduce((sum: number, bt: any) => sum + (bt.collected || 0), 0);
+      const totalGst = reportsData.taxTrend.reduce((sum: number, tt: any) => sum + (tt.gst || 0), 0);
+      const totalTds = reportsData.taxTrend.reduce((sum: number, tt: any) => sum + (tt.tds || 0), 0);
+      const totalNetCashFlow = totalCollected - totalTds;
+      
+      trendsRows.push([
+        'TOTAL SUMMARY',
+        totalBilled,
+        totalCollected,
+        totalGst,
+        totalTds,
+        totalNetCashFlow
+      ]);
+
+      const wsTrends = createSheetData(
+        'Monthly Billing & Tax Trends',
+        trendsHeaders,
+        trendsRows,
+        [15, 25, 25, 25, 25, 30],
+        [1, 2, 3, 4, 5] // Columns to format as currency
+      );
 
       // 3. Overdue Aging Invoices Sheet
-      const overdueData = (reportsData.overdueAging || []).map((inv: any) => ({
-        'Invoice Number': inv.number,
-        'Client Name': inv.clientName,
-        'Due Date': new Date(inv.dueDate).toLocaleDateString(),
-        'Overdue Days': inv.overdueDays,
-        'Amount Due (₹)': inv.amountDue
-      }));
-      const wsOverdue = XLSX.utils.json_to_sheet(overdueData);
+      const overdueHeaders = [
+        'Invoice Number', 
+        'Client Name', 
+        'Due Date', 
+        'Overdue Duration', 
+        'Outstanding Balance Due (INR)'
+      ];
+      
+      // Sort aging data descending by overdue duration (oldest first)
+      const sortedOverdueAging = [...(reportsData.overdueAging || [])].sort((a, b) => b.overdueDays - a.overdueDays);
+      
+      const overdueRows = sortedOverdueAging.map((inv: any) => [
+        inv.number,
+        inv.clientName,
+        new Date(inv.dueDate).toLocaleDateString(),
+        `${inv.overdueDays} Days`,
+        inv.amountDue
+      ]);
 
-      // Create Workbook and append sheets
-      const wb = XLSX.utils.book_new();
+      // Add Total Overdue row
+      const totalOverdue = sortedOverdueAging.reduce((sum: number, inv: any) => sum + (inv.amountDue || 0), 0);
+      overdueRows.push([
+        'TOTAL OVERDUE BALANCE',
+        '',
+        '',
+        '',
+        totalOverdue
+      ]);
+
+      const wsOverdue = createSheetData(
+        'Accounts Receivable Overdue Aging Register',
+        overdueHeaders,
+        overdueRows,
+        [20, 30, 18, 18, 30],
+        [4] // Format column 4 (Outstanding Balance)
+      );
+
+      // Create Workbook and append formatted sheets
       XLSX.utils.book_append_sheet(wb, wsSummary, 'Financial Overview');
       XLSX.utils.book_append_sheet(wb, wsTrends, 'Monthly Trends');
       XLSX.utils.book_append_sheet(wb, wsOverdue, 'Overdue Aging Register');
 
       // Save file
-      XLSX.writeFile(wb, `BillHouse_Financial_Report_${new Date().toISOString().slice(0,10)}.xlsx`);
-      setSuccessMsg('Financial report successfully exported to Excel format!');
+      const fileName = `BillHouse_Financial_Report_${new Date().toISOString().slice(0,10)}.xlsx`;
+      XLSX.writeFile(wb, fileName);
       addNotification('system', 'Excel Export Complete', 'Financial reports workbook generated.');
+      setExportSuccessModal({ isOpen: true, fileType: 'Excel', fileName });
     } catch (err: any) {
       console.error(err);
-      setErrorMsg('Failed to export Excel report.');
+      showPopup({
+        title: 'Export Failed',
+        message: 'Failed to export Excel report.',
+        type: 'error'
+      });
     }
   };
 
@@ -404,50 +584,91 @@ export const DashboardStub: React.FC = () => {
   const exportToCSV = () => {
     if (!reportsData) return;
     try {
-      let csvContent = 'data:text/csv;charset=utf-8,';
+      // Create BOM (Byte Order Mark) for UTF-8 compatibility in Microsoft Excel
+      let csvContent = '\uFEFF';
       
-      // Title
-      csvContent += 'BillHouse Invoicing Financial Report\n';
-      csvContent += `Generated: ${new Date().toLocaleString()}\n\n`;
+      // Title Block
+      csvContent += '==================================================\n';
+      csvContent += 'BILLHOUSE FINANCIAL PERFORMANCE & LEDGER REPORT\n';
+      csvContent += '==================================================\n';
+      csvContent += `Generated For:,"${businessProfile?.name || 'My Business'}"\n`;
+      csvContent += `Reporting Period:,${reportStartDate || 'All Time'} to ${reportEndDate || 'Present'}\n`;
+      csvContent += `Generated Date & Time:,${new Date().toLocaleString()}\n`;
+      csvContent += '==================================================\n\n';
 
-      // Financials Summary
-      csvContent += 'FINANCIALS OVERVIEW\n';
-      csvContent += 'Metric,Value (₹)\n';
-      csvContent += `Total Invoiced,${reportsData.financials.totalInvoiced}\n`;
-      csvContent += `Cash Collected,${reportsData.financials.totalCollected}\n`;
-      csvContent += `Outstanding Balance,${reportsData.financials.totalOutstanding}\n`;
+      // 1. Financials Summary
+      csvContent += '1. EXECUTIVE FINANCIAL OVERVIEW\n';
+      csvContent += '--------------------------------------------------\n';
+      csvContent += 'Financial Metric,Value (INR)\n';
+      csvContent += `Gross Amount Billed (Total Invoiced),${reportsData.financials.totalInvoiced}\n`;
+      csvContent += `Net Cash Collected,${reportsData.financials.totalCollected}\n`;
+      csvContent += `Outstanding Receivables (Unpaid),${reportsData.financials.totalOutstanding}\n`;
       csvContent += `GST Tax Collected,${reportsData.financials.totalGstCollected}\n`;
-      csvContent += `TDS Deducted,${reportsData.financials.totalTdsDeducted}\n`;
-      csvContent += `Invoice Count,${reportsData.financials.invoiceCount}\n\n`;
+      csvContent += `TDS Deductibles Withheld,${reportsData.financials.totalTdsDeducted}\n`;
+      csvContent += `Total Invoices Issued,${reportsData.financials.invoiceCount}\n\n`;
 
-      // Trends
-      csvContent += 'MONTHLY TRENDS\n';
-      csvContent += 'Month,Billed (₹),Collected (₹),GST Collected (₹),TDS Deducted (₹)\n';
+      // 2. Billing & Tax Trends
+      csvContent += '2. MONTH-ON-MONTH PERFORMANCE TRENDS\n';
+      csvContent += '--------------------------------------------------\n';
+      csvContent += 'Month,Gross Billed Amount (INR),Net Collected Amount (INR),GST Liability (INR),TDS Deductibles (INR),Net Cash Flow (INR)\n';
+      
+      let totalBilled = 0;
+      let totalCollected = 0;
+      let totalGst = 0;
+      let totalTds = 0;
+
       reportsData.billingTrend.forEach((bt: any, i: number) => {
         const tt = reportsData.taxTrend[i] || { gst: 0, tds: 0 };
-        csvContent += `${bt.month},${bt.billed},${bt.collected},${tt.gst},${tt.tds}\n`;
-      });
-      csvContent += '\n';
+        const billed = bt.billed || 0;
+        const collected = bt.collected || 0;
+        const gst = tt.gst || 0;
+        const tds = tt.tds || 0;
+        const netCash = collected - tds;
 
-      // Overdue aging
-      csvContent += 'OVERDUE AGING INVOICES\n';
-      csvContent += 'Invoice Number,Client Name,Due Date,Overdue Days,Amount Due (₹)\n';
-      (reportsData.overdueAging || []).forEach((inv: any) => {
-        csvContent += `${inv.number},"${inv.clientName}",${new Date(inv.dueDate).toLocaleDateString()},${inv.overdueDays},${inv.amountDue}\n`;
-      });
+        totalBilled += billed;
+        totalCollected += collected;
+        totalGst += gst;
+        totalTds += tds;
 
-      const encodedUri = encodeURI(csvContent);
+        csvContent += `${bt.month},${billed},${collected},${gst},${tds},${netCash}\n`;
+      });
+      csvContent += `TOTALS,${totalBilled},${totalCollected},${totalGst},${totalTds},${totalCollected - totalTds}\n\n`;
+
+      // 3. Overdue Aging
+      csvContent += '3. ACCOUNTS RECEIVABLE OVERDUE AGING REGISTER\n';
+      csvContent += '--------------------------------------------------\n';
+      csvContent += 'Invoice Number,Client Name,Due Date,Overdue Duration,Outstanding Amount Due (INR)\n';
+      
+      const sortedOverdue = [...(reportsData.overdueAging || [])].sort((a, b) => b.overdueDays - a.overdueDays);
+      let totalOverdue = 0;
+
+      sortedOverdue.forEach((inv: any) => {
+        const dueVal = inv.amountDue || 0;
+        totalOverdue += dueVal;
+        csvContent += `${inv.number},"${inv.clientName.replace(/"/g, '""')}",${new Date(inv.dueDate).toLocaleDateString()},${inv.overdueDays} Days,${dueVal}\n`;
+      });
+      csvContent += `TOTAL OVERDUE BALANCE,,,,${totalOverdue}\n`;
+
+      const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+      const url = URL.createObjectURL(blob);
       const link = document.createElement('a');
-      link.setAttribute('href', encodedUri);
-      link.setAttribute('download', `BillHouse_Financial_Report_${new Date().toISOString().slice(0,10)}.csv`);
+      link.setAttribute('href', url);
+      const fileName = `BillHouse_Financial_Report_${new Date().toISOString().slice(0,10)}.csv`;
+      link.setAttribute('download', fileName);
       document.body.appendChild(link);
       link.click();
       document.body.removeChild(link);
-      setSuccessMsg('Financial report successfully exported to CSV!');
+      URL.revokeObjectURL(url);
+
       addNotification('system', 'CSV Export Complete', 'Financial reports CSV generated.');
+      setExportSuccessModal({ isOpen: true, fileType: 'CSV', fileName });
     } catch (err: any) {
       console.error(err);
-      setErrorMsg('Failed to export CSV report.');
+      showPopup({
+        title: 'Export Failed',
+        message: 'Failed to export CSV report.',
+        type: 'error'
+      });
     }
   };
 
@@ -496,8 +717,6 @@ export const DashboardStub: React.FC = () => {
       return;
     }
     setSearchParams({ tab });
-    setSuccessMsg(null);
-    setErrorMsg(null);
     setIsMobileSidebarOpen(false);
   };
 
@@ -515,7 +734,6 @@ export const DashboardStub: React.FC = () => {
       country: 'India',
       notes: ''
     });
-    setErrorMsg(null);
     setIsClientModalOpen(true);
   };
 
@@ -532,17 +750,18 @@ export const DashboardStub: React.FC = () => {
       country: client.country || 'India',
       notes: client.notes || ''
     });
-    setErrorMsg(null);
     setIsClientModalOpen(true);
   };
 
   const handleClientSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    setErrorMsg(null);
-    setSuccessMsg(null);
 
     if (!clientForm.name || !clientForm.email) {
-      setErrorMsg('Name and email are required fields');
+      showPopup({
+        title: 'Validation Error',
+        message: 'Name and email are required fields',
+        type: 'error'
+      });
       return;
     }
 
@@ -550,13 +769,21 @@ export const DashboardStub: React.FC = () => {
       if (editingClient) {
         // PUT update
         const response = await API.put(`/clients/${editingClient._id}`, clientForm);
-        setSuccessMsg('Client details updated successfully!');
+        showPopup({
+          title: 'Success',
+          message: 'Client details updated successfully!',
+          type: 'success'
+        });
         setClients(prev => prev.map(c => c._id === editingClient._id ? response.data.client : c));
         addNotification('client', 'Client Profile Updated', `${clientForm.name} details were updated successfully.`);
       } else {
         // POST create
         const response = await API.post('/clients', clientForm);
-        setSuccessMsg('New client added successfully!');
+        showPopup({
+          title: 'Success',
+          message: 'New client added successfully!',
+          type: 'success'
+        });
         setClients(prev => [response.data.client, ...prev]);
         addNotification('client', 'New Client Registered', `Client ${clientForm.name} registered (Email: ${clientForm.email})`);
       }
@@ -564,48 +791,64 @@ export const DashboardStub: React.FC = () => {
       fetchDashboardStats(); // Refresh stats counters
     } catch (err: any) {
       console.error(err);
-      setErrorMsg(err.response?.data?.error || 'Error saving client information');
+      showPopup({
+        title: 'Error',
+        message: err.response?.data?.error || 'Error saving client information',
+        type: 'error'
+      });
     }
   };
 
-  const handleDeleteClient = async () => {
-    if (!isDeletingClient) return;
-    setErrorMsg(null);
-    setSuccessMsg(null);
+  const handleDeleteClient = async (client: ClientData) => {
     try {
-      await API.delete(`/clients/${isDeletingClient._id}`);
-      setSuccessMsg('Client archived successfully');
-      setClients(prev => prev.filter(c => c._id !== isDeletingClient._id));
-      addNotification('client', 'Client Archived', `${isDeletingClient.name} was archived to preserve invoice history.`);
-      setIsDeletingClient(null);
+      await API.delete(`/clients/${client._id}`);
+      showPopup({
+        title: 'Success',
+        message: 'Client archived successfully',
+        type: 'success'
+      });
+      setClients(prev => prev.filter(c => c._id !== client._id));
+      addNotification('client', 'Client Archived', `${client.name} was archived to preserve invoice history.`);
       fetchDashboardStats(); // Refresh stats counters
     } catch (err: any) {
       console.error(err);
-      setErrorMsg(err.response?.data?.error || 'Error deleting client record');
+      showPopup({
+        title: 'Error',
+        message: err.response?.data?.error || 'Error deleting client record',
+        type: 'error'
+      });
     }
   };
 
   const handleReactivateClient = async (client: ClientData) => {
-    setErrorMsg(null);
-    setSuccessMsg(null);
     try {
       await API.put(`/clients/${client._id}`, { isArchived: false });
-      setSuccessMsg('Client reactivated successfully');
+      showPopup({
+        title: 'Success',
+        message: 'Client reactivated successfully',
+        type: 'success'
+      });
       setClients(prev => prev.filter(c => c._id !== client._id));
       addNotification('client', 'Client Reactivated', `${client.name} is now active.`);
       fetchDashboardStats(); // Refresh stats counters
     } catch (err: any) {
       console.error(err);
-      setErrorMsg(err.response?.data?.error || 'Error reactivating client');
+      showPopup({
+        title: 'Error',
+        message: err.response?.data?.error || 'Error reactivating client',
+        type: 'error'
+      });
     }
   };
 
   const handleUpdateInvoiceStatus = async (invoiceId: string, newStatus: string) => {
-    setErrorMsg(null);
-    setSuccessMsg(null);
     try {
       await API.patch(`/invoices/${invoiceId}/status`, { status: newStatus });
-      setSuccessMsg(`Invoice status updated to ${newStatus}`);
+      showPopup({
+        title: 'Success',
+        message: `Invoice status updated to ${newStatus}`,
+        type: 'success'
+      });
       addNotification('invoice', 'Invoice Status Updated', `Invoice status changed to ${newStatus}.`);
       
       // Update local state and refetch stats to keep charts in sync
@@ -630,7 +873,11 @@ export const DashboardStub: React.FC = () => {
       setActiveStatusInvoiceId(null);
     } catch (err: any) {
       console.error(err);
-      setErrorMsg(err.response?.data?.error || 'Error updating invoice status');
+      showPopup({
+        title: 'Error',
+        message: err.response?.data?.error || 'Error updating invoice status',
+        type: 'error'
+      });
     }
   };
 
@@ -814,7 +1061,7 @@ export const DashboardStub: React.FC = () => {
                 : 'text-navy/70 hover:text-navy hover:bg-navy/5'
             }`}
           >
-            <DollarSign className="h-5 w-5 text-green" />
+            <IndianRupee className="h-5 w-5 text-green" />
             Payments
           </button>
 
@@ -1218,19 +1465,7 @@ export const DashboardStub: React.FC = () => {
           </div>
         </header>
 
-        {/* Notifications alerts banner */}
-        {successMsg && (
-          <div className="mx-8 mt-6 p-4 bg-green/10 border border-green/35 text-green-dark text-xs font-bold rounded-2xl animate-float-fast flex justify-between items-center">
-            <span>{successMsg}</span>
-            <X className="h-4 w-4 cursor-pointer" onClick={() => setSuccessMsg(null)} />
-          </div>
-        )}
-        {errorMsg && (
-          <div className="mx-8 mt-6 p-4 bg-danger/10 border border-danger/35 text-danger text-xs font-bold rounded-2xl animate-float-fast flex justify-between items-center">
-            <span>{errorMsg}</span>
-            <X className="h-4 w-4 cursor-pointer" onClick={() => setErrorMsg(null)} />
-          </div>
-        )}
+        {/* Notifications alerts banner is handled by global usePopup */}
 
         {/* 3. CORE VIEWS SWITCH */}
         <main className="p-4 sm:p-6 md:p-8 flex-grow">
@@ -1357,7 +1592,7 @@ export const DashboardStub: React.FC = () => {
                       <div className="flex flex-col gap-1.5 font-semibold min-w-0">
                         <div className="flex items-center gap-2 text-xs text-text-secondary font-bold">
                           <div className="p-1.5 bg-green/10 text-green rounded-lg shrink-0">
-                            <DollarSign className="h-4 w-4" />
+                            <IndianRupee className="h-4 w-4" />
                           </div>
                           Total Revenue
                         </div>
@@ -2149,7 +2384,16 @@ export const DashboardStub: React.FC = () => {
                                           <Edit2 className="h-4.5 w-4.5" />
                                         </button>
                                         <button
-                                          onClick={() => setIsDeletingClient(client)}
+                                          onClick={() => {
+                                            showPopup({
+                                              title: 'Archive Client Profile',
+                                              message: `Are you sure you want to archive client ${client.name}? This will deactivate them and hide them from active lists, but all historical invoices and billing records will be kept.`,
+                                              type: 'confirm',
+                                              confirmText: 'Yes, Archive Client',
+                                              cancelText: 'No, Keep Active',
+                                              onConfirm: () => handleDeleteClient(client)
+                                            });
+                                          }}
                                           title="Archive Client"
                                           className="p-1.5 hover:bg-amber-500/10 rounded-lg text-text-secondary hover:text-amber-600 transition-all"
                                         >
@@ -2185,262 +2429,583 @@ export const DashboardStub: React.FC = () => {
             /* ========================================================
                REPORTS & ANALYTICS VIEW
                ======================================================== */
-            <div className="flex flex-col gap-8 max-w-7xl mx-auto animate-fade-in print:p-0">
-              
-              {/* Reports Page Header Strip */}
-              <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center bg-white border border-navy/5 p-6 rounded-2xl shadow-sm gap-4 print:hidden text-left">
-                <div>
-                  <h2 className="text-xl font-extrabold text-navy tracking-tight flex items-center gap-2">
-                    <BarChart3 className="h-6 w-6 text-green" />
-                    Reports & Analytics
-                  </h2>
-                  <p className="text-xs text-text-secondary font-semibold mt-0.5">
-                    Premium business insights, tax tracking, and financial statements.
-                  </p>
-                </div>
-                
-                {/* Export controls */}
-                <div className="flex items-center gap-3 w-full sm:w-auto">
-                  <button 
-                    onClick={exportToExcel}
-                    className="flex-1 sm:flex-none flex items-center justify-center gap-2 px-4 py-2.5 bg-green hover:bg-green-dark text-white text-xs font-bold rounded-xl transition-all shadow-sm active:scale-98 cursor-pointer"
-                  >
-                    <FileSpreadsheet className="h-4.5 w-4.5" />
-                    Export Excel
-                  </button>
-                  <button 
-                    onClick={exportToCSV}
-                    className="flex-1 sm:flex-none flex items-center justify-center gap-2 px-4 py-2.5 bg-navy hover:bg-[#1a2d3c] text-white text-xs font-bold rounded-xl transition-all shadow-sm active:scale-98 cursor-pointer"
-                  >
-                    <Download className="h-4.5 w-4.5" />
-                    Export CSV
-                  </button>
-                  <button 
-                    onClick={() => window.print()}
-                    className="flex-1 sm:flex-none flex items-center justify-center gap-2 px-4 py-2.5 bg-slate-100 hover:bg-slate-200 text-navy text-xs font-bold rounded-xl transition-all shadow-sm active:scale-98 cursor-pointer border border-navy/5"
-                  >
-                    <PrintIcon className="h-4.5 w-4.5" />
-                    Print / PDF
-                  </button>
-                </div>
-              </div>
+            (() => {
+              const totalInvoiced = reportsData?.financials?.totalInvoiced || 0;
+              const totalCollected = reportsData?.financials?.totalCollected || 0;
+              const totalOutstanding = reportsData?.financials?.totalOutstanding || 0;
+              const totalGstCollected = reportsData?.financials?.totalGstCollected || 0;
+              const totalTdsDeducted = reportsData?.financials?.totalTdsDeducted || 0;
+              const invoiceCount = reportsData?.financials?.invoiceCount || 0;
 
-              {/* Date filtering options strip */}
-              <div className="flex flex-col sm:flex-row gap-4 items-center justify-between bg-white border border-navy/5 p-4 rounded-2xl shadow-sm print:hidden">
-                <div className="flex items-center gap-2 text-xs font-semibold text-text-secondary">
-                  <span className="w-2.5 h-2.5 rounded-full bg-green inline-block"></span>
-                  <span>Premium Active Period Filters</span>
-                </div>
-                
-                <div className="flex flex-wrap sm:flex-nowrap items-center gap-3">
-                  <div className="flex items-center gap-2">
-                    <span className="text-xs font-semibold text-text-secondary">From:</span>
-                    <input 
-                      type="date"
-                      value={reportStartDate}
-                      onChange={e => setReportStartDate(e.target.value)}
-                      className="px-3 py-2 text-xs rounded-xl border border-navy/10 bg-white text-navy font-semibold focus:outline-none focus:border-green cursor-pointer"
-                    />
-                  </div>
-                  <div className="flex items-center gap-2">
-                    <span className="text-xs font-semibold text-text-secondary">To:</span>
-                    <input 
-                      type="date"
-                      value={reportEndDate}
-                      onChange={e => setReportEndDate(e.target.value)}
-                      className="px-3 py-2 text-xs rounded-xl border border-navy/10 bg-white text-navy font-semibold focus:outline-none focus:border-green cursor-pointer"
-                    />
-                  </div>
-                  {(reportStartDate || reportEndDate) && (
-                    <button 
-                      onClick={() => { setReportStartDate(''); setReportEndDate(''); }}
-                      className="text-xs text-red-500 font-bold hover:underline"
-                    >
-                      Clear
-                    </button>
-                  )}
-                </div>
-              </div>
+              const collectionRate = totalInvoiced > 0 ? Math.round((totalCollected / totalInvoiced) * 100) : 0;
+              const outstandingRate = totalInvoiced > 0 ? Math.round((totalOutstanding / totalInvoiced) * 100) : 0;
+              const taxRate = totalInvoiced > 0 ? ((totalGstCollected / totalInvoiced) * 100).toFixed(1) : '0.0';
+              const tdsRate = totalInvoiced > 0 ? ((totalTdsDeducted / totalInvoiced) * 100).toFixed(1) : '0.0';
 
-              {reportsLoading ? (
-                <div className="flex flex-col gap-8 py-12 items-center justify-center bg-white border border-navy/5 rounded-3xl min-h-[400px]">
-                  <div className="w-10 h-10 border-4 border-green/20 border-t-green rounded-full animate-spin"></div>
-                  <span className="text-xs font-bold text-text-secondary animate-pulse">Analyzing accounts ledger...</span>
-                </div>
-              ) : !reportsData ? (
-                <div className="glass-card p-12 text-center flex flex-col items-center justify-center gap-3 bg-white border border-navy/5 rounded-3xl min-h-[400px]">
-                  <BarChart3 className="h-10 w-10 text-text-secondary/40 animate-pulse" />
-                  <p className="text-xs font-bold text-text-secondary">Failed to retrieve reporting details.</p>
-                </div>
-              ) : (
-                <>
-                  {/* Financial Aggregates KPI cards */}
-                  <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6 text-left">
-                    {/* KPI 1: Total Invoiced */}
-                    <div className="glass-card p-6 rounded-3xl flex justify-between items-center bg-white border border-navy/5 hover:shadow-md transition-all">
-                      <div className="flex flex-col gap-1.5 font-semibold min-w-0">
-                        <span className="text-[10px] font-extrabold uppercase tracking-wider text-text-secondary">Total Billed</span>
-                        <span className="text-2xl font-black text-navy mt-1 truncate">
-                          {formatINR(reportsData.financials.totalInvoiced)}
-                        </span>
-                        <span className="text-[10px] text-text-secondary font-medium">Accumulated invoice amount</span>
-                      </div>
-                      <div className="p-3 bg-navy/5 text-navy rounded-2xl shrink-0">
-                        <FileText className="h-5 w-5 text-navy" />
-                      </div>
+              // Collection efficiency index rating
+              let collectionEfficiencyLabel = 'Critical';
+              let collectionBadgeColor = 'bg-red-500/10 text-red-500 border border-red-500/20';
+              if (collectionRate >= 85) {
+                collectionEfficiencyLabel = 'Excellent';
+                collectionBadgeColor = 'bg-emerald-500/10 text-emerald-600 border border-emerald-500/20';
+              } else if (collectionRate >= 60) {
+                collectionEfficiencyLabel = 'Moderate';
+                collectionBadgeColor = 'bg-amber-500/10 text-amber-600 border border-amber-500/20';
+              }
+
+              // Outstanding risk rating
+              let outstandingRiskLabel = 'Low Risk';
+              let outstandingBadgeColor = 'bg-emerald-500/10 text-emerald-600 border border-emerald-500/20';
+              if (outstandingRate >= 40) {
+                outstandingRiskLabel = 'High Risk';
+                outstandingBadgeColor = 'bg-red-500/10 text-red-500 border border-red-500/20';
+              } else if (outstandingRate >= 15) {
+                outstandingRiskLabel = 'Medium Risk';
+                outstandingBadgeColor = 'bg-amber-500/10 text-amber-600 border border-amber-500/20';
+              }
+
+              // Sorted Overdue Aging Register
+              const sortedOverdueAging = reportsData?.overdueAging 
+                ? [...reportsData.overdueAging].sort((a: any, b: any) => b.overdueDays - a.overdueDays)
+                : [];
+
+              const totalOverdueAmount = sortedOverdueAging.reduce((sum: number, inv: any) => sum + (inv.amountDue || 0), 0);
+
+              // Print view calculations
+              const totalBilled = reportsData?.billingTrend?.reduce((sum: number, bt: any) => sum + (bt.billed || 0), 0) || 0;
+              const totalTrendsCollected = reportsData?.billingTrend?.reduce((sum: number, bt: any) => sum + (bt.collected || 0), 0) || 0;
+              const totalTrendsGst = reportsData?.taxTrend?.reduce((sum: number, tt: any) => sum + (tt.gst || 0), 0) || 0;
+              const totalTrendsTds = reportsData?.taxTrend?.reduce((sum: number, tt: any) => sum + (tt.tds || 0), 0) || 0;
+
+              // Custom Tooltip component for Recharts
+              const CustomTooltip = ({ active, payload, label }: any) => {
+                if (active && payload && payload.length) {
+                  return (
+                    <div className="glass-card-dark text-white p-3.5 rounded-2xl border border-white/10 text-left text-xs font-semibold shadow-2xl backdrop-blur-xl">
+                      <p className="text-white/60 mb-2 font-bold uppercase tracking-wider text-[9px]">{label}</p>
+                      {payload.map((entry: any, index: number) => (
+                        <div key={index} className="flex items-center justify-between gap-6 py-0.5">
+                          <span className="flex items-center gap-1.5">
+                            <span className="w-1.5 h-1.5 rounded-full" style={{ backgroundColor: entry.color }}></span>
+                            <span className="text-white/80">{entry.name}:</span>
+                          </span>
+                          <span className="font-black text-white">{formatINR(entry.value)}</span>
+                        </div>
+                      ))}
                     </div>
+                  );
+                }
+                return null;
+              };
 
-                    {/* KPI 2: Cash Collected */}
-                    <div className="glass-card p-6 rounded-3xl flex justify-between items-center bg-white border border-navy/5 hover:shadow-md transition-all">
-                      <div className="flex flex-col gap-1.5 font-semibold min-w-0">
-                        <span className="text-[10px] font-extrabold uppercase tracking-wider text-text-secondary">Cash Collected</span>
-                        <span className="text-2xl font-black text-green-dark mt-1 truncate">
-                          {formatINR(reportsData.financials.totalCollected)}
-                        </span>
-                        <span className="text-[10px] text-text-secondary font-medium">Received settlements</span>
-                      </div>
-                      <div className="p-3 bg-green/10 text-green rounded-2xl shrink-0">
-                        <DollarSign className="h-5 w-5 text-green" />
-                      </div>
-                    </div>
-
-                    {/* KPI 3: GST Tax liability */}
-                    <div className="glass-card p-6 rounded-3xl flex justify-between items-center bg-white border border-navy/5 hover:shadow-md transition-all">
-                      <div className="flex flex-col gap-1.5 font-semibold min-w-0">
-                        <span className="text-[10px] font-extrabold uppercase tracking-wider text-text-secondary">GST Collected</span>
-                        <span className="text-2xl font-black text-blue-600 mt-1 truncate">
-                          {formatINR(reportsData.financials.totalGstCollected)}
-                        </span>
-                        <span className="text-[10px] text-text-secondary font-medium">Accumulated GST tax</span>
-                      </div>
-                      <div className="p-3 bg-blue-500/10 text-blue-600 rounded-2xl shrink-0">
-                        <TrendingUp className="h-5 w-5 text-blue-600" />
-                      </div>
-                    </div>
-
-                    {/* KPI 4: TDS Deducted */}
-                    <div className="glass-card p-6 rounded-3xl flex justify-between items-center bg-white border border-navy/5 hover:shadow-md transition-all">
-                      <div className="flex flex-col gap-1.5 font-semibold min-w-0">
-                        <span className="text-[10px] font-extrabold uppercase tracking-wider text-text-secondary">TDS Deducted</span>
-                        <span className="text-2xl font-black text-amber-600 mt-1 truncate">
-                          {formatINR(reportsData.financials.totalTdsDeducted)}
-                        </span>
-                        <span className="text-[10px] text-text-secondary font-medium">Withheld taxes (TDS)</span>
-                      </div>
-                      <div className="p-3 bg-amber-500/10 text-amber-600 rounded-2xl shrink-0">
-                        <Clock className="h-5 w-5 text-amber-600" />
-                      </div>
-                    </div>
-                  </div>
-
-                  {/* Charts Grid */}
-                  <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 print:block print:space-y-8">
+              return (
+                <div className="flex flex-col gap-8 max-w-7xl mx-auto animate-fade-in print:p-0">
+                  
+                  {/* Screen Version of the Reports (hidden on print) */}
+                  <div className="flex flex-col gap-8 print:hidden">
                     
-                    {/* Chart 1: Monthly billing trend (Billed vs Collected) */}
-                    <div className="glass-card p-6 rounded-3xl bg-white border border-navy/5 hover:shadow-md transition-all">
-                      <h3 className="text-sm font-extrabold text-navy text-left mb-6">Monthly Billing Performance (INR)</h3>
-                      <div className="h-80 w-full select-none">
-                        <ResponsiveContainer width="100%" height="100%">
-                          <BarChart data={reportsData.billingTrend} margin={{ top: 10, right: 10, left: -10, bottom: 0 }}>
-                            <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#E2E8F0" />
-                            <XAxis dataKey="month" stroke="#5F6B76" fontSize={10} tickLine={false} axisLine={false} />
-                            <YAxis stroke="#5F6B76" fontSize={10} tickLine={false} axisLine={false} />
-                            <RechartsTooltip formatter={(value) => [`₹${value}`, 'Amount']} />
-                            <Legend wrapperStyle={{ fontSize: '11px', fontWeight: 'bold' }} />
-                            <Bar dataKey="billed" name="Billed Amount" fill="#0C4737" radius={[4, 4, 0, 0]} />
-                            <Bar dataKey="collected" name="Collected Amount" fill="#2F8F7A" radius={[4, 4, 0, 0]} />
-                          </BarChart>
-                        </ResponsiveContainer>
+                    {/* Reports Page Header Strip */}
+                    <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center bg-white border border-navy/5 p-6 rounded-3xl shadow-sm gap-4 text-left">
+                      <div>
+                        <h2 className="text-xl font-extrabold text-navy tracking-tight flex items-center gap-2">
+                          <BarChart3 className="h-6 w-6 text-green animate-float-medium" />
+                          Reports & Analytics
+                        </h2>
+                        <p className="text-xs text-text-secondary font-semibold mt-0.5">
+                          Premium business insights, tax tracking, and financial statements.
+                        </p>
+                      </div>
+                      
+                      {/* Export controls */}
+                      <div className="flex items-center gap-3 w-full sm:w-auto">
+                        <button 
+                          onClick={exportToExcel}
+                          className="flex-1 sm:flex-none flex items-center justify-center gap-2 px-4 py-2.5 bg-green hover:bg-green-dark text-white text-xs font-bold rounded-xl transition-all shadow-sm active:scale-98 cursor-pointer"
+                        >
+                          <FileSpreadsheet className="h-4.5 w-4.5" />
+                          Export Excel
+                        </button>
+                        <button 
+                          onClick={exportToCSV}
+                          className="flex-1 sm:flex-none flex items-center justify-center gap-2 px-4 py-2.5 bg-navy hover:bg-[#1a2d3c] text-white text-xs font-bold rounded-xl transition-all shadow-sm active:scale-98 cursor-pointer"
+                        >
+                          <Download className="h-4.5 w-4.5" />
+                          Export CSV
+                        </button>
+                        <button 
+                          onClick={() => window.print()}
+                          className="flex-1 sm:flex-none flex items-center justify-center gap-2 px-4 py-2.5 bg-slate-100 hover:bg-slate-200 text-navy text-xs font-bold rounded-xl transition-all shadow-sm active:scale-98 cursor-pointer border border-navy/5"
+                        >
+                          <PrintIcon className="h-4.5 w-4.5" />
+                          Print / PDF
+                        </button>
                       </div>
                     </div>
 
-                    {/* Chart 2: Tax Liability comparison (GST vs TDS) */}
-                    <div className="glass-card p-6 rounded-3xl bg-white border border-navy/5 hover:shadow-md transition-all">
-                      <h3 className="text-sm font-extrabold text-navy text-left mb-6">Tax Liability Breakdown (GST & TDS)</h3>
-                      <div className="h-80 w-full select-none">
-                        <ResponsiveContainer width="100%" height="100%">
-                          <AreaChart data={reportsData.taxTrend} margin={{ top: 10, right: 10, left: -10, bottom: 0 }}>
-                            <defs>
-                              <linearGradient id="colorGst" x1="0" y1="0" x2="0" y2="1">
-                                <stop offset="5%" stopColor="#3B82F6" stopOpacity={0.2}/>
-                                <stop offset="95%" stopColor="#3B82F6" stopOpacity={0}/>
-                              </linearGradient>
-                              <linearGradient id="colorTds" x1="0" y1="0" x2="0" y2="1">
-                                <stop offset="5%" stopColor="#D97706" stopOpacity={0.2}/>
-                                <stop offset="95%" stopColor="#D97706" stopOpacity={0}/>
-                              </linearGradient>
-                            </defs>
-                            <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#E2E8F0" />
-                            <XAxis dataKey="month" stroke="#5F6B76" fontSize={10} tickLine={false} axisLine={false} />
-                            <YAxis stroke="#5F6B76" fontSize={10} tickLine={false} axisLine={false} />
-                            <RechartsTooltip formatter={(value) => [`₹${value}`, 'Amount']} />
-                            <Legend wrapperStyle={{ fontSize: '11px', fontWeight: 'bold' }} />
-                            <Area type="monotone" dataKey="gst" name="GST Liability" stroke="#3B82F6" strokeWidth={2} fillOpacity={1} fill="url(#colorGst)" />
-                            <Area type="monotone" dataKey="tds" name="TDS Deductions" stroke="#D97706" strokeWidth={2} fillOpacity={1} fill="url(#colorTds)" />
-                          </AreaChart>
-                        </ResponsiveContainer>
+                    {/* Date filtering options strip */}
+                    <div className="flex flex-col md:flex-row gap-6 items-center justify-between bg-white border border-navy/5 p-5 rounded-3xl shadow-sm">
+                      <div className="flex items-center gap-2 text-xs font-bold text-navy text-left">
+                        <span className="w-2.5 h-2.5 rounded-full bg-green inline-block animate-pulse"></span>
+                        <span>Active Period:</span>
+                        <span className="text-text-secondary font-semibold">
+                          {reportStartDate || reportEndDate 
+                            ? `${reportStartDate || 'Beginning'} to ${reportEndDate || 'Today'}` 
+                            : 'All Time Records'}
+                        </span>
+                      </div>
+                      
+                      <div className="flex flex-wrap md:flex-nowrap items-center gap-4 w-full md:w-auto justify-end">
+                        {/* Presets Button Group */}
+                        <div className="flex flex-wrap gap-1 bg-slate-100 p-1 rounded-xl border border-navy/5">
+                          <button
+                            onClick={() => applyDatePreset('30days')}
+                            className="px-3 py-1.5 text-[10px] font-bold rounded-lg transition-all cursor-pointer text-text-secondary hover:text-navy hover:bg-white/50"
+                          >
+                            Last 30 Days
+                          </button>
+                          <button
+                            onClick={() => applyDatePreset('90days')}
+                            className="px-3 py-1.5 text-[10px] font-bold rounded-lg transition-all cursor-pointer text-text-secondary hover:text-navy hover:bg-white/50"
+                          >
+                            Last 90 Days
+                          </button>
+                          <button
+                            onClick={() => applyDatePreset('quarter')}
+                            className="px-3 py-1.5 text-[10px] font-bold rounded-lg transition-all cursor-pointer text-text-secondary hover:text-navy hover:bg-white/50"
+                          >
+                            This Quarter
+                          </button>
+                          <button
+                            onClick={() => applyDatePreset('fy')}
+                            className="px-3 py-1.5 text-[10px] font-bold rounded-lg transition-all cursor-pointer text-text-secondary hover:text-navy hover:bg-white/50"
+                          >
+                            This FY
+                          </button>
+                          <button
+                            onClick={() => applyDatePreset('all')}
+                            className="px-3 py-1.5 text-[10px] font-bold rounded-lg transition-all cursor-pointer text-text-secondary hover:text-navy hover:bg-white/50"
+                          >
+                            All Time
+                          </button>
+                        </div>
+
+                        {/* Custom dates input fields */}
+                        <div className="flex items-center gap-2">
+                          <div className="flex items-center gap-1.5 bg-[#F8FAFC] border border-navy/10 px-3 py-1.5 rounded-xl">
+                            <span className="text-[10px] font-extrabold text-text-secondary uppercase">From:</span>
+                            <input 
+                              type="date"
+                              value={reportStartDate}
+                              onChange={e => setReportStartDate(e.target.value)}
+                              className="text-xs bg-transparent text-navy font-bold focus:outline-none cursor-pointer w-28"
+                            />
+                          </div>
+                          <div className="flex items-center gap-1.5 bg-[#F8FAFC] border border-navy/10 px-3 py-1.5 rounded-xl">
+                            <span className="text-[10px] font-extrabold text-text-secondary uppercase">To:</span>
+                            <input 
+                              type="date"
+                              value={reportEndDate}
+                              onChange={e => setReportEndDate(e.target.value)}
+                              className="text-xs bg-transparent text-navy font-bold focus:outline-none cursor-pointer w-28"
+                            />
+                          </div>
+                          {(reportStartDate || reportEndDate) && (
+                            <button 
+                              onClick={() => { setReportStartDate(''); setReportEndDate(''); }}
+                              className="p-1.5 text-xs text-red-500 hover:text-red-700 font-extrabold hover:bg-red-50 rounded-xl transition-all"
+                              title="Clear Filters"
+                            >
+                              <X className="h-4.5 w-4.5" />
+                            </button>
+                          )}
+                        </div>
                       </div>
                     </div>
 
+                    {reportsLoading ? (
+                      <div className="flex flex-col gap-8 py-12 items-center justify-center bg-white border border-navy/5 rounded-3xl min-h-[400px]">
+                        <div className="w-10 h-10 border-4 border-green/20 border-t-green rounded-full animate-spin"></div>
+                        <span className="text-xs font-bold text-text-secondary animate-pulse">Analyzing accounts ledger...</span>
+                      </div>
+                    ) : !reportsData ? (
+                      <div className="glass-card p-12 text-center flex flex-col items-center justify-center gap-3 bg-white border border-navy/5 rounded-3xl min-h-[400px]">
+                        <BarChart3 className="h-10 w-10 text-text-secondary/40 animate-pulse" />
+                        <p className="text-xs font-bold text-text-secondary">Failed to retrieve reporting details.</p>
+                      </div>
+                    ) : (
+                      <>
+                        {/* Financial Aggregates KPI cards */}
+                        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5 gap-6 text-left">
+                          
+                          {/* KPI 1: Total Billed */}
+                          <div className="p-6 rounded-3xl flex justify-between items-center bg-white border border-navy/5 hover:border-navy/20 hover:-translate-y-1 hover:shadow-md transition-all duration-300">
+                            <div className="flex flex-col gap-1 font-semibold min-w-0">
+                              <span className="text-[10px] font-extrabold uppercase tracking-wider text-text-secondary">Gross Billed</span>
+                              <span className="text-xl font-black text-navy mt-1 truncate">
+                                {formatINR(totalInvoiced)}
+                              </span>
+                              <span className="text-[10px] text-text-secondary font-medium mt-1">
+                                {invoiceCount} invoices issued
+                              </span>
+                            </div>
+                            <div className="p-3 bg-navy/5 text-navy rounded-2xl shrink-0">
+                              <FileText className="h-5 w-5 text-navy" />
+                            </div>
+                          </div>
+
+                          {/* KPI 2: Cash Collected */}
+                          <div className="p-6 rounded-3xl flex justify-between items-center bg-white border border-emerald-500/10 hover:border-emerald-500/30 hover:-translate-y-1 hover:shadow-md transition-all duration-300">
+                            <div className="flex flex-col gap-1 font-semibold min-w-0">
+                              <span className="text-[10px] font-extrabold uppercase tracking-wider text-emerald-605">Cash Collected</span>
+                              <span className="text-xl font-black text-emerald-700 mt-1 truncate">
+                                {formatINR(totalCollected)}
+                              </span>
+                              <span className="text-[10px] text-text-secondary font-medium mt-1">
+                                Net received collections
+                              </span>
+                            </div>
+                            <div className="p-3 bg-emerald-50 text-emerald-650 rounded-2xl shrink-0">
+                              <IndianRupee className="h-5 w-5" />
+                            </div>
+                          </div>
+
+                          {/* KPI 3: Outstanding Receivables */}
+                          <div className="p-6 rounded-3xl flex justify-between items-center bg-white border border-red-500/10 hover:border-red-500/30 hover:-translate-y-1 hover:shadow-md transition-all duration-300">
+                            <div className="flex flex-col gap-1 font-semibold min-w-0">
+                              <span className="text-[10px] font-extrabold uppercase tracking-wider text-red-505">Outstanding</span>
+                              <span className="text-xl font-black text-red-600 mt-1 truncate">
+                                {formatINR(totalOutstanding)}
+                              </span>
+                              <span className="text-[10px] text-text-secondary font-medium mt-1">
+                                Unpaid invoices balance
+                              </span>
+                            </div>
+                            <div className="p-3 bg-red-50 text-red-505 rounded-2xl shrink-0">
+                              <AlertTriangle className="h-5 w-5" />
+                            </div>
+                          </div>
+
+                          {/* KPI 4: GST Tax liability */}
+                          <div className="p-6 rounded-3xl flex justify-between items-center bg-white border border-blue-500/10 hover:border-blue-500/30 hover:-translate-y-1 hover:shadow-md transition-all duration-300">
+                            <div className="flex flex-col gap-1 font-semibold min-w-0">
+                              <span className="text-[10px] font-extrabold uppercase tracking-wider text-blue-600">GST Liability</span>
+                              <span className="text-xl font-black text-blue-600 mt-1 truncate">
+                                {formatINR(totalGstCollected)}
+                              </span>
+                              <span className="text-[10px] text-text-secondary font-medium mt-1">
+                                {taxRate}% effective tax rate
+                              </span>
+                            </div>
+                            <div className="p-3 bg-blue-50 text-blue-600 rounded-2xl shrink-0">
+                              <TrendingUp className="h-5 w-5" />
+                            </div>
+                          </div>
+
+                          {/* KPI 5: TDS Deducted */}
+                          <div className="p-6 rounded-3xl flex justify-between items-center bg-white border border-amber-500/10 hover:border-amber-500/30 hover:-translate-y-1 hover:shadow-md transition-all duration-300">
+                            <div className="flex flex-col gap-1 font-semibold min-w-0">
+                              <span className="text-[10px] font-extrabold uppercase tracking-wider text-amber-600">TDS Withheld</span>
+                              <span className="text-xl font-black text-amber-600 mt-1 truncate">
+                                {formatINR(totalTdsDeducted)}
+                              </span>
+                              <span className="text-[10px] text-text-secondary font-medium mt-1">
+                                {tdsRate}% withheld tax rate
+                              </span>
+                            </div>
+                            <div className="p-3 bg-amber-50 text-amber-605 rounded-2xl shrink-0">
+                              <Clock className="h-5 w-5" />
+                            </div>
+                          </div>
+
+                        </div>
+
+                        {/* Charts Grid */}
+                        <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
+                          
+                          {/* Chart 1: Monthly billing trend (Billed vs Collected) */}
+                          <div className="p-6 rounded-3xl bg-white border border-navy/5 shadow-sm hover:shadow-md transition-all text-left">
+                            <div className="mb-6">
+                              <h3 className="text-sm font-extrabold text-navy">Monthly Billing Performance</h3>
+                              <p className="text-[10px] text-text-secondary mt-0.5">Comparison between gross bills generated and cash settlements received</p>
+                            </div>
+                            <div className="h-80 w-full select-none">
+                              <ResponsiveContainer width="100%" height="100%" minWidth={0}>
+                                <BarChart data={reportsData.billingTrend} margin={{ top: 10, right: 10, left: -10, bottom: 0 }}>
+                                  <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#E2E8F0" />
+                                  <XAxis dataKey="month" stroke="#5F6B76" fontSize={10} tickLine={false} axisLine={false} />
+                                  <YAxis stroke="#5F6B76" fontSize={10} tickLine={false} axisLine={false} />
+                                  <RechartsTooltip content={<CustomTooltip />} />
+                                  <Legend wrapperStyle={{ fontSize: '11px', fontWeight: 'bold', paddingTop: '15px' }} />
+                                  <Bar dataKey="billed" name="Billed Amount" fill="#0C4737" radius={[5, 5, 0, 0]} isAnimationActive={true} />
+                                  <Bar dataKey="collected" name="Collected Amount" fill="#2F8F7A" radius={[5, 5, 0, 0]} isAnimationActive={true} />
+                                </BarChart>
+                              </ResponsiveContainer>
+                            </div>
+                          </div>
+
+                          {/* Chart 2: Tax Liability comparison (GST vs TDS) */}
+                          <div className="p-6 rounded-3xl bg-white border border-navy/5 shadow-sm hover:shadow-md transition-all text-left">
+                            <div className="mb-6">
+                              <h3 className="text-sm font-extrabold text-navy">Tax Liability & Withholding</h3>
+                              <p className="text-[10px] text-text-secondary mt-0.5">Month-on-month record of GST tax liabilities and TDS deductions</p>
+                            </div>
+                            <div className="h-80 w-full select-none">
+                              <ResponsiveContainer width="100%" height="100%" minWidth={0}>
+                                <AreaChart data={reportsData.taxTrend} margin={{ top: 10, right: 10, left: -10, bottom: 0 }}>
+                                  <defs>
+                                    <linearGradient id="colorGst" x1="0" y1="0" x2="0" y2="1">
+                                      <stop offset="5%" stopColor="#3B82F6" stopOpacity={0.25}/>
+                                      <stop offset="95%" stopColor="#3B82F6" stopOpacity={0}/>
+                                    </linearGradient>
+                                    <linearGradient id="colorTds" x1="0" y1="0" x2="0" y2="1">
+                                      <stop offset="5%" stopColor="#D97706" stopOpacity={0.25}/>
+                                      <stop offset="95%" stopColor="#D97706" stopOpacity={0}/>
+                                    </linearGradient>
+                                  </defs>
+                                  <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#E2E8F0" />
+                                  <XAxis dataKey="month" stroke="#5F6B76" fontSize={10} tickLine={false} axisLine={false} />
+                                  <YAxis stroke="#5F6B76" fontSize={10} tickLine={false} axisLine={false} />
+                                  <RechartsTooltip content={<CustomTooltip />} />
+                                  <Legend wrapperStyle={{ fontSize: '11px', fontWeight: 'bold', paddingTop: '15px' }} />
+                                  <Area type="monotone" dataKey="gst" name="GST Liability" stroke="#3B82F6" strokeWidth={2.5} fillOpacity={1} fill="url(#colorGst)" isAnimationActive={true} />
+                                  <Area type="monotone" dataKey="tds" name="TDS Deductions" stroke="#D97706" strokeWidth={2.5} fillOpacity={1} fill="url(#colorTds)" isAnimationActive={true} />
+                                </AreaChart>
+                              </ResponsiveContainer>
+                            </div>
+                          </div>
+
+                        </div>
+
+                        {/* Overdue Aging List Panel */}
+                        <div className="p-6 rounded-3xl bg-white border border-navy/5 shadow-sm hover:shadow-md transition-all text-left">
+                          <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 mb-6">
+                            <div>
+                              <h3 className="text-sm font-extrabold text-navy">Overdue Invoices Aging Register</h3>
+                              <p className="text-[10px] text-text-secondary mt-0.5">List of all overdue outstanding balances sorted by age</p>
+                            </div>
+                            <span className="px-3 py-1 bg-red-500/10 border border-red-500/15 text-red-600 rounded-full text-[10px] font-extrabold uppercase shrink-0">
+                              {sortedOverdueAging.length} Overdue Account{sortedOverdueAging.length !== 1 ? 's' : ''} (Total: {formatINR(totalOverdueAmount)})
+                            </span>
+                          </div>
+
+                          <div className="overflow-x-auto rounded-2xl border border-navy/5">
+                            <table className="w-full text-left text-xs border-collapse">
+                              <thead>
+                                <tr className="border-b border-navy/5 text-text-secondary uppercase text-[10px] tracking-wider font-extrabold bg-[#F8FAFC]">
+                                  <th className="py-3.5 px-4 font-extrabold text-left">Invoice #</th>
+                                  <th className="py-3.5 px-4 font-extrabold text-left">Client Name</th>
+                                  <th className="py-3.5 px-4 font-extrabold text-left">Due Date</th>
+                                  <th className="py-3.5 px-4 font-extrabold text-center">Overdue Duration</th>
+                                  <th className="py-3.5 px-4 font-extrabold text-right">Outstanding Amount</th>
+                                </tr>
+                              </thead>
+                              <tbody className="divide-y divide-navy/5 text-navy font-semibold text-left">
+                                {sortedOverdueAging.length === 0 ? (
+                                  <tr>
+                                    <td colSpan={5} className="py-12 text-center text-text-secondary font-bold">
+                                      No overdue aging records found. Collection efficiency is outstanding!
+                                    </td>
+                                  </tr>
+                                ) : (
+                                  sortedOverdueAging.map((inv: any) => {
+                                    // Calculate row level status styling
+                                    let badgeColor = 'bg-emerald-500/10 text-emerald-600 border border-emerald-500/20';
+                                    if (inv.overdueDays > 60) {
+                                      badgeColor = 'bg-red-500/10 text-red-650 border border-red-500/20';
+                                    } else if (inv.overdueDays > 30) {
+                                      badgeColor = 'bg-amber-500/10 text-amber-650 border border-amber-500/20';
+                                    }
+                                    
+                                    return (
+                                      <tr key={inv._id} className="hover:bg-slate-50 transition-colors">
+                                        <td className="py-3.5 px-4 font-mono font-bold text-red-500">{inv.number}</td>
+                                        <td className="py-3.5 px-4 font-extrabold text-navy">{inv.clientName}</td>
+                                        <td className="py-3.5 px-4 text-text-secondary font-medium">
+                                          {new Date(inv.dueDate).toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric' })}
+                                        </td>
+                                        <td className="py-3.5 px-4 text-center">
+                                          <span className={`px-2.5 py-1 text-[10px] font-extrabold rounded-full border uppercase ${badgeColor}`}>
+                                            {inv.overdueDays} Days Overdue
+                                          </span>
+                                        </td>
+                                        <td className="py-3.5 px-4 text-right font-extrabold text-red-500">
+                                          {formatINR(inv.amountDue)}
+                                        </td>
+                                      </tr>
+                                    );
+                                  })
+                                )}
+                              </tbody>
+                            </table>
+                          </div>
+                        </div>
+                      </>
+                    )}
                   </div>
 
-                  {/* Overdue Aging List Panel */}
-                  <div className="glass-card p-6 rounded-3xl bg-white border border-navy/5 hover:shadow-md transition-all">
-                    <div className="flex justify-between items-center mb-6">
-                      <div className="text-left">
-                        <h3 className="text-sm font-extrabold text-navy">Overdue Invoices Aging Register</h3>
-                        <p className="text-[10px] text-text-secondary mt-0.5">Oldest overdue invoices needing recovery tracking</p>
+                  {/* Printable View of the Reports (displayed ONLY on print) */}
+                  {reportsData && (
+                    <div className="hidden print:flex flex-col gap-6 w-full text-left text-black p-6 font-sans bg-white printable-invoice-card">
+                      
+                      {/* Report Header */}
+                      <div className="flex justify-between items-start border-b border-black pb-4">
+                        <div>
+                          <h1 className="text-xl font-bold uppercase tracking-wide">Financial Performance & Tax Ledger Statement</h1>
+                          <p className="text-xs text-slate-500 mt-1">Generated by BillHouse Invoicing Engine</p>
+                        </div>
+                        <div className="text-right">
+                          <h2 className="text-sm font-bold text-black">{businessProfile?.name || 'My Business'}</h2>
+                          <p className="text-[10px] text-slate-500">Date Generated: {new Date().toLocaleDateString()} at {new Date().toLocaleTimeString()}</p>
+                          <p className="text-[10px] text-slate-500">
+                            Reporting Period: {reportStartDate || 'All Time'} to {reportEndDate || 'Present'}
+                          </p>
+                        </div>
                       </div>
-                      <span className="px-2.5 py-1 bg-red-500/10 text-red-500 rounded-full text-[10px] font-extrabold uppercase">
-                        {reportsData.overdueAging?.length || 0} Critical Overdue
-                      </span>
-                    </div>
 
-                    <div className="overflow-x-auto">
-                      <table className="w-full text-left text-xs border-collapse">
-                        <thead>
-                          <tr className="border-b border-navy/5 text-text-secondary uppercase text-[10px] tracking-wider font-extrabold bg-[#F8FAFC]">
-                            <th className="py-3 px-4">Invoice #</th>
-                            <th className="py-3 px-4">Client Name</th>
-                            <th className="py-3 px-4">Due Date</th>
-                            <th className="py-3 px-4 text-center">Overdue Days</th>
-                            <th className="py-3 px-4 text-right">Outstanding Amount</th>
-                          </tr>
-                        </thead>
-                        <tbody className="divide-y divide-navy/5 text-navy font-semibold">
-                          {!reportsData.overdueAging || reportsData.overdueAging.length === 0 ? (
-                            <tr>
-                              <td colSpan={5} className="py-8 text-center text-text-secondary font-bold">
-                                No overdue aging records. Excellent collection efficiency!
-                              </td>
+                      {/* KPI Section Table */}
+                      <div className="flex flex-col gap-2 page-break-inside-avoid">
+                        <h3 className="text-xs font-bold uppercase tracking-wider text-black border-b border-slate-300 pb-1 font-sans">1. Executive Summary</h3>
+                        <table className="w-full text-xs text-left border-collapse">
+                          <thead>
+                            <tr className="bg-slate-100 font-bold">
+                              <th className="p-2 border border-slate-300">Financial Metric</th>
+                              <th className="p-2 border border-slate-300 text-right">Value (INR)</th>
                             </tr>
-                          ) : (
-                            reportsData.overdueAging.map((inv: any) => (
-                              <tr key={inv._id} className="hover:bg-red-500/[0.02]">
-                                <td className="py-3 px-4 font-mono font-bold text-red-500">{inv.number}</td>
-                                <td className="py-3 px-4 font-extrabold">{inv.clientName}</td>
-                                <td className="py-3 px-4 text-text-secondary">
-                                  {new Date(inv.dueDate).toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric' })}
-                                </td>
-                                <td className="py-3 px-4 text-center">
-                                  <span className="px-2.5 py-0.5 bg-red-500/10 text-red-500 border border-red-500/20 rounded-full font-extrabold text-[10px]">
-                                    {inv.overdueDays} Days
-                                  </span>
-                                </td>
-                                <td className="py-3 px-4 text-right font-extrabold text-red-500">
-                                  {formatINR(inv.amountDue)}
+                          </thead>
+                          <tbody>
+                            <tr className="border-b border-slate-200">
+                              <td className="p-2 font-medium">Total Billed (Gross Revenue Generated)</td>
+                              <td className="p-2 text-right font-bold">{formatINR(totalInvoiced)}</td>
+                            </tr>
+                            <tr className="border-b border-slate-200">
+                              <td className="p-2 font-medium">Total Cash Settled (Collected Payments)</td>
+                              <td className="p-2 text-right font-bold text-emerald-800">{formatINR(totalCollected)}</td>
+                            </tr>
+                            <tr className="border-b border-slate-200">
+                              <td className="p-2 font-medium">Total Receivables Outstanding (Accounts Receivable)</td>
+                              <td className="p-2 text-right font-bold text-red-650">{formatINR(totalOutstanding)}</td>
+                            </tr>
+                            <tr className="border-b border-slate-200">
+                              <td className="p-2 font-medium">GST Tax Liability Collected</td>
+                              <td className="p-2 text-right font-bold">{formatINR(totalGstCollected)}</td>
+                            </tr>
+                            <tr className="border-b border-slate-200">
+                              <td className="p-2 font-medium">TDS Deductibles Withheld</td>
+                              <td className="p-2 text-right font-bold">{formatINR(totalTdsDeducted)}</td>
+                            </tr>
+                            <tr className="border-b border-slate-200">
+                              <td className="p-2 font-medium">Invoice Volume Count</td>
+                              <td className="p-2 text-right font-bold">{invoiceCount} Invoices</td>
+                            </tr>
+                            <tr className="bg-slate-50 font-bold border-t-2 border-slate-300">
+                              <td className="p-2">Collection Efficiency Rate</td>
+                              <td className="p-2 text-right text-emerald-800">{collectionRate}% ({collectionEfficiencyLabel})</td>
+                            </tr>
+                          </tbody>
+                        </table>
+                      </div>
+
+                      {/* Monthly Breakdown Table */}
+                      <div className="flex flex-col gap-2 mt-4 page-break-inside-avoid">
+                        <h3 className="text-xs font-bold uppercase tracking-wider text-black border-b border-slate-300 pb-1">2. Monthly Billing & Tax Breakdown</h3>
+                        <table className="w-full text-xs text-left border-collapse">
+                          <thead>
+                            <tr className="bg-slate-100 font-bold">
+                              <th className="p-2 border border-slate-300">Month</th>
+                              <th className="p-2 border border-slate-300 text-right">Gross Billed</th>
+                              <th className="p-2 border border-slate-300 text-right">Net Collected</th>
+                              <th className="p-2 border border-slate-300 text-right">GST Collected</th>
+                              <th className="p-2 border border-slate-300 text-right">TDS Withheld</th>
+                              <th className="p-2 border border-slate-300 text-right">Net Cash Flow</th>
+                            </tr>
+                          </thead>
+                          <tbody>
+                            {reportsData.billingTrend.map((bt: any, idx: number) => {
+                              const tt = reportsData.taxTrend[idx] || { gst: 0, tds: 0 };
+                              const netCash = (bt.collected || 0) - (tt.tds || 0);
+                              return (
+                                <tr key={idx} className="border-b border-slate-200">
+                                  <td className="p-2 font-bold bg-slate-50">{bt.month}</td>
+                                  <td className="p-2 text-right font-medium">{formatINR(bt.billed)}</td>
+                                  <td className="p-2 text-right font-medium text-emerald-800">{formatINR(bt.collected)}</td>
+                                  <td className="p-2 text-right font-medium">{formatINR(tt.gst)}</td>
+                                  <td className="p-2 text-right font-medium text-amber-850">{formatINR(tt.tds)}</td>
+                                  <td className="p-2 text-right font-bold">{formatINR(netCash)}</td>
+                                </tr>
+                              );
+                            })}
+                            
+                            {/* Monthly Total Row */}
+                            <tr className="bg-slate-100 font-bold border-t-2 border-slate-300">
+                              <td className="p-2">TOTAL SUMMARY</td>
+                              <td className="p-2 text-right">{formatINR(totalBilled)}</td>
+                              <td className="p-2 text-right text-emerald-800">{formatINR(totalTrendsCollected)}</td>
+                              <td className="p-2 text-right">{formatINR(totalTrendsGst)}</td>
+                              <td className="p-2 text-right text-amber-850">{formatINR(totalTrendsTds)}</td>
+                              <td className="p-2 text-right font-black">{formatINR(totalTrendsCollected - totalTrendsTds)}</td>
+                            </tr>
+                          </tbody>
+                        </table>
+                      </div>
+
+                      {/* Overdue Aging Table */}
+                      <div className="flex flex-col gap-2 mt-4 page-break-inside-avoid">
+                        <h3 className="text-xs font-bold uppercase tracking-wider text-red-755 border-b border-red-300 pb-1">3. Accounts Receivable Overdue Aging Register</h3>
+                        <table className="w-full text-xs text-left border-collapse border border-red-100">
+                          <thead>
+                            <tr className="bg-red-50 text-red-955 font-bold">
+                              <th className="p-2 border border-red-200">Invoice Number</th>
+                              <th className="p-2 border border-red-200">Client Name</th>
+                              <th className="p-2 border border-red-200">Due Date</th>
+                              <th className="p-2 border border-red-200 text-center">Overdue Days</th>
+                              <th className="p-2 border border-red-200 text-right">Outstanding Balance</th>
+                            </tr>
+                          </thead>
+                          <tbody>
+                            {sortedOverdueAging.length === 0 ? (
+                              <tr>
+                                <td colSpan={5} className="p-4 text-center text-slate-500 font-medium italic">
+                                  No outstanding overdue accounts receivable balances.
                                 </td>
                               </tr>
-                            ))
-                          )}
-                        </tbody>
-                      </table>
-                    </div>
-                  </div>
-                </>
-              )}
+                            ) : (
+                              sortedOverdueAging.map((inv: any) => (
+                                <tr key={inv._id} className="border-b border-red-100">
+                                  <td className="p-2 font-mono font-bold text-red-600">{inv.number}</td>
+                                  <td className="p-2 font-bold text-black">{inv.clientName}</td>
+                                  <td className="p-2 text-slate-500">
+                                    {new Date(inv.dueDate).toLocaleDateString()}
+                                  </td>
+                                  <td className="p-2 text-center text-red-650 font-bold">
+                                    {inv.overdueDays} Days
+                                  </td>
+                                  <td className="p-2 text-right font-bold text-red-600">
+                                    {formatINR(inv.amountDue)}
+                                  </td>
+                                </tr>
+                              ))
+                            )}
+                            
+                            {/* Total Overdue Row */}
+                            <tr className="bg-red-100/50 font-bold border-t-2 border-red-300 text-red-955">
+                              <td colSpan={4} className="p-2 text-left">TOTAL RECEIVABLES OVERDUE BALANCE</td>
+                              <td className="p-2 text-right font-black text-red-700">{formatINR(totalOverdueAmount)}</td>
+                            </tr>
+                          </tbody>
+                        </table>
+                      </div>
 
-            </div>
+                      {/* Footer */}
+                      <div className="mt-auto border-t border-slate-300 pt-4 text-center text-[9px] text-slate-500 flex justify-between">
+                        <span>BillHouse Financial Ledger Services &bull; Confirmed Official Ledger Statement</span>
+                        <span>Statement date: {new Date().toLocaleDateString()} at {new Date().toLocaleTimeString()}</span>
+                      </div>
+                    </div>
+                  )}
+
+                </div>
+              );
+            })()
           ) : activeTab === 'reminders' && isPro ? (
             <ReminderSettings />
           ) : activeTab === 'profile' ? (
@@ -2628,43 +3193,7 @@ export const DashboardStub: React.FC = () => {
         </div>
       )}
 
-      {/* 2. Delete Confirmation Modal */}
-      {isDeletingClient && (
-        <div className="fixed inset-0 bg-[#06121E]/60 backdrop-blur-sm z-50 flex items-center justify-center p-4">
-          <div className="w-full max-w-md bg-white rounded-3xl border border-navy/5 shadow-2xl p-6 flex flex-col gap-5 text-center">
-            
-            <div className="p-4 bg-amber-500/10 text-amber-600 rounded-full mx-auto w-16 h-16 flex items-center justify-center">
-              <Archive className="h-7 w-7" />
-            </div>
-
-            <div>
-              <h3 className="text-base font-extrabold text-navy">Archive Client Profile</h3>
-              <p className="text-xs text-text-secondary font-semibold mt-2 leading-relaxed">
-                Are you sure you want to archive client <strong>{isDeletingClient.name}</strong>? 
-                This will deactivate them and hide them from active lists, but all historical invoices and billing records will be kept.
-              </p>
-            </div>
-
-            <div className="flex justify-center gap-3 pt-3">
-              <Button
-                variant="outline"
-                onClick={() => setIsDeletingClient(null)}
-                className="py-2.5 px-4 text-xs font-bold border-navy/10 text-navy hover:bg-navy/5"
-              >
-                No, Keep Active
-              </Button>
-              <Button
-                variant="primary"
-                onClick={handleDeleteClient}
-                className="py-2.5 px-5 text-xs font-bold bg-amber-600 hover:bg-amber-700 border-amber-600 text-white shadow-sm"
-              >
-                Yes, Archive Client
-              </Button>
-            </div>
-
-          </div>
-        </div>
-      )}
+      {/* Delete Confirmation Modal is handled by global usePopup */}
 
       {/* 3. Reports locked feature overview Modal */}
       {isReportsModalOpen && (
@@ -2717,10 +3246,44 @@ export const DashboardStub: React.FC = () => {
         isOpen={isUpgradeModalOpen} 
         onClose={() => setIsUpgradeModalOpen(false)} 
         onSuccess={() => {
-          setSuccessMsg("Congratulations! You have successfully upgraded to the Pro plan.");
+          showPopup({
+            title: 'Success',
+            message: "Congratulations! You have successfully upgraded to the Pro plan.",
+            type: 'success'
+          });
           addNotification('system', 'Subscription Upgraded', 'Your business is now on the Professional Plan!');
         }}
       />
+
+      {/* 5. Export Success Dialog Modal */}
+      {exportSuccessModal.isOpen && (
+        <div className="fixed inset-0 bg-[#06121E]/60 backdrop-blur-sm z-50 flex items-center justify-center p-4 animate-fade-in">
+          <div className="bg-white rounded-3xl border border-navy/5 p-8 max-w-md w-full shadow-2xl relative text-center flex flex-col items-center gap-5">
+            {/* Success icon */}
+            <div className="w-16 h-16 rounded-full bg-emerald-50 border border-emerald-100 flex items-center justify-center text-emerald-600 animate-float-slow shrink-0">
+              <CheckCircle className="h-8 w-8 text-green-dark" />
+            </div>
+            
+            <div className="text-center">
+              <h3 className="text-lg font-black text-navy tracking-tight">Export Successful!</h3>
+              <p className="text-xs text-text-secondary mt-2.5 font-semibold leading-relaxed">
+                Your financial analytics report has been generated and compiled into <strong>{exportSuccessModal.fileType}</strong> format.
+              </p>
+            </div>
+
+            <div className="w-full bg-slate-50 border border-navy/5 p-3.5 rounded-2xl text-[10px] font-mono text-navy/80 truncate text-center select-all cursor-pointer" title="Double click to copy filename">
+              {exportSuccessModal.fileName}
+            </div>
+
+            <button 
+              onClick={() => setExportSuccessModal({ isOpen: false, fileType: '', fileName: '' })}
+              className="w-full py-3 bg-navy hover:bg-[#1a2d3c] text-white text-xs font-bold rounded-xl transition-all shadow-md active:scale-98 cursor-pointer"
+            >
+              Dismiss
+            </button>
+          </div>
+        </div>
+      )}
 
     </div>
   );

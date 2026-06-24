@@ -1,3 +1,5 @@
+import { usePopup } from '../../context/PopupContext';
+
 import React, { useState, useEffect } from 'react';
 import API from '../../utils/api';
 import Button from '../common/Button';
@@ -10,7 +12,7 @@ import {
   Trash2, 
   Clock, 
   CheckCircle2, 
-  DollarSign
+  IndianRupee
 } from 'lucide-react';
 
 interface PaymentData {
@@ -37,17 +39,9 @@ export const PaymentList: React.FC = () => {
   const [payments, setPayments] = useState<PaymentData[]>([]);
   const [invoices, setInvoices] = useState<any[]>([]);
   const [loading, setLoading] = useState<boolean>(true);
-  const [errorMsg, setErrorMsg] = useState<string | null>(null);
-  
-  // Modal & alert states
   const [isPaymentModalOpen, setIsPaymentModalOpen] = useState<boolean>(false);
-  const [messageBox, setMessageBox] = useState<{ title: string; message: string; isOpen: boolean }>({
-    title: '',
-    message: '',
-    isOpen: false
-  });
   const [actionLoading, setActionLoading] = useState<boolean>(false);
-  const [confirmDialog, setConfirmDialog] = useState<{ isOpen: boolean; paymentId: string; amount: number; invoiceNum: string } | null>(null);
+  const { showPopup } = usePopup();
 
   // Filters state
   const [searchQuery, setSearchQuery] = useState<string>('');
@@ -59,8 +53,6 @@ export const PaymentList: React.FC = () => {
   const fetchPaymentsData = async () => {
     try {
       setLoading(true);
-      setErrorMsg(null);
-      
       const [paymentsRes, invoicesRes] = await Promise.all([
         API.get('/payments'),
         API.get('/invoices')
@@ -70,7 +62,11 @@ export const PaymentList: React.FC = () => {
       setInvoices(invoicesRes.data);
     } catch (err: any) {
       console.error('Failed to load payments history data:', err);
-      setErrorMsg(err.response?.data?.error || 'Failed to retrieve payments history list');
+      showPopup({
+        title: 'Fetch Error',
+        message: err.response?.data?.error || 'Failed to retrieve payments history list',
+        type: 'error'
+      });
     } finally {
       setLoading(false);
     }
@@ -81,11 +77,31 @@ export const PaymentList: React.FC = () => {
   }, []);
 
   const handleVoidPayment = (paymentId: string, amount: number, invoiceNum: string) => {
-    setConfirmDialog({
-      isOpen: true,
-      paymentId,
-      amount,
-      invoiceNum
+    showPopup({
+      title: 'Void Payment',
+      message: `Are you sure you want to void the payment of ${formatCurrency(amount)} applied to Invoice ${invoiceNum}? This will delete the payment log and restore the invoice's outstanding balance due.`,
+      type: 'confirm',
+      confirmText: 'Yes, Void Payment',
+      onConfirm: async () => {
+        try {
+          setActionLoading(true);
+          const res = await API.delete(`/payments/${paymentId}`);
+          showPopup({
+            title: 'Payment Voided',
+            message: res.data.message || 'Payment has been successfully voided and balances updated.',
+            type: 'success'
+          });
+          fetchPaymentsData();
+        } catch (err: any) {
+          showPopup({
+            title: 'Void Failed',
+            message: err.response?.data?.error || 'Failed to void payment record',
+            type: 'error'
+          });
+        } finally {
+          setActionLoading(false);
+        }
+      }
     });
   };
 
@@ -269,7 +285,7 @@ export const PaymentList: React.FC = () => {
           <div className="flex items-center justify-between">
             <span className="text-[10px] font-extrabold uppercase tracking-wider text-text-secondary">Transactions Logged</span>
             <div className="p-1.5 bg-navy/5 rounded-lg">
-              <DollarSign className="h-3.5 w-3.5 text-navy/60" />
+              <IndianRupee className="h-3.5 w-3.5 text-navy/60" />
             </div>
           </div>
           <p className="text-2xl font-extrabold text-navy">{payments.length}</p>
@@ -366,36 +382,7 @@ export const PaymentList: React.FC = () => {
         </div>
       </div>
 
-      {errorMsg && (
-        <div className="p-4 bg-danger/10 border border-danger/35 text-danger text-xs font-bold rounded-2xl">
-          {errorMsg}
-        </div>
-      )}
-
-      {messageBox.isOpen && (
-        <div className="fixed inset-0 bg-navy/60 backdrop-blur-sm z-50 flex items-center justify-center p-4">
-          <div className="w-full max-w-md bg-white rounded-3xl border border-navy/5 shadow-2xl p-6 flex flex-col gap-5 text-center animate-scale-up">
-            <div className="p-4 bg-green/10 text-green rounded-full mx-auto w-16 h-16 flex items-center justify-center">
-              <CheckCircle2 className="h-8 w-8 text-green" />
-            </div>
-            <div>
-              <h3 className="text-base font-extrabold text-navy">{messageBox.title}</h3>
-              <p className="text-xs text-text-secondary font-semibold mt-2 leading-relaxed whitespace-pre-wrap">
-                {messageBox.message}
-              </p>
-            </div>
-            <div className="flex justify-center pt-3">
-              <Button
-                variant="primary"
-                onClick={() => setMessageBox(prev => ({ ...prev, isOpen: false }))}
-                className="py-2.5 px-6 text-xs font-bold bg-green hover:bg-green-dark text-white rounded-xl shadow-sm"
-              >
-                OK
-              </Button>
-            </div>
-          </div>
-        </div>
-      )}
+      {/* Success / Error popup is handled by global usePopup */}
 
       {/* Ledger Table display */}
       <GlassCard className="overflow-hidden border-navy/5 shadow-sm">
@@ -496,63 +483,15 @@ export const PaymentList: React.FC = () => {
         invoice={null}
         onSuccess={(updatedInvoice, amountRecorded) => {
           fetchPaymentsData();
-          setMessageBox({
+          showPopup({
             title: 'Payment Recorded',
             message: `A global payment of ₹${amountRecorded.toLocaleString('en-IN')} was successfully recorded for ${updatedInvoice.number}.`,
-            isOpen: true
+            type: 'success'
           });
         }}
       />
 
-      {confirmDialog && confirmDialog.isOpen && (
-        <div className="fixed inset-0 bg-[#06121E]/60 backdrop-blur-sm z-50 flex items-center justify-center p-4">
-          <div className="w-full max-w-md bg-white rounded-3xl border border-navy/5 shadow-2xl p-6 flex flex-col gap-5 text-center animate-scale-up">
-            <div className="p-4 bg-red-500/10 text-red-500 rounded-full mx-auto w-16 h-16 flex items-center justify-center text-2xl">
-              ⚠️
-            </div>
-            <div>
-              <h3 className="text-base font-extrabold text-navy">Void Payment Transaction</h3>
-              <p className="text-xs text-text-secondary font-semibold mt-2 leading-relaxed">
-                Are you sure you want to void the payment of <strong>₹{confirmDialog.amount}</strong> applied to Invoice <strong>{confirmDialog.invoiceNum}</strong>?
-                This will delete the payment log and restore the invoice's outstanding balance due.
-              </p>
-            </div>
-            <div className="flex justify-center gap-3 pt-3">
-              <Button
-                variant="outline"
-                onClick={() => setConfirmDialog(null)}
-                className="py-2.5 px-4 text-xs font-bold border-navy/10 text-navy hover:bg-navy/5"
-              >
-                Cancel
-              </Button>
-              <Button
-                variant="primary"
-                onClick={async () => {
-                  const { paymentId } = confirmDialog;
-                  setConfirmDialog(null);
-                  try {
-                    setActionLoading(true);
-                    const res = await API.delete(`/payments/${paymentId}`);
-                    setMessageBox({
-                      title: 'Payment Voided',
-                      message: res.data.message || 'Payment has been successfully voided and balances updated.',
-                      isOpen: true
-                    });
-                    fetchPaymentsData();
-                  } catch (err: any) {
-                    alert(err.response?.data?.error || 'Failed to void payment record');
-                  } finally {
-                    setActionLoading(false);
-                  }
-                }}
-                className="py-2.5 px-5 text-xs font-bold bg-red-500 hover:bg-red-600 border-red-500 text-white shadow-md"
-              >
-                Yes, Void Payment
-              </Button>
-            </div>
-          </div>
-        </div>
-      )}
+      {/* Void payment is handled by global usePopup */}
     </div>
   );
 };

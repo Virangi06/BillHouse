@@ -12,6 +12,7 @@ import {
   UserPlus, 
   AlertCircle
 } from 'lucide-react';
+import { usePopup } from '../../context/PopupContext';
 
 interface Client {
   _id: string;
@@ -42,7 +43,7 @@ export const InvoiceForm: React.FC<InvoiceFormProps> = ({ onAddNotification }) =
 
   const [clients, setClients] = useState<Client[]>([]);
   const [savingInvoice, setSavingInvoice] = useState<boolean>(false);
-  const [errorMsg, setErrorMsg] = useState<string | null>(null);
+  const { showPopup } = usePopup();
 
   // Quick Client Creation Modal State
   const [isClientModalOpen, setIsClientModalOpen] = useState<boolean>(false);
@@ -54,7 +55,6 @@ export const InvoiceForm: React.FC<InvoiceFormProps> = ({ onAddNotification }) =
     address: ''
   });
   const [savingClient, setSavingClient] = useState<boolean>(false);
-  const [clientError, setClientError] = useState<string | null>(null);
 
   // Form State
   const [selectedClientId, setSelectedClientId] = useState<string>(() => {
@@ -96,7 +96,11 @@ export const InvoiceForm: React.FC<InvoiceFormProps> = ({ onAddNotification }) =
       setClients(res.data);
     } catch (err: any) {
       console.error(err);
-      setErrorMsg('Failed to load client directory');
+      showPopup({
+        title: 'Error',
+        message: 'Failed to load client directory',
+        type: 'error'
+      });
     }
   };
 
@@ -130,7 +134,11 @@ export const InvoiceForm: React.FC<InvoiceFormProps> = ({ onAddNotification }) =
       setTerms(inv.terms || '');
     } catch (err: any) {
       console.error(err);
-      setErrorMsg('Failed to fetch invoice details for editing');
+      showPopup({
+        title: 'Error',
+        message: 'Failed to fetch invoice details for editing',
+        type: 'error'
+      });
     }
   };
 
@@ -211,13 +219,16 @@ export const InvoiceForm: React.FC<InvoiceFormProps> = ({ onAddNotification }) =
   const handleCreateClient = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!clientForm.name || !clientForm.email) {
-      setClientError('Name and email are required');
+      showPopup({
+        title: 'Validation Error',
+        message: 'Name and email are required',
+        type: 'error'
+      });
       return;
     }
 
     try {
       setSavingClient(true);
-      setClientError(null);
       const res = await API.post('/clients', clientForm);
       const newClient = res.data.client;
       
@@ -229,43 +240,74 @@ export const InvoiceForm: React.FC<InvoiceFormProps> = ({ onAddNotification }) =
       }
       setClientForm({ name: '', email: '', phone: '', taxId: '', address: '' });
     } catch (err: any) {
-      setClientError(err.response?.data?.error || 'Failed to create client');
+      showPopup({
+        title: 'Error',
+        message: err.response?.data?.error || 'Failed to create client',
+        type: 'error'
+      });
     } finally {
       setSavingClient(false);
     }
   };
 
   const validateStep = (step: number): boolean => {
-    setErrorMsg(null);
     if (step === 1) {
       if (!selectedClientId) {
-        setErrorMsg('Please select a client first');
+        showPopup({
+          title: 'Validation Error',
+          message: 'Please select a client first',
+          type: 'error'
+        });
         return false;
       }
     } else if (step === 2) {
       if (!date) {
-        setErrorMsg('Please select an issue date');
+        showPopup({
+          title: 'Validation Error',
+          message: 'Please select an issue date',
+          type: 'error'
+        });
         return false;
       }
       if (!dueDate) {
-        setErrorMsg('Please select a due date');
+        showPopup({
+          title: 'Validation Error',
+          message: 'Please select a due date',
+          type: 'error'
+        });
         return false;
       }
     } else if (step === 3) {
       if (items.length === 0) {
-        setErrorMsg('At least one line item is required');
+        showPopup({
+          title: 'Validation Error',
+          message: 'At least one line item is required',
+          type: 'error'
+        });
         return false;
       }
       if (items.some(item => !item.description.trim())) {
-        setErrorMsg('All line items must have a description');
+        showPopup({
+          title: 'Validation Error',
+          message: 'All line items must have a description',
+          type: 'error'
+        });
         return false;
       }
       if (items.some(item => item.quantity <= 0)) {
-        setErrorMsg('Quantity must be greater than 0');
+        showPopup({
+          title: 'Validation Error',
+          message: 'Quantity must be greater than 0',
+          type: 'error'
+        });
         return false;
       }
       if (items.some(item => item.rate < 0)) {
-        setErrorMsg('Rate cannot be negative');
+        showPopup({
+          title: 'Validation Error',
+          message: 'Rate cannot be negative',
+          type: 'error'
+        });
         return false;
       }
     }
@@ -279,7 +321,6 @@ export const InvoiceForm: React.FC<InvoiceFormProps> = ({ onAddNotification }) =
   };
 
   const handlePrevStep = () => {
-    setErrorMsg(null);
     setCurrentStep(prev => Math.max(prev - 1, 1));
   };
 
@@ -294,7 +335,6 @@ export const InvoiceForm: React.FC<InvoiceFormProps> = ({ onAddNotification }) =
 
     try {
       setSavingInvoice(true);
-      setErrorMsg(null);
 
       const payload = {
         clientId: selectedClientId,
@@ -316,18 +356,32 @@ export const InvoiceForm: React.FC<InvoiceFormProps> = ({ onAddNotification }) =
         if (onAddNotification) {
           onAddNotification('invoice', 'Invoice Updated', `Invoice ${response.data.invoice.number} details were updated successfully.`);
         }
+        showPopup({
+          title: 'Success',
+          message: 'Invoice updated successfully!',
+          type: 'success'
+        });
       } else {
         response = await API.post('/invoices', payload);
         if (onAddNotification) {
           onAddNotification('invoice', 'New Invoice Issued', `Invoice ${response.data.invoice.number} was compiled successfully for ₹${response.data.invoice.totalAmount}.`);
         }
+        showPopup({
+          title: 'Success',
+          message: 'Invoice created successfully!',
+          type: 'success'
+        });
       }
 
       // Redirect back to list
       setSearchParams({ tab: 'invoices' });
     } catch (err: any) {
       console.error(err);
-      setErrorMsg(err.response?.data?.error || 'Failed to save invoice');
+      showPopup({
+        title: 'Save Failed',
+        message: err.response?.data?.error || 'Failed to save invoice',
+        type: 'error'
+      });
     } finally {
       setSavingInvoice(false);
     }
@@ -390,7 +444,6 @@ export const InvoiceForm: React.FC<InvoiceFormProps> = ({ onAddNotification }) =
                     }
                   }
                   if (isValid) {
-                    setErrorMsg(null);
                     setCurrentStep(s.id);
                   }
                 }}
@@ -488,12 +541,7 @@ export const InvoiceForm: React.FC<InvoiceFormProps> = ({ onAddNotification }) =
             )}
 
             {/* Validation Message - Localized at the bottom of the box */}
-            {errorMsg && (
-              <div className="p-3.5 bg-danger/10 border border-danger/35 text-danger text-xs font-bold rounded-xl animate-float-fast flex items-center gap-2">
-                <AlertCircle className="h-4.5 w-4.5 shrink-0" />
-                <span>{errorMsg}</span>
-              </div>
-            )}
+            {/* Error is handled by global usePopup */}
 
             <div className="flex justify-end pt-4 border-t border-navy/5">
               <Button
@@ -602,12 +650,7 @@ export const InvoiceForm: React.FC<InvoiceFormProps> = ({ onAddNotification }) =
             </div>
 
             {/* Validation Message - Localized at the bottom of the box */}
-            {errorMsg && (
-              <div className="p-3.5 bg-danger/10 border border-danger/35 text-danger text-xs font-bold rounded-xl animate-float-fast flex items-center gap-2">
-                <AlertCircle className="h-4.5 w-4.5 shrink-0" />
-                <span>{errorMsg}</span>
-              </div>
-            )}
+            {/* Error is handled by global usePopup */}
 
             <div className="flex justify-between pt-4 border-t border-navy/5">
               <Button
@@ -747,12 +790,7 @@ export const InvoiceForm: React.FC<InvoiceFormProps> = ({ onAddNotification }) =
             </div>
 
             {/* Validation Message - Localized at the bottom of the box */}
-            {errorMsg && (
-              <div className="p-3.5 bg-danger/10 border border-danger/35 text-danger text-xs font-bold rounded-xl animate-float-fast flex items-center gap-2">
-                <AlertCircle className="h-4.5 w-4.5 shrink-0" />
-                <span>{errorMsg}</span>
-              </div>
-            )}
+            {/* Error is handled by global usePopup */}
 
             <div className="flex justify-between pt-4 border-t border-navy/5">
               <Button
@@ -934,18 +972,14 @@ export const InvoiceForm: React.FC<InvoiceFormProps> = ({ onAddNotification }) =
                     type="button"
                     onClick={() => setSearchParams({ tab: 'invoices' })}
                     className="text-center text-xs font-bold text-navy/60 hover:text-navy hover:underline py-1 mt-1 transition-all"
+                            className="text-center text-xs font-bold text-navy/60 hover:text-navy hover:underline py-1 mt-1 transition-all"
                   >
                     Cancel & Return
                   </button>
                 </div>
 
                 {/* Validation Message - Localized at the bottom of the box */}
-                {errorMsg && (
-                  <div className="mt-2 p-3.5 bg-danger/10 border border-danger/35 text-danger text-xs font-bold rounded-xl animate-float-fast flex items-center gap-2">
-                    <AlertCircle className="h-4.5 w-4.5 shrink-0" />
-                    <span>{errorMsg}</span>
-                  </div>
-                )}
+                {/* Error is handled by global usePopup */}
               </GlassCard>
 
               <div className="flex justify-start">
@@ -983,12 +1017,7 @@ export const InvoiceForm: React.FC<InvoiceFormProps> = ({ onAddNotification }) =
               </button>
             </div>
 
-            {clientError && (
-              <div className="p-3 bg-danger/10 border border-danger/35 text-danger text-xs font-bold rounded-xl flex items-center gap-2">
-                <AlertCircle className="h-4.5 w-4.5 shrink-0" />
-                <span>{clientError}</span>
-              </div>
-            )}
+            {/* Error is handled by global usePopup */}
 
             <form onSubmit={handleCreateClient} className="flex flex-col gap-4">
               <Input

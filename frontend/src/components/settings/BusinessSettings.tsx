@@ -7,10 +7,11 @@ import {
   Building2, User, Briefcase, MapPin, Upload, X,
   Save, CheckCircle, AlertCircle, Banknote, FileText,
   Shield, BadgePercent, Sparkles, RefreshCw, Globe,
-  Clock, DollarSign, Phone, Bell, Mail, Hash,
+  Clock, IndianRupee, Phone, Bell, Mail, Hash,
   CreditCard, Landmark, QrCode, Settings2,
   CheckCircle2
 } from 'lucide-react';
+import { usePopup } from '../../context/PopupContext';
 
 const BUSINESS_TYPES = [
   { value: 'freelancer', label: 'Freelancer', icon: User },
@@ -76,8 +77,6 @@ const BusinessSettings: React.FC<BusinessSettingsProps> = ({ defaultTab = 'profi
     setActiveTab(defaultTab);
   }, [defaultTab]);
   const [saving, setSaving] = useState(false);
-  const [successMsg, setSuccessMsg] = useState<string | null>(null);
-  const [errorMsg, setErrorMsg] = useState<string | null>(null);
   const [logoPreview, setLogoPreview] = useState<string>('');
   const [bannerPreview, setBannerPreview] = useState<string>('');
 
@@ -86,13 +85,11 @@ const BusinessSettings: React.FC<BusinessSettingsProps> = ({ defaultTab = 'profi
   const [newPassword, setNewPassword] = useState('');
   const [confirmNewPassword, setConfirmNewPassword] = useState('');
   const [passwordUpdating, setPasswordUpdating] = useState(false);
-  const [passwordSuccess, setPasswordSuccess] = useState<string | null>(null);
-  const [passwordError, setPasswordError] = useState<string | null>(null);
 
   const [showDeleteModal, setShowDeleteModal] = useState(false);
   const [deleteConfirmText, setDeleteConfirmText] = useState('');
   const [deletingAccount, setDeletingAccount] = useState(false);
-  const [deleteError, setDeleteError] = useState<string | null>(null);
+  const { showPopup } = usePopup();
 
   const [isUpgradeModalOpen, setIsUpgradeModalOpen] = useState(false);
   const [cancellingSub, setCancellingSub] = useState(false);
@@ -101,16 +98,21 @@ const BusinessSettings: React.FC<BusinessSettingsProps> = ({ defaultTab = 'profi
 
   const handleCancelSubscription = async () => {
     setCancellingSub(true);
-    setPasswordError(null);
-    setPasswordSuccess(null);
     try {
       const response = await API.post('/subscription/cancel-subscription');
       await refreshBusinessProfile();
-      setSuccessMsg(response.data.message || 'Auto-renewal turned off successfully.');
-      setTimeout(() => setSuccessMsg(null), 4000);
+      showPopup({
+        title: 'Subscription Cancelled',
+        message: response.data.message || 'Auto-renewal turned off successfully.',
+        type: 'success'
+      });
       setShowCancelModal(false);
     } catch (err: any) {
-      setErrorMsg(err.response?.data?.error || 'Failed to cancel subscription.');
+      showPopup({
+        title: 'Cancellation Failed',
+        message: err.response?.data?.error || 'Failed to cancel subscription.',
+        type: 'error'
+      });
     } finally {
       setCancellingSub(false);
     }
@@ -118,15 +120,20 @@ const BusinessSettings: React.FC<BusinessSettingsProps> = ({ defaultTab = 'profi
 
   const handleReactivateSubscription = async () => {
     setReactivatingSub(true);
-    setPasswordError(null);
-    setPasswordSuccess(null);
     try {
       const response = await API.post('/subscription/reactivate-subscription');
       await refreshBusinessProfile();
-      setSuccessMsg(response.data.message || 'Auto-renewal reactivated successfully.');
-      setTimeout(() => setSuccessMsg(null), 4000);
+      showPopup({
+        title: 'Subscription Reactivated',
+        message: response.data.message || 'Auto-renewal reactivated successfully.',
+        type: 'success'
+      });
     } catch (err: any) {
-      setErrorMsg(err.response?.data?.error || 'Failed to reactivate subscription.');
+      showPopup({
+        title: 'Reactivation Failed',
+        message: err.response?.data?.error || 'Failed to reactivate subscription.',
+        type: 'error'
+      });
     } finally {
       setReactivatingSub(false);
     }
@@ -134,16 +141,22 @@ const BusinessSettings: React.FC<BusinessSettingsProps> = ({ defaultTab = 'profi
 
   const handlePasswordChange = async (e: React.FormEvent) => {
     e.preventDefault();
-    setPasswordError(null);
-    setPasswordSuccess(null);
 
     if (!currentPassword || !newPassword || !confirmNewPassword) {
-      setPasswordError('All fields are required.');
+      showPopup({
+        title: 'Validation Error',
+        message: 'All fields are required.',
+        type: 'warning'
+      });
       return;
     }
 
     if (newPassword !== confirmNewPassword) {
-      setPasswordError('New passwords do not match.');
+      showPopup({
+        title: 'Validation Error',
+        message: 'New passwords do not match.',
+        type: 'warning'
+      });
       return;
     }
 
@@ -153,12 +166,20 @@ const BusinessSettings: React.FC<BusinessSettingsProps> = ({ defaultTab = 'profi
         currentPassword,
         newPassword
       });
-      setPasswordSuccess('Password updated successfully!');
+      showPopup({
+        title: 'Password Updated',
+        message: 'Password updated successfully!',
+        type: 'success'
+      });
       setCurrentPassword('');
       setNewPassword('');
       setConfirmNewPassword('');
     } catch (err: any) {
-      setPasswordError(err.response?.data?.error || 'Failed to update password.');
+      showPopup({
+        title: 'Update Failed',
+        message: err.response?.data?.error || 'Failed to update password.',
+        type: 'error'
+      });
     } finally {
       setPasswordUpdating(false);
     }
@@ -166,19 +187,26 @@ const BusinessSettings: React.FC<BusinessSettingsProps> = ({ defaultTab = 'profi
 
   const handleDeleteAccount = async () => {
     if (deleteConfirmText !== 'DELETE') {
-      setDeleteError('Please type DELETE to confirm.');
+      showPopup({
+        title: 'Validation Error',
+        message: 'Please type DELETE to confirm.',
+        type: 'warning'
+      });
       return;
     }
 
     setDeletingAccount(true);
-    setDeleteError(null);
     try {
       await API.delete('/auth/delete-account');
       setShowDeleteModal(false);
       logout();
       window.location.href = '/';
     } catch (err: any) {
-      setDeleteError(err.response?.data?.error || 'Failed to delete account.');
+      showPopup({
+        title: 'Delete Failed',
+        message: err.response?.data?.error || 'Failed to delete account.',
+        type: 'error'
+      });
       setDeletingAccount(false);
     }
   };
@@ -260,8 +288,15 @@ const BusinessSettings: React.FC<BusinessSettingsProps> = ({ defaultTab = 'profi
   const removeBanner = () => { setBannerPreview(''); set('bannerBase64', ''); if (bannerInputRef.current) bannerInputRef.current.value = ''; };
 
   const handleSave = async () => {
-    if (!form.name.trim()) { setErrorMsg('Business name is required.'); return; }
-    setSaving(true); setErrorMsg(null); setSuccessMsg(null);
+    if (!form.name.trim()) {
+      showPopup({
+        title: 'Validation Error',
+        message: 'Business name is required.',
+        type: 'warning'
+      });
+      return;
+    }
+    setSaving(true);
     try {
       const payload = {
         name: form.name.trim(), legalName: form.legalName.trim(), type: form.type,
@@ -281,10 +316,17 @@ const BusinessSettings: React.FC<BusinessSettingsProps> = ({ defaultTab = 'profi
       if (businessProfile) { await API.put('/business', payload); }
       else { await API.post('/business', payload); }
       await refreshBusinessProfile();
-      setSuccessMsg('Business settings saved successfully!');
-      setTimeout(() => setSuccessMsg(null), 4000);
+      showPopup({
+        title: 'Settings Saved',
+        message: 'Business settings saved successfully!',
+        type: 'success'
+      });
     } catch (err: any) {
-      setErrorMsg(err.response?.data?.error || 'Failed to save settings. Please try again.');
+      showPopup({
+        title: 'Save Failed',
+        message: err.response?.data?.error || 'Failed to save settings. Please try again.',
+        type: 'error'
+      });
     } finally { setSaving(false); }
   };
 
@@ -314,7 +356,7 @@ const BusinessSettings: React.FC<BusinessSettingsProps> = ({ defaultTab = 'profi
   /* ── Stat chip shown in the header ─────────────────── */
   const statChips = [
     { label: 'Business',   value: form.name || '—', icon: Building2 },
-    { label: 'Currency',   value: form.currency,     icon: DollarSign },
+    { label: 'Currency',   value: form.currency,     icon: IndianRupee },
     { label: 'GST',        value: form.gstNumber || 'Not set', icon: BadgePercent },
     { label: 'Reminders',  value: businessProfile?.remindersEnabled ? `${businessProfile?.remindersIntervals?.length || 0} active` : 'Disabled', icon: Bell },
   ];
@@ -516,7 +558,7 @@ const BusinessSettings: React.FC<BusinessSettingsProps> = ({ defaultTab = 'profi
       case 'invoice': return (
         <div className="flex flex-col gap-5">
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-            <Field label="Currency" icon={DollarSign}>
+            <Field label="Currency" icon={IndianRupee}>
               <select className={selectClass} value={form.currency} onChange={e => set('currency', e.target.value)}>
                 {CURRENCIES.map(c => <option key={c.value} value={c.value}>{c.label}</option>)}
               </select>
@@ -805,30 +847,16 @@ const BusinessSettings: React.FC<BusinessSettingsProps> = ({ defaultTab = 'profi
                   Modify your login password below. Requirements: 8+ characters, uppercase, lowercase, numbers & symbols.
                 </p>
 
-                {passwordSuccess && (
-                  <div className="p-3 bg-green/10 border border-green/20 text-green-dark text-xs font-bold rounded-xl flex items-center gap-2">
-                    <CheckCircle className="h-4 w-4 text-green" />
-                    {passwordSuccess}
-                  </div>
-                )}
-                
-                {passwordError && (
-                  <div className="p-3 bg-red-50 border border-red-200 text-red-650 text-xs font-bold rounded-xl flex items-center gap-2">
-                    <AlertCircle className="h-4 w-4 text-red-500" />
-                    {passwordError}
-                  </div>
-                )}
-
                 <div className="flex flex-col gap-3.5">
                   <div className="flex flex-col gap-1">
                     <label className={labelClass}>Current Password</label>
                     <input
-                      id="account-curr-pwd"
-                      type="password"
-                      className={inputClass}
-                      placeholder="••••••••"
-                      value={currentPassword}
-                      onChange={e => { setCurrentPassword(e.target.value); setPasswordError(null); }}
+                       id="account-curr-pwd"
+                       type="password"
+                       className={inputClass}
+                       placeholder="••••••••"
+                       value={currentPassword}
+                       onChange={e => { setCurrentPassword(e.target.value); }}
                     />
                   </div>
                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-3.5">
@@ -923,11 +951,8 @@ const BusinessSettings: React.FC<BusinessSettingsProps> = ({ defaultTab = 'profi
                     className="w-full bg-white border border-navy/15 rounded-xl px-4 py-2.5 text-xs text-navy font-bold focus:outline-none focus:ring-2 focus:ring-red-500/20 focus:border-red-500/50 placeholder:text-navy/20"
                     placeholder="Type DELETE"
                     value={deleteConfirmText}
-                    onChange={e => { setDeleteConfirmText(e.target.value); setDeleteError(null); }}
+                    onChange={e => { setDeleteConfirmText(e.target.value); }}
                   />
-                  {deleteError && (
-                    <p className="text-[10px] text-red-600 font-extrabold leading-none">{deleteError}</p>
-                  )}
                 </div>
 
                 <div className="flex gap-3 pt-2">
@@ -1048,22 +1073,7 @@ const BusinessSettings: React.FC<BusinessSettingsProps> = ({ defaultTab = 'profi
         </div>
       </div>
 
-      {/* ── Alerts ─────────────────────────────────────── */}
-      {successMsg && (
-        <div className="flex items-center gap-3 p-4 bg-green/10 border border-green/25 text-green-dark text-xs font-bold rounded-2xl">
-          <CheckCircle className="h-4 w-4 shrink-0 text-green" />
-          {successMsg}
-        </div>
-      )}
-      {errorMsg && (
-        <div className="flex items-center justify-between gap-3 p-4 bg-red-50 border border-red-200 text-red-600 text-xs font-bold rounded-2xl">
-          <div className="flex items-center gap-2">
-            <AlertCircle className="h-4 w-4 shrink-0 text-red-500" />
-            {errorMsg}
-          </div>
-          <button onClick={() => setErrorMsg(null)} className="text-red-400 hover:text-red-600">✕</button>
-        </div>
-      )}
+      {/* Alerts are handled by global usePopup */}
 
       {/* ── Main Content: Horizontal tabs + Panel ──────── */}
       <div className="flex flex-col gap-4">

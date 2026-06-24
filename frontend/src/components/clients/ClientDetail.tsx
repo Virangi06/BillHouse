@@ -15,6 +15,7 @@ import {
 } from 'lucide-react';
 import GlassCard from '../common/GlassCard';
 import Button from '../common/Button';
+import { usePopup } from '../../context/PopupContext';
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -97,6 +98,7 @@ const ClientDetail: React.FC<ClientDetailProps> = ({
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
   const [activeStatusId, setActiveStatusId] = useState<string | null>(null);
   const [updatingStatusId, setUpdatingStatusId] = useState<string | null>(null);
+  const { showPopup } = usePopup();
 
   // ─── Load client summary ───────────────────────────────────────────────────
 
@@ -135,8 +137,17 @@ const ClientDetail: React.FC<ClientDetailProps> = ({
       await loadSummary();
       setActiveStatusId(null);
       onAddNotification('invoice', 'Invoice Status Updated', `Invoice status changed to ${newStatus}.`);
+      showPopup({
+        title: 'Success',
+        message: `Invoice status changed to ${newStatus}.`,
+        type: 'success'
+      });
     } catch (err: any) {
-      setErrorMsg(err.response?.data?.error || 'Failed to update invoice status.');
+      showPopup({
+        title: 'Error',
+        message: err.response?.data?.error || 'Failed to update invoice status.',
+        type: 'error'
+      });
     } finally {
       setUpdatingStatusId(null);
     }

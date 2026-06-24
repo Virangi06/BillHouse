@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useBusinessProfile, getLogoUrl } from '../../context/BusinessContext';
+import { usePopup } from '../../context/PopupContext';
 import API from '../../utils/api';
 import {
   Bell,
@@ -19,8 +20,7 @@ const ReminderSettings: React.FC = () => {
   const [remindersIntervals, setRemindersIntervals] = useState<number[]>([7, 14, 30]);
   const [reminderTemplate, setReminderTemplate] = useState<'professional' | 'friendly' | 'urgent'>('professional');
   const [saving, setSaving] = useState<boolean>(false);
-  const [successMsg, setSuccessMsg] = useState<string | null>(null);
-  const [errorMsg, setErrorMsg] = useState<string | null>(null);
+  const { showPopup } = usePopup();
 
   useEffect(() => {
     if (businessProfile) {
@@ -40,14 +40,10 @@ const ReminderSettings: React.FC = () => {
       }
       return next;
     });
-    setSuccessMsg(null);
-    setErrorMsg(null);
   };
 
   const handleSave = async () => {
     setSaving(true);
-    setErrorMsg(null);
-    setSuccessMsg(null);
     try {
       await API.put('/business', {
         remindersEnabled,
@@ -55,10 +51,17 @@ const ReminderSettings: React.FC = () => {
         reminderTemplate,
       });
       await refreshBusinessProfile();
-      setSuccessMsg('Reminder automation settings updated successfully!');
-      setTimeout(() => setSuccessMsg(null), 4000);
+      showPopup({
+        title: 'Success',
+        message: 'Reminder automation settings updated successfully!',
+        type: 'success'
+      });
     } catch (err: any) {
-      setErrorMsg(err.response?.data?.error || 'Failed to update reminder settings.');
+      showPopup({
+        title: 'Error',
+        message: err.response?.data?.error || 'Failed to update reminder settings.',
+        type: 'error'
+      });
     } finally {
       setSaving(false);
     }
@@ -101,22 +104,7 @@ const ReminderSettings: React.FC = () => {
         </button>
       </div>
 
-      {/* Alerts */}
-      {successMsg && (
-        <div className="flex items-center gap-3 p-4 bg-green/10 border border-green/25 text-green-dark text-xs font-bold rounded-2xl animate-fade-in">
-          <CheckCircle className="h-4 w-4 shrink-0 text-green" />
-          {successMsg}
-        </div>
-      )}
-      {errorMsg && (
-        <div className="flex items-center justify-between gap-3 p-4 bg-red-50 border border-red-200 text-red-600 text-xs font-bold rounded-2xl animate-fade-in">
-          <div className="flex items-center gap-2">
-            <AlertCircle className="h-4 w-4 shrink-0 text-red-500" />
-            {errorMsg}
-          </div>
-          <button onClick={() => setErrorMsg(null)} className="text-red-400 hover:text-red-600">✕</button>
-        </div>
-      )}
+      {/* Alerts are handled by global usePopup */}
 
       {/* Main Grid split: settings / live preview */}
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 items-start">
@@ -226,7 +214,7 @@ const ReminderSettings: React.FC = () => {
                     <button
                       key={t.value}
                       type="button"
-                      onClick={() => { setReminderTemplate(t.value as any); setSuccessMsg(null); setErrorMsg(null); }}
+                      onClick={() => { setReminderTemplate(t.value as any); }}
                       className={`w-full p-3 rounded-xl border-2 text-left transition-all cursor-pointer flex flex-col gap-0.5
                         ${reminderTemplate === t.value
                           ? 'border-green bg-green/8 text-navy shadow-sm'

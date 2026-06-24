@@ -4,6 +4,7 @@ import API from '../../utils/api';
 import { useBusinessProfile, type BusinessProfile } from '../../context/BusinessContext';
 import { useAuth } from '../../context/AuthContext';
 import logoTransparent from '../../assets/Logo_transparent.png';
+import { usePopup } from '../../context/PopupContext';
 import {
   Building2, User, Briefcase,
   MapPin, FileText, CheckCircle,
@@ -54,9 +55,9 @@ const OnboardingWizard: React.FC = () => {
 
   const [currentStep, setCurrentStep] = useState(1);
   const [saving, setSaving] = useState(false);
-  const [errorMsg, setErrorMsg] = useState<string | null>(null);
   const [logoPreview, setLogoPreview] = useState<string>('');
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const { showPopup } = usePopup();
 
   const [form, setForm] = useState<FormData>({
     name: user?.businessName || (user?.name ? `${user.name}'s Business` : ''),
@@ -80,7 +81,6 @@ const OnboardingWizard: React.FC = () => {
 
   const set = (field: keyof FormData, value: string) => {
     setForm(prev => ({ ...prev, [field]: value }));
-    setErrorMsg(null);
   };
 
   const handleLogoUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -88,11 +88,19 @@ const OnboardingWizard: React.FC = () => {
     if (!file) return;
 
     if (file.size > 500_000) {
-      setErrorMsg('Logo must be under 500KB. Please compress the image and try again.');
+      showPopup({
+        title: 'Upload Error',
+        message: 'Logo must be under 500KB. Please compress the image and try again.',
+        type: 'error'
+      });
       return;
     }
     if (!file.type.startsWith('image/')) {
-      setErrorMsg('Please select a valid image file (PNG, JPG, SVG, WebP).');
+      showPopup({
+        title: 'Upload Error',
+        message: 'Please select a valid image file (PNG, JPG, SVG, WebP).',
+        type: 'error'
+      });
       return;
     }
 
@@ -112,14 +120,34 @@ const OnboardingWizard: React.FC = () => {
   };
 
   const validateStep = (): boolean => {
-    setErrorMsg(null);
     if (currentStep === 1) {
-      if (!form.name.trim()) { setErrorMsg('Business name is required.'); return false; }
+      if (!form.name.trim()) {
+        showPopup({
+          title: 'Validation Error',
+          message: 'Business name is required.',
+          type: 'error'
+        });
+        return false;
+      }
     }
     if (currentStep === 3) {
-      if (!form.invoicePrefix.trim()) { setErrorMsg('Invoice prefix is required.'); return false; }
+      if (!form.invoicePrefix.trim()) {
+        showPopup({
+          title: 'Validation Error',
+          message: 'Invoice prefix is required.',
+          type: 'error'
+        });
+        return false;
+      }
       const num = parseInt(form.invoiceNextNumber);
-      if (isNaN(num) || num < 1) { setErrorMsg('Starting invoice number must be 1 or greater.'); return false; }
+      if (isNaN(num) || num < 1) {
+        showPopup({
+          title: 'Validation Error',
+          message: 'Starting invoice number must be 1 or greater.',
+          type: 'error'
+        });
+        return false;
+      }
     }
     return true;
   };
@@ -131,14 +159,12 @@ const OnboardingWizard: React.FC = () => {
 
   const handleBack = () => {
     if (currentStep > 1) setCurrentStep(s => s - 1);
-    setErrorMsg(null);
   };
 
 
 
   const handleSkipStep = () => {
     // Only callable on Step 3 (Branding) and Step 4 (Bank Details)
-    setErrorMsg(null);
     if (currentStep === 3) setCurrentStep(4);
     else if (currentStep === 4) handleSave(); // Skip bank details and save immediately
   };
@@ -146,7 +172,6 @@ const OnboardingWizard: React.FC = () => {
   const handleSave = async () => {
     if (!validateStep()) return;
     setSaving(true);
-    setErrorMsg(null);
     try {
       const payload = {
         name: form.name.trim() || (user?.name ? `${user.name}'s Business` : 'My Business'),
@@ -170,7 +195,11 @@ const OnboardingWizard: React.FC = () => {
       const response = await API.post('/business', payload);
       setOnboardingComplete(response.data.business as BusinessProfile);
     } catch (err: any) {
-      setErrorMsg(err.response?.data?.error || 'Failed to save business profile. Please try again.');
+      showPopup({
+        title: 'Save Failed',
+        message: err.response?.data?.error || 'Failed to save business profile. Please try again.',
+        type: 'error'
+      });
     } finally {
       setSaving(false);
     }
@@ -499,12 +528,7 @@ const OnboardingWizard: React.FC = () => {
             </div>
           )}
 
-          {/* Error */}
-          {errorMsg && (
-            <div className="mt-4 p-3 bg-red-50 border border-red-200 rounded-xl text-xs font-bold text-red-600">
-              {errorMsg}
-            </div>
-          )}
+          {/* Error is handled by global usePopup */}
         </div>
 
         {/* Footer Navigation */}

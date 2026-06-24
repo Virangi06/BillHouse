@@ -1,3 +1,5 @@
+import { usePopup } from '../../context/PopupContext';
+
 import React, { useState, useEffect } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import API from '../../utils/api';
@@ -17,7 +19,7 @@ import {
   AlertCircle,
   XCircle,
   Send,
-  DollarSign
+  IndianRupee
 } from 'lucide-react';
 
 export interface InvoiceData {
@@ -42,12 +44,7 @@ export const InvoiceList: React.FC<InvoiceListProps> = ({ onAddNotification }) =
   const [invoices, setInvoices] = useState<InvoiceData[]>([]);
   const [loading, setLoading] = useState<boolean>(true);
   const [actionLoading, setActionLoading] = useState<boolean>(false);
-  const [errorMsg, setErrorMsg] = useState<string | null>(null);
-  const [messageBox, setMessageBox] = useState<{ title: string; message: string; isOpen: boolean }>({
-    title: '',
-    message: '',
-    isOpen: false
-  });
+  const { showPopup } = usePopup();
   const [paymentInvoice, setPaymentInvoice] = useState<any | null>(null);
   
   // Filters and search
@@ -94,7 +91,11 @@ export const InvoiceList: React.FC<InvoiceListProps> = ({ onAddNotification }) =
       setInvoices(response.data);
     } catch (err: any) {
       console.error('Failed to fetch invoices:', err);
-      setErrorMsg(err.response?.data?.error || 'Failed to fetch invoices from server');
+      showPopup({
+        title: 'Fetch Error',
+        message: err.response?.data?.error || 'Failed to fetch invoices from server',
+        type: 'error'
+      });
     } finally {
       setLoading(false);
     }
@@ -146,41 +147,59 @@ export const InvoiceList: React.FC<InvoiceListProps> = ({ onAddNotification }) =
   });
 
   const handleDelete = async (id: string) => {
-    if (!window.confirm('Are you sure you want to delete this invoice? This action cannot be undone.')) {
-      return;
-    }
-
     const targetInvoice = invoices.find(inv => inv._id === id);
-    try {
-      setActionLoading(true);
-      await API.delete(`/invoices/${id}`);
-      setInvoices(prev => prev.filter(inv => inv._id !== id));
-      if (onAddNotification && targetInvoice) {
-        onAddNotification('invoice', 'Invoice Deleted', `Invoice ${targetInvoice.number} has been permanently deleted.`);
+    if (!targetInvoice) return;
+
+    showPopup({
+      title: 'Delete Invoice',
+      message: `Are you sure you want to delete invoice ${targetInvoice.number}? This action cannot be undone.`,
+      type: 'confirm',
+      confirmText: 'Delete',
+      onConfirm: async () => {
+        try {
+          setActionLoading(true);
+          await API.delete(`/invoices/${id}`);
+          setInvoices(prev => prev.filter(inv => inv._id !== id));
+          if (onAddNotification) {
+            onAddNotification('invoice', 'Invoice Deleted', `Invoice ${targetInvoice.number} has been permanently deleted.`);
+          }
+          showPopup({
+            title: 'Invoice Deleted',
+            message: `Invoice ${targetInvoice.number} has been successfully deleted.`,
+            type: 'success'
+          });
+        } catch (err: any) {
+          showPopup({
+            title: 'Delete Failed',
+            message: err.response?.data?.error || 'Failed to delete invoice',
+            type: 'error'
+          });
+        } finally {
+          setActionLoading(false);
+        }
       }
-    } catch (err: any) {
-      alert(err.response?.data?.error || 'Failed to delete invoice');
-    } finally {
-      setActionLoading(false);
-    }
+    });
   };
 
   const handleSendEmail = async (id: string, number: string) => {
     try {
       setActionLoading(true);
-      setErrorMsg(null);
       const res = await API.post(`/invoices/${id}/send`);
-      setMessageBox({
+      showPopup({
         title: 'Invoice Dispatched',
         message: res.data.message || `Invoice ${number} sent to client successfully.`,
-        isOpen: true
+        type: 'success'
       });
       fetchInvoices();
       if (onAddNotification) {
         onAddNotification('invoice', 'Invoice Dispatched', `Invoice ${number} sent to client email.`);
       }
     } catch (err: any) {
-      setErrorMsg(err.response?.data?.error || 'Failed to send invoice email.');
+      showPopup({
+        title: 'Dispatch Failed',
+        message: err.response?.data?.error || 'Failed to send invoice email.',
+        type: 'error'
+      });
     } finally {
       setActionLoading(false);
     }
@@ -189,19 +208,22 @@ export const InvoiceList: React.FC<InvoiceListProps> = ({ onAddNotification }) =
   const handleSendReminder = async (id: string, number: string) => {
     try {
       setActionLoading(true);
-      setErrorMsg(null);
       const res = await API.post(`/invoices/${id}/reminder`);
-      setMessageBox({
+      showPopup({
         title: 'Reminder Dispatched',
         message: res.data.message || `Payment reminder for Invoice ${number} sent successfully.`,
-        isOpen: true
+        type: 'success'
       });
       fetchInvoices();
       if (onAddNotification) {
         onAddNotification('invoice', 'Reminder Dispatched', `Payment reminder for ${number} sent to client.`);
       }
     } catch (err: any) {
-      setErrorMsg(err.response?.data?.error || 'Failed to send payment reminder.');
+      showPopup({
+        title: 'Reminder Failed',
+        message: err.response?.data?.error || 'Failed to send payment reminder.',
+        type: 'error'
+      });
     } finally {
       setActionLoading(false);
     }
@@ -479,38 +501,7 @@ export const InvoiceList: React.FC<InvoiceListProps> = ({ onAddNotification }) =
         </div>
       </div>
 
-      {errorMsg && (
-        <div className="p-4 bg-danger/10 border border-danger/35 text-danger text-xs font-bold rounded-2xl">
-          {errorMsg}
-        </div>
-      )}
 
-      {messageBox.isOpen && (
-        <div className="fixed inset-0 bg-navy/60 backdrop-blur-sm z-50 flex items-center justify-center p-4">
-          <div className="w-full max-w-md bg-white rounded-3xl border border-navy/5 shadow-2xl p-6 flex flex-col gap-5 text-center animate-scale-up">
-            <div className="p-4 bg-green/10 text-green rounded-full mx-auto w-16 h-16 flex items-center justify-center">
-              <CheckCircle2 className="h-8 w-8 text-green" />
-            </div>
-
-            <div>
-              <h3 className="text-base font-extrabold text-navy">{messageBox.title}</h3>
-              <p className="text-xs text-text-secondary font-semibold mt-2 leading-relaxed whitespace-pre-wrap">
-                {messageBox.message}
-              </p>
-            </div>
-
-            <div className="flex justify-center pt-3">
-              <Button
-                variant="primary"
-                onClick={() => setMessageBox(prev => ({ ...prev, isOpen: false }))}
-                className="py-2.5 px-6 text-xs font-bold bg-green hover:bg-green-dark text-white rounded-xl shadow-sm"
-              >
-                OK
-              </Button>
-            </div>
-          </div>
-        </div>
-      )}
 
       {/* List Table container */}
       <GlassCard className="overflow-hidden border-navy/5 shadow-sm">
@@ -705,7 +696,7 @@ export const InvoiceList: React.FC<InvoiceListProps> = ({ onAddNotification }) =
                   onClick={() => { setActiveDropdownId(null); setDropdownPos(null); setPaymentInvoice(inv); }}
                   className="flex items-center gap-2 px-3.5 py-2 text-xs font-bold text-navy hover:bg-navy/5 transition-colors w-full text-left"
                 >
-                  <DollarSign className="h-4 w-4 opacity-70" /> Record Payment
+                  <IndianRupee className="h-4 w-4 opacity-70" /> Record Payment
                 </button>
               )}
 

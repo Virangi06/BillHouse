@@ -1,7 +1,8 @@
 import React, { useState, useEffect } from 'react';
 import API from '../../utils/api';
 import Button from '../common/Button';
-import { X, AlertCircle } from 'lucide-react';
+import { X } from 'lucide-react';
+import { usePopup } from '../../context/PopupContext';
 
 interface InvoiceSummaryData {
   _id: string;
@@ -34,7 +35,7 @@ export const RecordPaymentModal: React.FC<RecordPaymentModalProps> = ({
   const [transactionId, setTransactionId] = useState<string>('');
   const [notes, setNotes] = useState<string>('');
   const [loading, setLoading] = useState<boolean>(false);
-  const [errorMsg, setErrorMsg] = useState<string | null>(null);
+  const { showPopup } = usePopup();
 
   useEffect(() => {
     if (invoice) {
@@ -45,7 +46,6 @@ export const RecordPaymentModal: React.FC<RecordPaymentModalProps> = ({
       setMethod('UPI');
       setTransactionId('');
       setNotes('');
-      setErrorMsg(null);
     } else if (isOpen) {
       const fetchActiveInvoices = async () => {
         try {
@@ -72,10 +72,13 @@ export const RecordPaymentModal: React.FC<RecordPaymentModalProps> = ({
           setMethod('UPI');
           setTransactionId('');
           setNotes('');
-          setErrorMsg(null);
         } catch (err: any) {
           console.error(err);
-          setErrorMsg('Failed to load active invoices for payment recording');
+          showPopup({
+            title: 'Error',
+            message: 'Failed to load active invoices for payment recording',
+            type: 'error'
+          });
         } finally {
           setLoading(false);
         }
@@ -106,21 +109,32 @@ export const RecordPaymentModal: React.FC<RecordPaymentModalProps> = ({
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    setErrorMsg(null);
 
     if (!selectedInvoice) {
-      setErrorMsg('Please select an active invoice statement first');
+      showPopup({
+        title: 'Validation Error',
+        message: 'Please select an active invoice statement first',
+        type: 'error'
+      });
       return;
     }
 
     const parsedAmount = Number(amount);
     if (isNaN(parsedAmount) || parsedAmount <= 0) {
-      setErrorMsg('Payment amount must be a number greater than 0');
+      showPopup({
+        title: 'Validation Error',
+        message: 'Payment amount must be a number greater than 0',
+        type: 'error'
+      });
       return;
     }
 
     if (parsedAmount > selectedInvoice.amountDue) {
-      setErrorMsg(`Payment amount cannot exceed the remaining balance due (₹${selectedInvoice.amountDue})`);
+      showPopup({
+        title: 'Validation Error',
+        message: `Payment amount cannot exceed the remaining balance due (₹${selectedInvoice.amountDue})`,
+        type: 'error'
+      });
       return;
     }
 
@@ -137,7 +151,11 @@ export const RecordPaymentModal: React.FC<RecordPaymentModalProps> = ({
       onSuccess(res.data.invoice, parsedAmount);
       onClose();
     } catch (err: any) {
-      setErrorMsg(err.response?.data?.error || 'Failed to record payment transaction');
+      showPopup({
+        title: 'Error',
+        message: err.response?.data?.error || 'Failed to record payment transaction',
+        type: 'error'
+      });
     } finally {
       setLoading(false);
     }
@@ -166,12 +184,7 @@ export const RecordPaymentModal: React.FC<RecordPaymentModalProps> = ({
           </button>
         </div>
 
-        {errorMsg && (
-          <div className="p-3.5 bg-danger/10 border border-danger/25 text-danger text-xs font-semibold rounded-xl flex items-center gap-2">
-            <AlertCircle className="h-4 w-4 shrink-0" />
-            <span>{errorMsg}</span>
-          </div>
-        )}
+        {/* Error is handled by global usePopup */}
 
         {/* Input Form */}
         <form onSubmit={handleSubmit} className="flex flex-col gap-4 text-xs font-semibold">

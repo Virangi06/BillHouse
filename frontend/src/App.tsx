@@ -14,11 +14,14 @@ import TermsOfService from './pages/TermsOfService';
 import GDPRCompliance from './pages/GDPRCompliance';
 import SecurityAudit from './pages/SecurityAudit';
 
+import { PopupProvider } from './context/PopupContext';
+
 function App() {
   return (
-    <AuthProvider>
-      <BusinessProvider>
-        <Router>
+    <PopupProvider>
+      <AuthProvider>
+        <BusinessProvider>
+          <Router>
           <Routes>
             <Route path="/" element={<Home />} />
             <Route path="/login" element={<Login />} />
@@ -42,6 +45,7 @@ function App() {
         </Router>
       </BusinessProvider>
     </AuthProvider>
+  </PopupProvider>
   );
 }
 

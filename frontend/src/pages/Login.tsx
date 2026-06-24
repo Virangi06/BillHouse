@@ -8,6 +8,8 @@ import Button from '../components/common/Button';
 import GlassCard from '../components/common/GlassCard';
 import API from '../utils/api';
 
+import { usePopup } from '../context/PopupContext';
+
 interface LoginFormInputs {
   email: string;
   password: string;
@@ -16,9 +18,9 @@ interface LoginFormInputs {
 
 export const Login: React.FC = () => {
   const { register, handleSubmit, formState: { errors } } = useForm<LoginFormInputs>();
-  const [errorMsg, setErrorMsg] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(false);
   const { login } = useAuth();
+  const { showPopup } = usePopup();
   const navigate = useNavigate();
   const location = useLocation();
 
@@ -26,7 +28,6 @@ export const Login: React.FC = () => {
   const from = (location.state as any)?.from?.pathname || '/dashboard';
 
   const onSubmit = async (data: LoginFormInputs) => {
-    setErrorMsg(null);
     setIsLoading(true);
     try {
       const response = await API.post('/auth/login', {
@@ -47,11 +48,12 @@ export const Login: React.FC = () => {
       navigate(from, { replace: true });
     } catch (error: any) {
       console.error('Login error:', error);
-      if (error.response && error.response.data) {
-        setErrorMsg(error.response.data.error || 'Invalid credentials');
-      } else {
-        setErrorMsg('Network error. Please try again.');
-      }
+      const msg = error.response?.data?.error || 'Invalid credentials or network error. Please try again.';
+      showPopup({
+        title: 'Sign In Failed',
+        message: msg,
+        type: 'error'
+      });
     } finally {
       setIsLoading(false);
     }
@@ -64,13 +66,6 @@ export const Login: React.FC = () => {
       maxWidthClass="max-w-xl"
     >
       <GlassCard className="w-full p-5 sm:p-6 md:p-8 border-navy/5 bg-white shadow-xl flex flex-col gap-6">
-        
-        {/* Error Notification Alert */}
-        {errorMsg && (
-          <div className="p-4 bg-danger/10 border border-danger/35 text-danger text-sm font-semibold rounded-2xl animate-float-fast">
-            {errorMsg}
-          </div>
-        )}
 
         <form onSubmit={handleSubmit(onSubmit)} className="flex flex-col gap-4">
           {/* Email field */}

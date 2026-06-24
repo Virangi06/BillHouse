@@ -1,6 +1,6 @@
 import React from 'react';
 import { AreaChart, Area, XAxis, YAxis, ResponsiveContainer, Tooltip, PieChart, Pie, Cell } from 'recharts';
-import { DollarSign, CheckCircle, Clock, Bell, UserPlus, ArrowUpRight, X } from 'lucide-react';
+import { IndianRupee, CheckCircle, Clock, Bell, UserPlus, ArrowUpRight, X } from 'lucide-react';
 import GlassCard from '../common/GlassCard';
 
 interface DashboardPreviewProps {
@@ -170,7 +170,7 @@ export const DashboardPreview: React.FC<DashboardPreviewProps> = ({
                       <p className="text-2xl font-bold text-navy mt-1">₹2,48,900</p>
                     </div>
                     <div className="p-3 bg-green/10 text-green rounded-xl">
-                      <DollarSign className="h-5 w-5" />
+                      <IndianRupee className="h-5 w-5" />
                     </div>
                   </div>
 

@@ -13,22 +13,25 @@ interface ResetFormInputs {
   confirmPassword: string;
 }
 
+import { usePopup } from '../context/PopupContext';
+
 export const ResetPassword: React.FC = () => {
   const { register, handleSubmit, watch, formState: { errors } } = useForm<ResetFormInputs>();
   const [searchParams] = useSearchParams();
-  const [errorMsg, setErrorMsg] = useState<string | null>(null);
   const [successMsg, setSuccessMsg] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(false);
+  const { showPopup } = usePopup();
 
   const token = searchParams.get('token');
   const passwordValue = watch('passwordHash');
 
   const onSubmit = async (data: ResetFormInputs) => {
-    setErrorMsg(null);
-    setSuccessMsg(null);
-
     if (!token) {
-      setErrorMsg('Invalid or missing reset token. Please request a new link.');
+      showPopup({
+        title: 'Reset Link Invalid',
+        message: 'Invalid or missing reset token. Please request a new link.',
+        type: 'error'
+      });
       return;
     }
 
@@ -38,14 +41,23 @@ export const ResetPassword: React.FC = () => {
         token,
         password: data.passwordHash,
       });
-      setSuccessMsg(response.data.message || 'Password updated successfully!');
+      const msg = response.data.message || 'Password updated successfully!';
+      showPopup({
+        title: 'Password Updated',
+        message: msg,
+        type: 'success',
+        onConfirm: () => {
+          setSuccessMsg(msg);
+        }
+      });
     } catch (error: any) {
       console.error('Reset password error:', error);
-      if (error.response && error.response.data) {
-        setErrorMsg(error.response.data.error || 'Password update failed.');
-      } else {
-        setErrorMsg('Network error. Please try again.');
-      }
+      const msg = error.response?.data?.error || 'Password update failed. Please try again.';
+      showPopup({
+        title: 'Reset Failed',
+        message: msg,
+        type: 'error'
+      });
     } finally {
       setIsLoading(false);
     }
@@ -86,13 +98,6 @@ export const ResetPassword: React.FC = () => {
       maxWidthClass="max-w-xl"
     >
       <GlassCard className="w-full p-5 sm:p-6 md:p-8 border-navy/5 bg-white shadow-xl flex flex-col gap-6">
-        
-        {/* Error notification */}
-        {errorMsg && (
-          <div className="p-4 bg-danger/10 border border-danger/35 text-danger text-sm font-semibold rounded-2xl animate-float-fast">
-            {errorMsg}
-          </div>
-        )}
 
         {!token ? (
           <div className="flex flex-col gap-4">

@@ -1,3 +1,5 @@
+import { usePopup } from '../../context/PopupContext';
+
 import React, { useState, useEffect } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import API from '../../utils/api';
@@ -19,7 +21,7 @@ import {
   FileText,
   Building,
   Send,
-  DollarSign
+  IndianRupee
 } from 'lucide-react';
 
 interface InvoiceItem {
@@ -81,15 +83,10 @@ export const InvoiceDetail: React.FC<{
   const [client, setClient] = useState<ClientDetail | null>(null);
   const [loading, setLoading] = useState<boolean>(true);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
-  const [messageBox, setMessageBox] = useState<{ title: string; message: string; isOpen: boolean }>({
-    title: '',
-    message: '',
-    isOpen: false
-  });
   const [actionLoading, setActionLoading] = useState<boolean>(false);
   const [payments, setPayments] = useState<any[]>([]);
   const [isPaymentModalOpen, setIsPaymentModalOpen] = useState<boolean>(false);
-  const [confirmDialog, setConfirmDialog] = useState<{ isOpen: boolean; paymentId: string; amount: number } | null>(null);
+  const { showPopup } = usePopup();
 
   const handleDownloadPDF = () => {
     const element = document.querySelector('.printable-invoice-card');
@@ -116,12 +113,11 @@ export const InvoiceDetail: React.FC<{
     if (!invoice) return;
     try {
       setActionLoading(true);
-      setErrorMsg(null);
       const res = await API.post(`/invoices/${invoice._id}/send`);
-      setMessageBox({
+      showPopup({
         title: 'Invoice Dispatched',
         message: res.data.message || `Invoice ${invoice.number} sent to ${client?.email || 'client'} successfully.`,
-        isOpen: true
+        type: 'success'
       });
       if (res.data?.invoice) {
         setInvoice(res.data.invoice);
@@ -130,7 +126,11 @@ export const InvoiceDetail: React.FC<{
         onAddNotification('invoice', 'Invoice Dispatched', `Invoice ${invoice.number} sent to ${client?.email || 'client'}.`);
       }
     } catch (err: any) {
-      setErrorMsg(err.response?.data?.error || 'Failed to send invoice email.');
+      showPopup({
+        title: 'Dispatch Failed',
+        message: err.response?.data?.error || 'Failed to send invoice email.',
+        type: 'error'
+      });
     } finally {
       setActionLoading(false);
     }
@@ -140,12 +140,11 @@ export const InvoiceDetail: React.FC<{
     if (!invoice) return;
     try {
       setActionLoading(true);
-      setErrorMsg(null);
       const res = await API.post(`/invoices/${invoice._id}/reminder`);
-      setMessageBox({
+      showPopup({
         title: 'Reminder Dispatched',
         message: res.data.message || 'Payment reminder sent successfully.',
-        isOpen: true
+        type: 'success'
       });
       if (res.data?.invoice) {
         setInvoice(res.data.invoice);
@@ -154,7 +153,11 @@ export const InvoiceDetail: React.FC<{
         onAddNotification('invoice', 'Reminder Dispatched', `Payment reminder for ${invoice.number} sent to client.`);
       }
     } catch (err: any) {
-      setErrorMsg(err.response?.data?.error || 'Failed to send payment reminder.');
+      showPopup({
+        title: 'Reminder Failed',
+        message: err.response?.data?.error || 'Failed to send payment reminder.',
+        type: 'error'
+      });
     } finally {
       setActionLoading(false);
     }
@@ -170,10 +173,39 @@ export const InvoiceDetail: React.FC<{
   };
 
   const handleVoidPayment = (paymentId: string, amount: number) => {
-    setConfirmDialog({
-      isOpen: true,
-      paymentId,
-      amount
+    showPopup({
+      title: 'Void Payment',
+      message: `Are you sure you want to void this payment of ${formatCurrency(amount)}? This will delete the transaction log and restore the invoice's outstanding balance due.`,
+      type: 'confirm',
+      confirmText: 'Yes, Void Payment',
+      onConfirm: async () => {
+        try {
+          setActionLoading(true);
+          const res = await API.delete(`/payments/${paymentId}`);
+          showPopup({
+            title: 'Payment Voided',
+            message: res.data.message || 'Payment has been successfully voided.',
+            type: 'success'
+          });
+          if (res.data?.invoice) {
+            setInvoice(res.data.invoice);
+          }
+          if (invoiceId) {
+            fetchPayments(invoiceId);
+          }
+          if (onAddNotification && invoice) {
+            onAddNotification('payment', 'Payment Voided', `Payment of ₹${amount} for ${invoice.number} was voided.`);
+          }
+        } catch (err: any) {
+          showPopup({
+            title: 'Void Failed',
+            message: err.response?.data?.error || 'Failed to void payment transaction',
+            type: 'error'
+          });
+        } finally {
+          setActionLoading(false);
+        }
+      }
     });
   };
 
@@ -289,7 +321,6 @@ export const InvoiceDetail: React.FC<{
     if (!invoice) return;
     try {
       setActionLoading(true);
-      setErrorMsg(null);
       const res = await API.patch<{ message: string; invoice: InvoiceDetailData }>(`/invoices/${invoice._id}/status`, { status: newStatus });
       if (res.data?.invoice) {
         setInvoice(res.data.invoice);
@@ -301,11 +332,20 @@ export const InvoiceDetail: React.FC<{
           amountDue: newStatus === 'Paid' ? 0 : (newStatus === 'Partially Paid' ? prev.totalAmount - Math.round(prev.totalAmount / 2) : prev.totalAmount)
         } : null);
       }
+      showPopup({
+        title: 'Status Updated',
+        message: `Invoice status changed to ${newStatus}.`,
+        type: 'success'
+      });
     } catch (err: any) {
       const msg = err.response?.data?.error
         || (err.message === 'Network Error' ? 'Network error – check that the backend server is running and CORS allows PATCH requests.' : null)
         || 'Failed to update invoice status';
-      setErrorMsg(msg);
+      showPopup({
+        title: 'Update Failed',
+        message: msg,
+        type: 'error'
+      });
     } finally {
       setActionLoading(false);
     }
@@ -313,53 +353,82 @@ export const InvoiceDetail: React.FC<{
 
   const handleDuplicate = async () => {
     if (!invoice) return;
-    if (!window.confirm('Do you want to duplicate this invoice? This will draft a new copy.')) {
-      return;
-    }
+    showPopup({
+      title: 'Duplicate Invoice',
+      message: 'Do you want to duplicate this invoice? This will draft a new copy.',
+      type: 'confirm',
+      confirmText: 'Duplicate',
+      onConfirm: async () => {
+        try {
+          setActionLoading(true);
+          const payload = {
+            clientId: invoice.client,
+            date: new Date().toISOString().split('T')[0],
+            dueDate: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString().split('T')[0],
+            discountAmount: invoice.discountAmount,
+            notes: invoice.notes,
+            terms: invoice.terms,
+            items: invoice.items.map(it => ({
+              description: it.description,
+              quantity: it.quantity,
+              rate: it.rate,
+              gstRate: it.gstRate
+            })),
+            status: 'Draft'
+          };
 
-    try {
-      setActionLoading(true);
-      const payload = {
-        clientId: invoice.client,
-        date: new Date().toISOString().split('T')[0],
-        dueDate: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString().split('T')[0],
-        discountAmount: invoice.discountAmount,
-        notes: invoice.notes,
-        terms: invoice.terms,
-        items: invoice.items.map(it => ({
-          description: it.description,
-          quantity: it.quantity,
-          rate: it.rate,
-          gstRate: it.gstRate
-        })),
-        status: 'Draft'
-      };
-
-      const res = await API.post('/invoices', payload);
-      alert('Invoice duplicated successfully! Redirecting to the new draft.');
-      setSearchParams({ tab: 'invoices', action: 'detail', id: res.data.invoice._id });
-    } catch (err: any) {
-      alert(err.response?.data?.error || 'Failed to duplicate invoice');
-    } finally {
-      setActionLoading(false);
-    }
+          const res = await API.post('/invoices', payload);
+          showPopup({
+            title: 'Invoice Duplicated',
+            message: 'Invoice duplicated successfully! Redirecting to the new draft.',
+            type: 'success',
+            onConfirm: () => {
+              setSearchParams({ tab: 'invoices', action: 'detail', id: res.data.invoice._id });
+            }
+          });
+        } catch (err: any) {
+          showPopup({
+            title: 'Duplicate Failed',
+            message: err.response?.data?.error || 'Failed to duplicate invoice',
+            type: 'error'
+          });
+        } finally {
+          setActionLoading(false);
+        }
+      }
+    });
   };
 
   const handleDelete = async () => {
     if (!invoice) return;
-    if (!window.confirm('Are you absolutely sure you want to permanently delete this invoice?')) {
-      return;
-    }
-
-    try {
-      setActionLoading(true);
-      await API.delete(`/invoices/${invoice._id}`);
-      setSearchParams({ tab: 'invoices' });
-    } catch (err: any) {
-      alert(err.response?.data?.error || 'Failed to delete invoice');
-    } finally {
-      setActionLoading(false);
-    }
+    showPopup({
+      title: 'Delete Invoice',
+      message: 'Are you absolutely sure you want to permanently delete this invoice?',
+      type: 'confirm',
+      confirmText: 'Delete',
+      onConfirm: async () => {
+        try {
+          setActionLoading(true);
+          await API.delete(`/invoices/${invoice._id}`);
+          showPopup({
+            title: 'Invoice Deleted',
+            message: 'Invoice deleted successfully.',
+            type: 'success',
+            onConfirm: () => {
+              setSearchParams({ tab: 'invoices' });
+            }
+          });
+        } catch (err: any) {
+          showPopup({
+            title: 'Delete Failed',
+            message: err.response?.data?.error || 'Failed to delete invoice',
+            type: 'error'
+          });
+        } finally {
+          setActionLoading(false);
+        }
+      }
+    });
   };
 
   const handlePrint = () => {
@@ -616,42 +685,7 @@ export const InvoiceDetail: React.FC<{
         </div>
       </div>
 
-      {errorMsg && (
-        <div className="p-4 bg-red-500/10 border border-red-500/35 text-red-700 text-xs font-bold rounded-2xl flex items-center justify-between gap-3 print:hidden">
-          <div className="flex items-center gap-2">
-            <AlertCircle className="h-4 w-4 shrink-0" />
-            <span>{errorMsg}</span>
-          </div>
-          <button onClick={() => setErrorMsg(null)} className="p-1 hover:bg-red-500/10 rounded-lg shrink-0">✕</button>
-        </div>
-      )}
-
-      {messageBox.isOpen && (
-        <div className="fixed inset-0 bg-navy/60 backdrop-blur-sm z-50 flex items-center justify-center p-4 print:hidden">
-          <div className="w-full max-w-md bg-white rounded-3xl border border-navy/5 shadow-2xl p-6 flex flex-col gap-5 text-center animate-scale-up">
-            <div className="p-4 bg-green/10 text-green rounded-full mx-auto w-16 h-16 flex items-center justify-center">
-              <CheckCircle2 className="h-8 w-8 text-green" />
-            </div>
-
-            <div>
-              <h3 className="text-base font-extrabold text-navy">{messageBox.title}</h3>
-              <p className="text-xs text-text-secondary font-semibold mt-2 leading-relaxed whitespace-pre-wrap">
-                {messageBox.message}
-              </p>
-            </div>
-
-            <div className="flex justify-center pt-3">
-              <Button
-                variant="primary"
-                onClick={() => setMessageBox(prev => ({ ...prev, isOpen: false }))}
-                className="py-2.5 px-6 text-xs font-bold bg-green hover:bg-green-dark text-white rounded-xl shadow-sm"
-              >
-                OK
-              </Button>
-            </div>
-          </div>
-        </div>
-      )}
+      {/* Success / Error popup is handled by global usePopup */}
 
       {/* Main Content Grid */}
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 w-full items-start">
@@ -1122,7 +1156,7 @@ export const InvoiceDetail: React.FC<{
                   onClick={() => setIsPaymentModalOpen(true)}
                   className="w-full py-2.5 text-xs font-black bg-amber-500 hover:bg-amber-600 text-white rounded-xl flex items-center justify-center gap-1.5 shadow-sm"
                 >
-                  <DollarSign className="h-4 w-4" />
+                  <IndianRupee className="h-4 w-4" />
                   Record Payment
                 </Button>
               )}
@@ -1237,64 +1271,7 @@ export const InvoiceDetail: React.FC<{
         }}
       />
 
-      {confirmDialog && confirmDialog.isOpen && (
-        <div className="fixed inset-0 bg-[#06121E]/60 backdrop-blur-sm z-50 flex items-center justify-center p-4">
-          <div className="w-full max-w-md bg-white rounded-3xl border border-navy/5 shadow-2xl p-6 flex flex-col gap-5 text-center animate-scale-up">
-            <div className="p-4 bg-red-500/10 text-red-500 rounded-full mx-auto w-16 h-16 flex items-center justify-center text-2xl">
-              ⚠️
-            </div>
-            <div>
-              <h3 className="text-base font-extrabold text-navy">Void Payment Transaction</h3>
-              <p className="text-xs text-text-secondary font-semibold mt-2 leading-relaxed">
-                Are you sure you want to void this payment of <strong>₹{confirmDialog.amount}</strong>?
-                This will delete the transaction log and restore the invoice's outstanding balance due.
-              </p>
-            </div>
-            <div className="flex justify-center gap-3 pt-3">
-              <Button
-                variant="outline"
-                onClick={() => setConfirmDialog(null)}
-                className="py-2.5 px-4 text-xs font-bold border-navy/10 text-navy hover:bg-navy/5"
-              >
-                Cancel
-              </Button>
-              <Button
-                variant="primary"
-                onClick={async () => {
-                  const { paymentId, amount } = confirmDialog;
-                  setConfirmDialog(null);
-                  try {
-                    setActionLoading(true);
-                    setErrorMsg(null);
-                    const res = await API.delete(`/payments/${paymentId}`);
-                    setMessageBox({
-                      title: 'Payment Voided',
-                      message: res.data.message || 'Payment has been successfully voided.',
-                      isOpen: true
-                    });
-                    if (res.data?.invoice) {
-                      setInvoice(res.data.invoice);
-                    }
-                    if (invoiceId) {
-                      fetchPayments(invoiceId);
-                    }
-                    if (onAddNotification && invoice) {
-                      onAddNotification('payment', 'Payment Voided', `Payment of ₹${amount} for ${invoice.number} was voided.`);
-                    }
-                  } catch (err: any) {
-                    setErrorMsg(err.response?.data?.error || 'Failed to void payment transaction');
-                  } finally {
-                    setActionLoading(false);
-                  }
-                }}
-                className="py-2.5 px-5 text-xs font-bold bg-red-500 hover:bg-red-600 border-red-500 text-white shadow-md"
-              >
-                Yes, Void Payment
-              </Button>
-            </div>
-          </div>
-        </div>
-      )}
+      {/* Void payment confirm is handled by global usePopup */}
     </div>
   );
 };

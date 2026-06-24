@@ -4,6 +4,7 @@ import { useAuth } from '../../context/AuthContext';
 import { useBusinessProfile } from '../../context/BusinessContext';
 import Button from './Button';
 import { X, Check, ShieldCheck, Zap, Sparkles, CreditCard } from 'lucide-react';
+import { usePopup } from '../../context/PopupContext';
 
 interface UpgradeModalProps {
   isOpen: boolean;
@@ -17,8 +18,8 @@ export const UpgradeModal: React.FC<UpgradeModalProps> = ({ isOpen, onClose, onS
   
   const [billingCycle, setBillingCycle] = useState<'monthly' | 'annual'>('monthly');
   const [loading, setLoading] = useState<boolean>(false);
-  const [errorMsg, setErrorMsg] = useState<string | null>(null);
   const [mockOrder, setMockOrder] = useState<any | null>(null); // For Mock Checkout Flow
+  const { showPopup } = usePopup();
 
   // Load Razorpay Script dynamically on mount
   useEffect(() => {
@@ -37,7 +38,6 @@ export const UpgradeModal: React.FC<UpgradeModalProps> = ({ isOpen, onClose, onS
   if (!isOpen) return null;
 
   const handleUpgrade = async () => {
-    setErrorMsg(null);
     setLoading(true);
     setMockOrder(null);
     
@@ -103,7 +103,11 @@ export const UpgradeModal: React.FC<UpgradeModalProps> = ({ isOpen, onClose, onS
       }
     } catch (err: any) {
       console.error(err);
-      setErrorMsg(err.response?.data?.error || 'Failed to initialize payment process.');
+      showPopup({
+        title: 'Payment Error',
+        message: err.response?.data?.error || 'Failed to initialize payment process.',
+        type: 'error'
+      });
       setLoading(false);
     }
   };
@@ -112,7 +116,6 @@ export const UpgradeModal: React.FC<UpgradeModalProps> = ({ isOpen, onClose, onS
   const handleMockCheckoutSubmit = async () => {
     if (!mockOrder) return;
     setLoading(true);
-    setErrorMsg(null);
     try {
       await API.post('/subscription/razorpay/verify-payment', {
         razorpay_order_id: mockOrder.order_id,
@@ -126,7 +129,11 @@ export const UpgradeModal: React.FC<UpgradeModalProps> = ({ isOpen, onClose, onS
       onClose();
     } catch (err: any) {
       console.error(err);
-      setErrorMsg(err.response?.data?.error || 'Mock upgrade failed.');
+      showPopup({
+        title: 'Mock Upgrade Failed',
+        message: err.response?.data?.error || 'Mock upgrade failed.',
+        type: 'error'
+      });
     } finally {
       setLoading(false);
     }
@@ -204,11 +211,7 @@ export const UpgradeModal: React.FC<UpgradeModalProps> = ({ isOpen, onClose, onS
               </div>
             </div>
 
-            {errorMsg && (
-              <div className="w-full p-3 bg-danger/10 border border-danger/30 text-danger text-xs font-bold rounded-xl text-left">
-                {errorMsg}
-              </div>
-            )}
+            {/* Error is handled by global usePopup */}
 
             <div className="flex w-full gap-3 mt-2">
               <Button
@@ -290,11 +293,7 @@ export const UpgradeModal: React.FC<UpgradeModalProps> = ({ isOpen, onClose, onS
               </ul>
             </div>
 
-            {errorMsg && (
-              <div className="p-3.5 bg-danger/10 border border-danger/35 text-danger text-xs font-bold rounded-xl">
-                {errorMsg}
-              </div>
-            )}
+            {/* Error is handled by global usePopup */}
 
             {/* Remittance Compliance / Checkout Protection */}
             <div className="flex items-center gap-2 text-[10px] text-text-secondary/80 font-semibold justify-center">

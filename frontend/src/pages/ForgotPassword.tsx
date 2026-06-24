@@ -11,29 +11,37 @@ import { MailCheck } from 'lucide-react';
 interface ForgotFormInputs {
   email: string;
 }
+import { usePopup } from '../context/PopupContext';
 
 export const ForgotPassword: React.FC = () => {
   const { register, handleSubmit, formState: { errors } } = useForm<ForgotFormInputs>();
-  const [errorMsg, setErrorMsg] = useState<string | null>(null);
   const [successMsg, setSuccessMsg] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(false);
+  const { showPopup } = usePopup();
 
   const onSubmit = async (data: ForgotFormInputs) => {
-    setErrorMsg(null);
-    setSuccessMsg(null);
     setIsLoading(true);
     try {
       const response = await API.post('/auth/forgot-password', {
         email: data.email,
       });
-      setSuccessMsg(response.data.message || 'If that email is registered, we have sent a password reset link.');
+      const msg = response.data.message || 'If that email is registered, we have sent a password reset link.';
+      showPopup({
+        title: 'Recovery Link Sent',
+        message: msg,
+        type: 'success',
+        onConfirm: () => {
+          setSuccessMsg(msg);
+        }
+      });
     } catch (error: any) {
       console.error('Forgot password error:', error);
-      if (error.response && error.response.data) {
-        setErrorMsg(error.response.data.error || 'Request failed.');
-      } else {
-        setErrorMsg('Network error. Please try again.');
-      }
+      const msg = error.response?.data?.error || 'Request failed. Please try again.';
+      showPopup({
+        title: 'Recovery Failed',
+        message: msg,
+        type: 'error'
+      });
     } finally {
       setIsLoading(false);
     }
@@ -77,13 +85,6 @@ export const ForgotPassword: React.FC = () => {
       maxWidthClass="max-w-xl"
     >
       <GlassCard className="w-full p-5 sm:p-6 md:p-8 border-navy/5 bg-white shadow-xl flex flex-col gap-6">
-        
-        {/* Error notification */}
-        {errorMsg && (
-          <div className="p-4 bg-danger/10 border border-danger/35 text-danger text-sm font-semibold rounded-2xl animate-float-fast">
-            {errorMsg}
-          </div>
-        )}
 
         <form onSubmit={handleSubmit(onSubmit)} className="flex flex-col gap-4">
           {/* Email field */}

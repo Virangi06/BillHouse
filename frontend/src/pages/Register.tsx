@@ -8,6 +8,8 @@ import GlassCard from '../components/common/GlassCard';
 import API from '../utils/api';
 import { MailOpen } from 'lucide-react';
 
+import { usePopup } from '../context/PopupContext';
+
 interface RegisterFormInputs {
   name: string;
   businessName?: string;
@@ -19,15 +21,13 @@ interface RegisterFormInputs {
 
 export const Register: React.FC = () => {
   const { register, handleSubmit, watch, formState: { errors } } = useForm<RegisterFormInputs>();
-  const [errorMsg, setErrorMsg] = useState<string | null>(null);
   const [successMsg, setSuccessMsg] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(false);
+  const { showPopup } = usePopup();
 
   const passwordValue = watch('passwordHash');
 
   const onSubmit = async (data: RegisterFormInputs) => {
-    setErrorMsg(null);
-    setSuccessMsg(null);
     setIsLoading(true);
     try {
       const response = await API.post('/auth/signup', {
@@ -37,14 +37,22 @@ export const Register: React.FC = () => {
         businessName: data.businessName,
       });
 
-      setSuccessMsg(response.data.message || 'Registration successful! Verification email has been sent.');
+      showPopup({
+        title: 'Account Created!',
+        message: response.data.message || 'Registration successful! Verification email has been sent.',
+        type: 'success',
+        onConfirm: () => {
+          setSuccessMsg(response.data.message || 'Registration successful! Verification email has been sent.');
+        }
+      });
     } catch (error: any) {
       console.error('Registration error:', error);
-      if (error.response && error.response.data) {
-        setErrorMsg(error.response.data.error || 'Registration failed.');
-      } else {
-        setErrorMsg('Network error. Please try again.');
-      }
+      const msg = error.response?.data?.error || 'Registration failed. Please try again.';
+      showPopup({
+        title: 'Registration Failed',
+        message: msg,
+        type: 'error'
+      });
     } finally {
       setIsLoading(false);
     }
@@ -87,13 +95,6 @@ export const Register: React.FC = () => {
       maxWidthClass="max-w-2xl"
     >
       <GlassCard className="p-5 sm:p-6 md:p-8 border-navy/5 bg-white shadow-xl flex flex-col gap-6">
-
-        {/* Error notification */}
-        {errorMsg && (
-          <div className="p-4 bg-danger/10 border border-danger/35 text-danger text-sm font-semibold rounded-2xl animate-float-fast">
-            {errorMsg}
-          </div>
-        )}
 
         <form onSubmit={handleSubmit(onSubmit)} className="grid grid-cols-1 sm:grid-cols-2 gap-x-4 gap-y-3">
 

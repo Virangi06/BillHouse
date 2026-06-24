@@ -4,9 +4,10 @@ import { useBusinessProfile } from '../../context/BusinessContext';
 import {
   Building2, User, MapPin, Upload, X, Save, Globe,
   Shield, FileText, Sparkles, CheckCircle, AlertCircle, Compass,
-  DollarSign, Clock, Layout, RefreshCw, BarChart2, Briefcase, Phone,
+  IndianRupee, Clock, Layout, RefreshCw, BarChart2, Briefcase, Phone,
   Edit3
 } from 'lucide-react';
+import { usePopup } from '../../context/PopupContext';
 
 const PROFILE_FIELDS = [
   { key: 'legalName', label: 'Business Owner Name', category: 'Basic Info' },
@@ -64,15 +65,14 @@ const INDUSTRIES = [
   'Other Services'
 ];
 
-const BusinessProfilePage: React.FC = () => {
+export const BusinessProfilePage: React.FC = () => {
   const { businessProfile, refreshBusinessProfile } = useBusinessProfile();
   const logoInputRef = useRef<HTMLInputElement>(null);
   const bannerInputRef = useRef<HTMLInputElement>(null);
 
   const [isEditMode, setIsEditMode] = useState(false);
   const [saving, setSaving] = useState(false);
-  const [successMsg, setSuccessMsg] = useState<string | null>(null);
-  const [errorMsg, setErrorMsg] = useState<string | null>(null);
+  const { showPopup } = usePopup();
 
   // Form State
   const [form, setForm] = useState({
@@ -156,8 +156,6 @@ const BusinessProfilePage: React.FC = () => {
 
   const handleInputChange = (field: string, value: string) => {
     setForm(prev => ({ ...prev, [field]: value }));
-    setErrorMsg(null);
-    setSuccessMsg(null);
   };
 
   // Image Upload Handling
@@ -169,11 +167,11 @@ const BusinessProfilePage: React.FC = () => {
     const limitLabel = field === 'logoBase64' ? '500KB' : '1.5MB';
 
     if (file.size > limit) {
-      setErrorMsg(`Image must be under ${limitLabel}. Please compress first.`);
+      showPopup({ title: 'Upload Error', message: `Image must be under ${limitLabel}.`, type: 'error' });
       return;
     }
     if (!file.type.startsWith('image/')) {
-      setErrorMsg('Please upload a valid image file.');
+      showPopup({ title: 'Upload Error', message: 'Please upload a valid image file.', type: 'error' });
       return;
     }
 
@@ -187,13 +185,15 @@ const BusinessProfilePage: React.FC = () => {
 
   const handleSave = async () => {
     if (!form.name.trim()) {
-      setErrorMsg('Business Name is a required field.');
+      showPopup({
+        title: 'Validation Error',
+        message: 'Business Name is a required field.',
+        type: 'warning'
+      });
       return;
     }
 
     setSaving(true);
-    setErrorMsg(null);
-    setSuccessMsg(null);
 
     try {
       if (businessProfile) {
@@ -203,11 +203,18 @@ const BusinessProfilePage: React.FC = () => {
       }
 
       await refreshBusinessProfile();
-      setSuccessMsg('Business profile saved successfully!');
+      showPopup({
+        title: 'Profile Updated',
+        message: 'Business profile saved successfully!',
+        type: 'success'
+      });
       setIsEditMode(false);
-      setTimeout(() => setSuccessMsg(null), 4000);
     } catch (err: any) {
-      setErrorMsg(err.response?.data?.error || 'Failed to save business profile.');
+      showPopup({
+        title: 'Save Failed',
+        message: err.response?.data?.error || 'Failed to save business profile.',
+        type: 'error'
+      });
     } finally {
       setSaving(false);
     }
@@ -216,7 +223,6 @@ const BusinessProfilePage: React.FC = () => {
   const handleCancel = () => {
     resetForm();
     setIsEditMode(false);
-    setErrorMsg(null);
   };
 
   // UI styling helpers
@@ -336,22 +342,7 @@ const BusinessProfilePage: React.FC = () => {
         </div>
       </div>
 
-      {/* Success/Error Alerts */}
-      {successMsg && (
-        <div className="flex items-center gap-3 p-4 bg-green/10 border border-green/35 text-green-dark text-xs font-bold rounded-2xl animate-float-fast">
-          <CheckCircle className="h-4 w-4 shrink-0 text-green" />
-          {successMsg}
-        </div>
-      )}
-      {errorMsg && (
-        <div className="flex items-center justify-between gap-3 p-4 bg-red-50 border border-red-200 text-red-600 text-xs font-bold rounded-2xl animate-float-fast">
-          <div className="flex items-center gap-2">
-            <AlertCircle className="h-4 w-4 shrink-0 text-red-500" />
-            {errorMsg}
-          </div>
-          <button onClick={() => setErrorMsg(null)} className="text-red-400 hover:text-red-600">✕</button>
-        </div>
-      )}
+      {/* Alerts are handled by global usePopup */}
 
       {/* Main Grid Section */}
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-8 items-start">
@@ -651,7 +642,7 @@ const BusinessProfilePage: React.FC = () => {
             
             {!isEditMode ? (
               <div className="grid grid-cols-1 md:grid-cols-2 gap-x-8">
-                {viewRow('Currency', form.currency, <DollarSign className="h-3.5 w-3.5 text-green" />)}
+                {viewRow('Currency', form.currency, <IndianRupee className="h-3.5 w-3.5 text-green" />)}
                 {viewRow('Time Zone', form.timeZone, <Clock className="h-3.5 w-3.5 text-green" />)}
                 {viewRow('Invoice Prefix', form.invoicePrefix, <FileText className="h-3.5 w-3.5 text-green" />)}
                 {viewRow('Invoice Number Format', form.invoiceNumberFormat, <Layout className="h-3.5 w-3.5 text-green" />)}
